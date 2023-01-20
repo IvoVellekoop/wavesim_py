@@ -1,0 +1,88 @@
+Below are the instructions for setting up Miniconda (a much lighter counterpart of Anaconda) to work in conda environments.
+
+---
+## Installing Miniconda on a Linux system (or Windows Subsystem for Linux)
+
+1. Download the appropriate (i.e. Linux/Windows/MacOS) installer from https://docs.conda.io/en/latest/miniconda.html
+
+Assuming Linux for the step ahead. Instructions also available at https://conda.io/projects/conda/en/stable/user-guide/install/linux.html
+
+2. In the directory where the installer was downloaded, in the terminal window, run:
+
+        bash Miniconda3-latest-Linux-x86_64.sh
+
+3. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later.
+
+4. To make the changes take effect, close and then re-open your terminal window.
+
+5. Test your installation. In your terminal window or Anaconda Prompt, run the command
+
+        conda list
+
+A list of installed packages appears if it has been installed correctly.
+
+---
+## Setting up a conda environment
+
+Instructions also available at https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
+
+Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work.
+
+1. If you see (base) before all the information before \$ on a command line, you are already in the base conda environment. If not, run:
+
+        conda activate
+
+2. Update conda:
+
+                conda update conda
+                conda update --all
+
+3. New conda environment from:
+
+    * scratch, just with commands
+        
+                conda create --name <environment name>
+
+        OR
+
+    * a .yml file in the current directory
+
+                conda env create -f <filename>.yml
+
+4. To export current environment to a .yml file:
+
+        conda env export > <filename>.yml
+
+5. To install any packages within an environment, first go into the environment and then install the package:
+
+        conda activate <environment name>
+        conda install <package name>
+
+6. If conda does not have the package, and googling it suggests installing it via pip, use this command to install it specifically within the current environment and not globally (always prefer conda over pip. Only go to pip if the package is not available through conda):
+
+        python -m pip install <package name>
+
+7. After updating conda, setting up a new environment, installing packages, it is a nice idea to clean-up any installation packages or tarballs as they are not needed anymore:
+
+        conda clean --all
+
+---
+## Working with conda and jupyter notebooks (.ipynb)
+
+We need to add the conda environment to jupyter notebooks so that it can be selected in the Select Kernel option in a jupyter notebook
+
+1. Activate the desired conda environment
+
+        conda activate <environment name>
+
+2. Install the ipykernel package
+
+        conda install ipykernel
+
+3. Add/install the environment to the ipykernel
+
+        python -m ipykernel install --user --name=<environment name>
+
+4. (Additional step for Visual Studio code) Install the Jupyter extension through the gui
+
+5. The environment should now be visible in the Select Kernel dropdown.

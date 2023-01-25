@@ -86,3 +86,16 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 4. (Additional step for Visual Studio code) Install the Jupyter extension through the gui
 
 5. The environment should now be visible in the Select Kernel dropdown.
+
+
+## If problem with specifying fonts in matplotlib.rc 
+
+Example of an error: "findfont: Generic family 'sans-serif' not found because none of the following families were found: Time New Roman"
+
+1. Check if 'mscorefonts' package installed in conda (using conda list). If not,
+
+        conda install -c conda-forge mscorefonts
+
+2. Clear matplotlib cache. An equally important step.
+
+        rm ~/.cache/matplotlib -rf

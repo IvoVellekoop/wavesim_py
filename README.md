@@ -83,10 +83,45 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
         python -m ipykernel install --user --name=<environment name>
 
-4. (Additional step for Visual Studio code) Install the Jupyter extension through the gui
+### Additional step for Visual Studio code
+
+4. Install the Jupyter extension through the gui
+
+### To open in browser (google chrome)
+
+4. Although these packages should already be installed through the .yml file while setting up the environment, if the current working directory does not open jupyter in a browser window after entering the command:
+
+        jupyter notebook
+        
+    1. Set up jupyterlab and jupyter notebook with the following commands
+
+            conda install -c conda-forge jupyterlab
+            conda install -c anaconda notebook
+
+    2. Run the below command again, and now jupyter should open in a browser window:
+
+            jupyter notebook
 
 5. The environment should now be visible in the Select Kernel dropdown.
 
+
+### To convert the current jupyter notebook into a presentation (plotly plots stay interactive)
+
+1. Open the jupter notebook in a browser window and check that running all cells gives the expected output
+
+2. In the toolbar at the top, Click **View** --> **Cell Toolbar** ---> **Slideshow**
+
+3. Each cell in the notebook will now have a toolbar at the top with a dropdown named **Slide Type**. In the dropdown, select **Slide** for all the cells you want to include in the presentation.
+
+4. Convert the .ipynb notebook to a .html presentation with the command
+
+        jupyter nbconvert --to slides <filename>.ipynb
+
+5. If you don't want to show the code, and just the outputs
+
+        jupyter nbconvert --to slides --no-input <filename>.ipynb
+
+6. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
 
 ## If problem with specifying fonts in matplotlib.rc 
 

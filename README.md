@@ -113,13 +113,23 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
 3. Each cell in the notebook will now have a toolbar at the top with a dropdown named **Slide Type**. In the dropdown, select **Slide** for all the cells you want to include in the presentation.
 
-4. Convert the .ipynb notebook to a .html presentation with the command
+4. Convert the .ipynb notebook to a .html presentation with the command(s and the options as below)
 
-        jupyter nbconvert --to slides <filename>.ipynb
+    * Default options
 
-5. If you don't want to show the code, and just the outputs
+            jupyter nbconvert --to slides <filename>.ipynb
 
-        jupyter nbconvert --to slides --no-input <filename>.ipynb
+    * If you don't want to show the code, and just the outputs
+
+            jupyter nbconvert --to slides --no-input <filename>.ipynb
+
+    * In addition to above, if you don't want any transitions
+
+            jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none
+
+    * In addition to above, if you don't want a specific theme (here, serif)
+
+            jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none --SlidesExporter.reveal_theme=serif
 
 6. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
 

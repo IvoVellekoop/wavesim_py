@@ -144,7 +144,6 @@ dependencies:
   - pillow=9.3.0=py310hace64e9_1
   - pip=22.3.1=py310h06a4308_0
   - platformdirs=2.5.2=py310h06a4308_0
-  - plotly=5.9.0=py310h06a4308_0
   - ply=3.11=py310h06a4308_0
   - prometheus_client=0.14.1=py310h06a4308_0
   - prompt-toolkit=3.0.36=py310h06a4308_0
@@ -203,8 +202,11 @@ dependencies:
   - zlib=1.2.13=h5eee18b_0
   - zstd=1.5.2=ha4553b6_0
   - pip:
+      - chart-studio==1.1.0
       - ffmpeg-python==0.2.0
       - future==0.18.3
       - kaleido==0.2.1
+      - plotly==5.13.0
       - pyqt5-sip==12.11.0
+      - retrying==1.3.4
 prefix: /home/swapnil/miniconda3/envs/anysim_cluster

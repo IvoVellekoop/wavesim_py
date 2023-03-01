@@ -133,6 +133,8 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
 6. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
 
+7. To convert the .html slides to pdf, add _?print-pdf_ in the URL in the web browser between _html_ and _#_.
+
 ## If problem with specifying fonts in matplotlib.rc 
 
 Example of an error: "findfont: Generic family 'sans-serif' not found because none of the following families were found: Time New Roman"

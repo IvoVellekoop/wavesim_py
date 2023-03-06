@@ -127,7 +127,7 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
             jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none
 
-    * In addition to above, if you don't want a specific theme (here, serif)
+    * In addition to above, if you want a specific theme (here, serif)
 
             jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none --SlidesExporter.reveal_theme=serif
 

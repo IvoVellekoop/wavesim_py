@@ -1,3 +1,6 @@
+# from numpy import floor, ceil, asarray, diag, eye, ones, zeros, pi, abs, round, max, array, imag, matmul, pad, zeros_like, real, sqrt, expand_dims, maximum, concatenate, isreal, min, argmin, argmax, argsort, minimum, remainder, conj, tile, flip, arange, sin, meshgrid, exp, power, matrix, mean
+# from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, ifftshift, 
+# from numpy.linalg import norm, solve, lstsq#, svd
 import numpy as np
 from scipy.linalg import eigvals
 
@@ -26,7 +29,6 @@ def AnySim(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4), cp=2
         else:
             Vraw = -1j * k0**2 * n**2
         mu_min = 10.0/(boundaries_width * pixel_size)
-        mu_min = max(mu_min, 1.e-3 / boundaries_width)  # give tiny non-zero minimum value to prevent division by zero in homogeneous media
     else:                                               
         ## add correction term to Vraw
         Ones = np.eye(N_roi)
@@ -44,19 +46,20 @@ def AnySim(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4), cp=2
             # Lo = O @ Finv_O @ np.diag(L_O.flatten()) @ F_O @ O.T
             # Lw_cp = (Lo-Lw)
             ## Option 2. Replacing (Lo-Lw) with the upper and lower triangular corners of -Lw
-            Lw_cp = -Lw.copy()
+            Lw_cp = Lw.copy()
             Lw_cp[:-cp,:-cp] = 0
             Lw_cp[cp:,cp:] = 0
 
             Vraw = -1j * (np.diag(k0**2 * n**2) + Lw_cp)
         mu_min = 0
+    mu_min = max(mu_min, 1.e-3 / (N*pixel_size))  # give tiny non-zero minimum value to prevent division by zero in homogeneous media
     Vmin = np.array([np.imag((k0 + 1j * mu_min)**2)])  # minimum required absorption coefficient
     Vmax = 0.95
     ## find scaling factors (and apply scaling and shift to Vraw)
     Tl, Tr, V0, V = center_scale(Vraw, Vmin, Vmax, N_dim, boundaries_width, cp)
 
     ## Check that spectral radius of V is < 1 (0.95 here)
-    spec_rad = spec_radius(V, N_dim)
+    spec_rad = spec_radius(V, 2)
     if spec_rad < 1:
         pass
     else:
@@ -98,7 +101,7 @@ def AnySim(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4), cp=2
                 V_check = 1 - B
             else:
                 V_check = 1 - B[bw_l:-bw_r,bw_l:-bw_r]
-        s1 = spec_radius(V_check, N_dim)
+        s1 = spec_radius(V_check, 2)
         if s1 < 1:
             pass
         else:
@@ -181,9 +184,9 @@ def center_scale(Vraw, Vrmin, Vmax, N_dim, boundaries_width, cp=2):
             V = Ttot.flatten() * (Vraw - V0.flatten())
             if N_dim == 1: ## Apply scaling and shift only to the diagonal elements of Vraw
                 n = len(V)
-                if boundaries_width == 0: ## When correction term added, apply scaling to corners
-                    d_ut = Ttot.flatten() * Vraw[:cp,-cp:].copy()
-                    d_lt = Ttot.flatten() * Vraw[-cp:,:cp].copy()
+                if boundaries_width == 0: ## When correction term added, apply scaling and shift to corners
+                    d_ut = V[:cp,-cp:].copy()
+                    d_lt = V[-cp:,:cp].copy()
                 d = V.ravel()[::n+1]
                 values = d.copy()
                 V[:,:] = 0 + 1j*0

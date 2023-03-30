@@ -1,125 +1,52 @@
-# from numpy import floor, ceil, asarray, diag, eye, ones, zeros, pi, abs, round, max, array, imag, matmul, pad, zeros_like, real, sqrt, expand_dims, maximum, concatenate, isreal, min, argmin, argmax, argsort, minimum, remainder, conj, tile, flip, arange, sin, meshgrid, exp, power, matrix, mean
-# from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, ifftshift, 
-# from numpy.linalg import norm, solve, lstsq#, svd
 import numpy as np
 from scipy.linalg import eigvals
 
-#@title AnySim
-def AnySim(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4), cp=2):
+#@title AnySim (original implementation in MATLAB as on github: https://github.com/IvoVellekoop/anysim)
+def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4)):
     N_dim = n.ndim
     N = int(N_roi+2*boundaries_width)
     bw_l = int(np.floor(boundaries_width))
     bw_r = int(np.ceil(boundaries_width))
 
-    if N_dim == 1:
-        F = DFT_matrix(N)
-        Finv = np.asarray((np.matrix(F).H)/N)
-    # p = 2*np.pi*np.fft.fftfreq(N, pixel_size)
-    # L = np.abs(p)**2
-    ## AnySim MATLAB function replicated
-    L = (coordinates_f(1, N, pixel_size)**2).T
-    for d in range(2,N_dim+1):
-        L = L + coordinates_f(d, N, pixel_size)**2
-
     #@title make medium
-    if boundaries_width != 0:
-        ## V_raw. Also, epsilon = n^2 (refractive index)
-        if N_dim == 1:
-            Vraw = np.diag(-1j * k0**2 * n**2)
-        else:
-            Vraw = -1j * k0**2 * n**2
-        mu_min = 10.0/(boundaries_width * pixel_size)
-    else:                                               
-        ## add correction term to Vraw
-        Ones = np.eye(N_roi)
-        O = np.zeros((N_roi, N*10))
-        O[:,:N_roi] = Ones
-        p_O = 2*np.pi*np.fft.fftfreq(N*10, pixel_size)
-        L_O = np.abs(p_O)**2
-        if N_dim==1:
-            Lw = Finv @ np.diag(L.flatten()) @ F
-
-            ## Option 1. Using (Lo-Lw) as the wrap-around correction
-            # F_O = DFT_matrix(N*10)
-            # Finv_O = np.asarray((np.matrix(F_O).H)/(N*10))
-            # F_O = np.asarray(F_O)
-            # Lo = O @ Finv_O @ np.diag(L_O.flatten()) @ F_O @ O.T
-            # Lw_cp = (Lo-Lw)
-            ## Option 2. Replacing (Lo-Lw) with the upper and lower triangular corners of -Lw
-            Lw_cp = Lw.copy()
-            Lw_cp[:-cp,:-cp] = 0
-            Lw_cp[cp:,cp:] = 0
-
-            Vraw = -1j * (np.diag(k0**2 * n**2) + Lw_cp)
-        mu_min = 0
+    Vraw = -1j * k0**2 * n**2
+    mu_min = 10.0/(boundaries_width * pixel_size)
     mu_min = max(mu_min, 1.e-3 / (N*pixel_size))  # give tiny non-zero minimum value to prevent division by zero in homogeneous media
     Vmin = np.array([np.imag((k0 + 1j * mu_min)**2)])  # minimum required absorption coefficient
     Vmax = 0.95
     ## find scaling factors (and apply scaling and shift to Vraw)
-    Tl, Tr, V0, V = center_scale(Vraw, Vmin, Vmax, N_dim, boundaries_width, cp)
-
-    ## Check that spectral radius of V is < 1 (0.95 here)
-    spec_rad = spec_radius(V, 2)
-    if spec_rad < 1:
+    Tl, Tr, V0, V = center_scale(Vraw, Vmin, Vmax)
+    Tl = Tl * 1j
+    ## Check that ||V|| < 1 (0.95 here)
+    vc = checkV(V)
+    if vc < 1:
         pass
     else:
-        return print('||V|| not < 1, but {}'.format(spec_rad))
-
-    Tl = Tl * 1j
-    ## B = 1 - V, and pad in case there are boundaries
-    if boundaries_width != 0:
-        if N_dim == 1:
-            B = pad_func((np.eye(N_roi)-V), boundaries_width, bw_l, bw_r, N_roi, N_dim, 0).astype('complex_')  # obj.medium(), i.e., medium (1-V)
-        else:
-            B = pad_func((1-V), boundaries_width, bw_l, bw_r, N_roi, N_dim, 0).astype('complex_')  # obj.medium(), i.e., medium (1-V)
-    else:
-        B = np.eye(N)-V
-
-    ## for N_dim 1, only the diagonal elements should be nonzero. Additionally, if there are no boundaries, the upper and lower triangle corners should also be nonzero (size determined by cp, i.e., corner points. Default value: 2)
-    if N_dim==1:
-        n = len(B)
-        if boundaries_width == 0:
-            d_ut = B[:cp,-cp:].copy()
-            d_lt = B[-cp:,:cp].copy()
-        d = B.ravel()[::n+1]
-        values = d.copy()
-        B[:,:] = 0 + 1j*0
-        d[:] = values
-        if boundaries_width == 0:
-            B[:cp,-cp:] = d_ut
-            B[-cp:,:cp] = d_lt
-
-    ## Check that spectral radius of 1-B is < 1 (0.95 here)
-    if Vraw.shape[0]!=1:
-        if N_dim == 1:
-            if boundaries_width == 0:
-                V_check = np.eye(B.shape[0]) - B
-            else:
-                V_check = np.eye(V.shape[0]) - B[bw_l:-bw_r,bw_l:-bw_r]
-        else:
-            if boundaries_width == 0:
-                V_check = 1 - B
-            else:
-                V_check = 1 - B[bw_l:-bw_r,bw_l:-bw_r]
-        s1 = spec_radius(V_check, 2)
-        if s1 < 1:
-            pass
-        else:
-            return print('||1-B|| not < 1, but {}'.format(s1))
-
-    ## construct the medium operator
-    if N_dim==1:
-        medium = lambda x: np.matmul(B, x)
-    else:
-        medium = lambda x: B * x
+        return print('||V|| not < 1, but {}'.format(vc))
+    ## B = 1 - V, and pad
+    B = pad_func((1-V), boundaries_width, bw_l, bw_r, N_roi, N_dim, 0).astype('complex_')  # obj.medium(), i.e., medium (1-V)
+    medium = lambda x: B * x
 
     #@title make propagator
+    L = (coordinates_f(1, N, pixel_size)**2).T
+    for d in range(2,N_dim+1):
+        L = L + coordinates_f(d, N, pixel_size)**2
     L = Tl * Tr * (L - 1j*V0)
-    Lr = 1/(L+1)
-    if N_dim==1:
-        propagator = lambda x: (Finv @ np.diag(Lr.flatten()) @ F @ x)
+    Lr = np.squeeze(1/(L+1))
+    propagator = lambda x: (np.fft.ifftn(Lr * np.fft.fftn(x)))
+
+    ## Check that A = L + V is accretive
+    if N_dim == 1:
+        L = np.diag(np.squeeze(L)[bw_l:-bw_r])
+        V = np.diag(V)
     else:
-        propagator = lambda x: (np.fft.ifftn(Lr * np.fft.fftn(x)))
+        L = L[bw_l:-bw_r, bw_l:-bw_r]
+    A = L + V
+    for _ in range(10): ## Repeat test for multiple random vectors
+        z = np.random.rand(s.shape[0],1) + 1j*np.random.randn(s.shape[0],1)
+        acc = np.real(np.matrix(z).H @ A @ z)
+        if np.round(acc, 12) < 0:
+            return print('A is not accretive. ', acc)
 
     ## pad the source term with zeros so that it is the same size as B.shape[0]
     b = np.pad(s, N_dim*((bw_l,bw_r),), mode='constant') * np.asarray(Tl.flatten()) # source term y
@@ -127,31 +54,21 @@ def AnySim(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4), cp=2
     #@title update
     u = (np.zeros_like(b, dtype='complex_'))    # field u, initialize with 0
     alpha = 0.75                                # ~step size of the Richardson iteration \in (0,1]
-    # print('B', B.shape, 'u', u.shape, 'medium(u)', medium(u).shape, 'b', b.shape, 'Lr', Lr.shape)
     for _ in range(iters):
         t1 = medium(u) + b
         t1 = propagator(t1)
         t1 = medium(u-t1)
-        # residuals = state(u, t1, i)
         u = u - (alpha * t1)
     u = (Tr.flatten()*u).astype('complex_')
-    if boundaries_width!=0:
-        if N_dim == 1:
-            u = u[bw_l:-bw_r]
-        else:
-            u = u[bw_l:-bw_r,bw_l:-bw_r]
-    return u
 
-# def state(u, t1, i):
-#     if i==0:
-#         normb = np.linalg.norm(t1)
-#     nr = np.linalg.norm(t1)
-#     residuals = []
-#     residuals.append(nr/normb)
-#     return residuals
+    if N_dim == 1:
+        u = u[bw_l:-bw_r]
+    elif N_dim == 2:
+        u = u[bw_l:-bw_r,bw_l:-bw_r]
+    return u, L, V
 
 ## make medium
-def center_scale(Vraw, Vrmin, Vmax, N_dim, boundaries_width, cp=2):
+def center_scale(Vraw, Vrmin, Vmax):
     dim = sum(Vrmin.shape[a-1]>1 for a in range(Vrmin.ndim))
     Vreshape = np.expand_dims(Vraw, axis=tuple(range(2-dim)))
     Vrmin = np.expand_dims(Vrmin, axis=tuple(range(2-Vrmin.ndim)))
@@ -162,7 +79,7 @@ def center_scale(Vraw, Vrmin, Vmax, N_dim, boundaries_width, cp=2):
 
     for n in range(N):
         for m in range(M):
-            c, r = smallest_circle((Vreshape[n,m,:]), N_dim, boundaries_width, cp=2)
+            c, r = smallest_circle((Vreshape[n,m,:]))
             # adjust centers and radii so that the real part of centers+radii >= Vmin
             re_diff = np.real(c) + r - Vrmin[n, m]
             if re_diff < 0:
@@ -174,32 +91,16 @@ def center_scale(Vraw, Vrmin, Vmax, N_dim, boundaries_width, cp=2):
     
     if dim == 0: # potential is a scalar field
         if Vraw.any() < 0:
-            print('Vraw is not accretive')
-            # break
+            return print('Vraw is not accretive')
         else:
             Ttot = Vmax/radii
             Tl = np.sqrt(Ttot)
             Tr  = Tl.copy()
-            V0 = centers.copy()
-            V = Ttot.flatten() * (Vraw - V0.flatten())
-            if N_dim == 1: ## Apply scaling and shift only to the diagonal elements of Vraw
-                n = len(V)
-                if boundaries_width == 0: ## When correction term added, apply scaling and shift to corners
-                    d_ut = V[:cp,-cp:].copy()
-                    d_lt = V[-cp:,:cp].copy()
-                d = V.ravel()[::n+1]
-                values = d.copy()
-                V[:,:] = 0 + 1j*0
-                d[:] = values
-                if boundaries_width == 0:
-                    V[:cp,-cp:] = d_ut
-                    V[-cp:,:cp] = d_lt
-            if V.ndim==1:
-                V = np.expand_dims(V, axis=1)
+            V0 = centers.flatten()
+            V = Ttot.flatten() * ( Vraw - V0 )
     elif dim == 1: # potential is a field of diagonal matrices, stored as column vectors
         if Vraw.any() < 0:
-            print('Vraw is not accretive')
-            # break
+            return print('Vraw is not accretive')
         else:
             if (radii < np.abs(centers) * 1.e-6).any():
                 radii = np.maximum(radii, np.abs(c)*1.e-6)
@@ -221,16 +122,10 @@ def center_scale(Vraw, Vrmin, Vmax, N_dim, boundaries_width, cp=2):
     #         ('At least one of the components of the potential is (near-)constant, using threshold to avoid divergence in Tr')
     #     # compute scaling factor for the matrix
     #     P, R, C = equilibriate(radii) ### python equivalent function? scipy.linalg.matrix_balance?
-    return Tl, Tr, V0, V
+    return Tl.flatten(), Tr.flatten(), V0, V
 
-def smallest_circle(points, N_dim, boundaries_width, cp=2, tolerance=1.e-10):
-    if N_dim == 1: 
-        if boundaries_width!=0: ## Select only the diagonal elements of the 2D Vraw array
-            points = np.diag(points).flatten()
-        else:                   ## When the correction is added, also select the corner points
-            points = np.concatenate((np.diag(points), points[:cp,-cp:].flatten(), points[-cp:,:cp].flatten()))
-    else:
-        points = points.flatten()
+def smallest_circle(points, tolerance=1.e-10):
+    points = points.flatten()
     if np.isreal(points).all():
         pmin = np.min(points)
         pmax = np.max(points)
@@ -390,11 +285,11 @@ def conjugate_inflated_triangle(points, r):
 def signed_surface(points):
     return np.imag((points[0]-points[1]) * np.conj(points[2]-points[1]))
 
-## apply scaling
+## pad (1-V) to size N = N_roi + (2*boundaries_width)
 def pad_func(M, boundaries_width, bw_l, bw_r, N_roi, N_dim, element_dimension=0):
     sz = M.shape[element_dimension+0:N_dim]
     if (boundaries_width != 0) & (sz == (1,)):
-        M = np.tile(M, (int((np.ones(1) * (N_roi-1) + 1)[0]), 1))
+        M = np.tile(M, (int((np.ones(1) * (N_roi-1) + 1)[0]),))
     M = np.pad(M, ((bw_l,bw_r)), mode='edge')
 
     for d in range(N_dim):
@@ -407,10 +302,10 @@ def pad_func(M, boundaries_width, bw_l, bw_r, N_roi, N_dim, element_dimension=0)
         left_boundary = boundaries_window(np.floor(w))
         right_boundary = boundaries_window(np.ceil(w))
         full_filter = np.concatenate((left_boundary, np.ones((N_roi,1)), np.flip(right_boundary)))
-        try:
+        if N_dim == 1:
+            M = M * np.squeeze(full_filter)
+        else:
             M = full_filter.T * M * full_filter
-        except:
-            M = M * full_filter
     return M
 
 def boundaries_window(L):
@@ -438,9 +333,6 @@ def symrange(N):
 def relative_error(E_, E_true):
     return np.mean( np.linalg.norm(E_-E_true, ord=2) ) / np.mean( np.linalg.norm(E_true, ord=2) )
 
-## Spectral radius
-def spec_radius(A, N_dim):
-    if N_dim == 1:
-        return np.round(max(abs(eigvals(A))),2)
-    else:
-        return np.round(np.max(np.abs(A)),2)
+## Check that V is a contraction
+def checkV(A):
+    return np.max(np.abs(A))

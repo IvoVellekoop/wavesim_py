@@ -6,11 +6,9 @@ def AnySim_wrap(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=5):
     N_dim = n.ndim
 
     ## Correction term
-    F = DFT_matrix(N)
-    Finv = np.asarray((np.matrix(F).H)/N)
+    F = np.matrix(DFT_matrix(N))
+    Finv = F.H/N
     L = (coordinates_f(1, N, pixel_size)**2).T
-    for d in range(2,N_dim+1):
-        L = L + coordinates_f(d, N, pixel_size)**2
     Lw = Finv @ np.diag(L.flatten()) @ F
 
     # ## Option 1. Using (Lo-Lw) as the wrap-around correction
@@ -18,24 +16,26 @@ def AnySim_wrap(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=5):
     Omega = np.zeros((N, N*10))
     Omega[:,:N] = Ones
     p_O = 2*np.pi*np.fft.fftfreq(N*10, pixel_size)
-    L_Omega = np.abs(p_O)**2
+    L_Omega = p_O**2
     F_Omega = DFT_matrix(N*10)
-    Finv_Omega = np.asarray((np.matrix(F_Omega).H)/(N*10))
+    Finv_Omega = F_Omega.H/(N*10)
     Lo = Omega @ Finv_Omega @ np.diag(L_Omega.flatten()) @ F_Omega @ Omega.T
     L_corr1 = (Lo-Lw)
-    L_corr = np.real(L_corr1) + 0j*np.imag(L_corr1)
+    L_corr = np.real(L_corr1) #+ 0j*np.imag(L_corr1)
     # ## Option 2. Replacing (Lo-Lw) with the upper and lower triangular corners of -Lw
     # L_corr = -Lw.copy()
     # L_corr[:-cp,:-cp] = 0
     # L_corr[cp:,cp:] = 0
     # print(relative_error(L_corr, L_corr1))
+    Lw + L_corr == Lo?
+    Lw = Lo
+    L_corr = 0
 
     ## make medium
-    Vraw = -1j * ( np.diag(k0**2 * n**2) + L_corr )
+    Vraw = -1j * k0**2 * n**2
+    V0 = ( np.max(np.imag(Vraw)) + np.min(np.imag(Vraw)) )/2
     # points = np.concatenate((np.diag(Vraw), Vraw[:cp,-cp:].flatten(), Vraw[-cp:,:cp].flatten()))
-    abs_im_Vraw = np.abs(np.imag(Vraw))
-    V0 = ( np.max(abs_im_Vraw) + np.min(abs_im_Vraw) )/2
-    V = Vraw - np.eye(N)*V0
+    V = np.diag(Vraw - V0) - 1j * L_corr
     Vmax = 0.95
     # print(checkV(V), np.linalg.norm(V,2))
     scaling = Vmax/np.linalg.norm(V,2) #checkV(V) #
@@ -61,11 +61,8 @@ def AnySim_wrap(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=5):
     ## Check that A = L + V is accretive
     L = np.diag(np.squeeze(L))
     A = L + V
-    for _ in range(10): ## Repeat test for multiple random vectors
-        z = np.random.rand(b.size,1) + 1j*np.random.randn(b.size,1)
-        acc = np.real(np.matrix(z).H @ A @ z)
-        if np.round(acc, 13) < 0:
-            return print('A is not accretive. ', acc)
+    if np.min(np.eig(A + A.H)) < 0:
+        return print('A is not accretive. ')
 
     ## pad the source term with zeros so that it is the same size as B.shape[0]
     b = Tl * b.copy() # source term y
@@ -86,8 +83,7 @@ def AnySim_omega(n, N, pixel_size, k0, b, iters=int(1.e+4)):
 
     ## make medium
     Vraw = np.diag(-1j * k0**2 * n**2)
-    abs_im_Vraw = np.abs(np.imag(Vraw))
-    V0 = ( np.max(abs_im_Vraw) + np.min(abs_im_Vraw) )/2
+    V0 = ( np.max(np.imag(Vraw)) + np.min(np.imag(Vraw)) )/2
     V = Vraw - np.eye(N)*V0
     Vmax = 0.95
     # print(checkV(V), np.linalg.norm(V,2))

@@ -1,14 +1,14 @@
 import numpy as np
 from scipy.linalg import eigvals
 
-#@title AnySim (original implementation in MATLAB as on github: https://github.com/IvoVellekoop/anysim)
+## AnySim (original implementation in MATLAB as on github: https://github.com/IvoVellekoop/anysim)
 def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4)):
     N_dim = n.ndim
     N = int(N_roi+2*boundaries_width)
     bw_l = int(np.floor(boundaries_width))
     bw_r = int(np.ceil(boundaries_width))
 
-    #@title make medium
+    ## make medium
     Vraw = -1j * k0**2 * n**2
     mu_min = 10.0/(boundaries_width * pixel_size)
     mu_min = max(mu_min, 1.e-3 / (N*pixel_size))  # give tiny non-zero minimum value to prevent division by zero in homogeneous media
@@ -17,17 +17,19 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
     ## find scaling factors (and apply scaling and shift to Vraw)
     Tl, Tr, V0, V = center_scale(Vraw, Vmin, Vmax)
     Tl = Tl * 1j
+
     ## Check that ||V|| < 1 (0.95 here)
     vc = checkV(V)
     if vc < 1:
         pass
     else:
         return print('||V|| not < 1, but {}'.format(vc))
+
     ## B = 1 - V, and pad
     B = pad_func((1-V), boundaries_width, bw_l, bw_r, N_roi, N_dim, 0).astype('complex_')  # obj.medium(), i.e., medium (1-V)
     medium = lambda x: B * x
 
-    #@title make propagator
+    ## make propagator
     L = (coordinates_f(1, N, pixel_size)**2).T
     for d in range(2,N_dim+1):
         L = L + coordinates_f(d, N, pixel_size)**2
@@ -51,7 +53,7 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
     ## pad the source term with zeros so that it is the same size as B.shape[0]
     b = np.pad(s, N_dim*((bw_l,bw_r),), mode='constant') * np.asarray(Tl.flatten()) # source term y
 
-    #@title update
+    ## update
     u = (np.zeros_like(b, dtype='complex_'))    # field u, initialize with 0
     alpha = 0.75                                # ~step size of the Richardson iteration \in (0,1]
     for _ in range(iters):
@@ -65,7 +67,7 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
         u = u[bw_l:-bw_r]
     elif N_dim == 2:
         u = u[bw_l:-bw_r,bw_l:-bw_r]
-    return u, L, V
+    return u
 
 ## make medium
 def center_scale(Vraw, Vrmin, Vmax):

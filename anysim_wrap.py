@@ -37,10 +37,10 @@ def AnySim_wrap(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=5):
     V0 = ( np.max(abs_im_Vraw) + np.min(abs_im_Vraw) )/2
     V = Vraw - np.eye(N)*V0
     Vmax = 0.95
-    scaling = Vmax/np.linalg.norm(V,2)
+    scaling = Vmax/checkV(V) #np.linalg.norm(V,2)
     V *= scaling
     ## Check that ||V|| < 1 (0.95 here)
-    vc = np.linalg.norm(V,2)
+    vc = checkV(V) #np.linalg.norm(V,2)
     if vc < 1:
         pass
     else:

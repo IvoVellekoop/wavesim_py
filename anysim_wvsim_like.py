@@ -9,20 +9,14 @@ def AnySim_wvsim_like(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1
     bw_r = int(np.ceil(boundaries_width))
 
     ## make medium
-    Vraw = -1j * k0**2 * n**2
-    # e_r = n**2
-    # V0 = k0**2 * (np.max(np.real(e_r)) + np.min(np.real(e_r)))/2
-    abs_im_Vraw = np.abs(np.imag(Vraw))
-    V0 = ( np.max(abs_im_Vraw) + np.min(abs_im_Vraw) )/2
-    V = Vraw - V0
-
+    V0 = k0**2 * (np.max(np.real(n**2)) + np.min(np.real(n**2)))/2
+    V = -1j * k0**2 * n**2 - V0
     ## uncommment if you want diag V in 1D
-    # Vraw = np.diag(-1j * k0**2 * n**2)
-    # V = Vraw - np.eye(N_roi)*V0
+    # V = np.diag(V)
     
     Vmax = 0.95
     scaling = Vmax/checkV(V)
-    V *= scaling
+    V = scaling * V
     ## Check that ||V|| < 1 (0.95 here)
     vc = checkV(V)
     if vc < 1:
@@ -52,12 +46,10 @@ def AnySim_wvsim_like(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1
     if N_dim == 1:
         L = np.diag(np.squeeze(L)[bw_l:-bw_r])
         V = np.diag(V)
-    else:
-        L = L[bw_l:-bw_r, bw_l:-bw_r]
-    A = L + V
-    for _ in range(10): ## Repeat test for multiple random vectors
-        z = np.random.rand(s.shape[0],1) + 1j*np.random.randn(s.shape[0],1)
-        acc = np.real(np.matrix(z).H @ A @ z)
+    # else:
+    #     L = L[bw_l:-bw_r, bw_l:-bw_r]
+        A = L + V
+        acc = np.min(np.linalg.eigvals(A + np.asarray(np.matrix(A).H)))
         if np.round(acc, 13) < 0:
             return print('A is not accretive. ', acc)
 
@@ -78,4 +70,4 @@ def AnySim_wvsim_like(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1
         u = u[bw_l:-bw_r]
     elif N_dim == 2:
         u = u[bw_l:-bw_r,bw_l:-bw_r]
-    return u, L, V
+    return u

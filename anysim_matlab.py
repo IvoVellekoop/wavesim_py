@@ -16,6 +16,7 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
     Vmax = 0.95
     ## find scaling factors (and apply scaling and shift to Vraw)
     Tl, Tr, V0, V = center_scale(Vraw, Vmin, Vmax)
+    V = Tl * Tr * V
     Tl = Tl * 1j
 
     ## Check that ||V|| < 1 (0.95 here)
@@ -41,13 +42,11 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
     if N_dim == 1:
         L = np.diag(np.squeeze(L)[bw_l:-bw_r])
         V = np.diag(V)
-    else:
-        L = L[bw_l:-bw_r, bw_l:-bw_r]
-    A = L + V
-    for _ in range(10): ## Repeat test for multiple random vectors
-        z = np.random.rand(s.shape[0],1) + 1j*np.random.randn(s.shape[0],1)
-        acc = np.real(np.matrix(z).H @ A @ z)
-        if np.round(acc, 12) < 0:
+    # else:
+    #     L = L[bw_l:-bw_r, bw_l:-bw_r]
+        A = L + V
+        acc = np.min(np.linalg.eigvals(A + np.asarray(np.matrix(A).H)))
+        if np.round(acc, 13) < 0:
             return print('A is not accretive. ', acc)
 
     ## pad the source term with zeros so that it is the same size as B.shape[0]
@@ -61,13 +60,74 @@ def AnySim_matlab(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4
         t1 = propagator(t1)
         t1 = medium(u-t1)
         u = u - (alpha * t1)
-    u = (Tr.flatten()*u).astype('complex_')
+    u = (Tr.flatten()*u)#.astype('complex_')
 
     if N_dim == 1:
         u = u[bw_l:-bw_r]
     elif N_dim == 2:
         u = u[bw_l:-bw_r,bw_l:-bw_r]
     return u
+
+## AnySim with wrap-around correction (WITH the smallest circle shifting for computing V0)
+def AnySim_wrap2(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=20):
+    # ## Correction term
+    F = DFT_matrix(N)
+    Finv = np.asarray(np.matrix(F).H/N)
+    p = 2*np.pi*np.fft.fftfreq(N, pixel_size)
+    L = p**2
+    Lw = Finv @ np.diag(L.flatten()) @ F
+
+    L_corr = -np.real(Lw).copy()
+    L_corr[:-cp,:-cp] = 0
+    L_corr[cp:,cp:] = 0
+
+    ## make medium
+    Vraw = -1j * k0**2 * n**2
+    Vmin = np.array([np.imag((k0)**2)])  # minimum required absorption coefficient
+    Vmax = 0.95
+    ## find scaling factors (and apply scaling and shift to Vraw)
+    _, _, V0, V = center_scale(Vraw, Vmin, Vmax)
+    V = np.diag(V) + 1j * L_corr
+
+    Vmax = 0.95
+    scaling = Vmax/np.linalg.norm(V,2) #checkV(V) #
+    V = scaling * V
+    ## Check that ||V|| < 1 (0.95 here)
+    vc = np.linalg.norm(V,2) #checkV(V) #
+    if vc < 1:
+        pass
+    else:
+        return print('||V|| not < 1, but {}'.format(vc))
+
+    ## B = 1 - V
+    B = np.eye(N) - V
+    medium = lambda x: B @ x
+
+    ## make propagator
+    Tr = np.sqrt(scaling)
+    Tl = 1j * Tr
+    L = Tl * Tr * (L - 1j*V0)
+    Lr = np.squeeze(1/(L+1))
+    propagator = lambda x: (np.fft.ifftn(Lr * np.fft.fftn(x)))
+
+    ## Check that A = L + V is accretive
+    L = np.diag(np.squeeze(L))
+    A = L + V
+    acc = np.min(np.linalg.eigvals(A + np.asarray(np.matrix(A).H)))
+    if np.round(acc, 13) < 0:
+        return print('A is not accretive. ', acc)
+
+    b = Tl * b # scale the source term y
+
+    ## update
+    u = (np.zeros_like(b, dtype='complex_'))    # field u, initialize with 0
+    alpha = 1.                                # ~step size of the Richardson iteration \in (0,1]
+    for _ in range(iters):
+        t1 = medium(u) + b
+        t1 = propagator(t1)
+        t1 = medium(u-t1)
+        u = u - (alpha * t1)
+    return Tr*u
 
 ## make medium
 def center_scale(Vraw, Vrmin, Vmax):
@@ -99,7 +159,8 @@ def center_scale(Vraw, Vrmin, Vmax):
             Tl = np.sqrt(Ttot)
             Tr  = Tl.copy()
             V0 = centers.flatten()
-            V = Ttot.flatten() * ( Vraw - V0 )
+            # V = Ttot.flatten() * ( Vraw - V0 )
+            V = Vraw - V0
     elif dim == 1: # potential is a field of diagonal matrices, stored as column vectors
         if Vraw.any() < 0:
             return print('Vraw is not accretive')
@@ -111,7 +172,8 @@ def center_scale(Vraw, Vrmin, Vmax):
             Tl = np.sqrt(np.diag(TT))
             Tr = Tl
             V0 = np.diag(centers.flatten())
-            V = TT * (Vraw - np.diag(V0))
+            # V = TT * (Vraw - np.diag(V0))
+            V = Vraw - np.diag(V0)
     # elif dim == 2: # potential is a field of full matrices, stored as pages
     #     # check if matrix is near-singular
     #     # and add a small offset to the singular values if it is
@@ -333,7 +395,7 @@ def symrange(N):
 
 ## Relative error
 def relative_error(E_, E_true):
-    return np.mean( np.linalg.norm(E_-E_true, ord=2) ) / np.mean( np.linalg.norm(E_true, ord=2) )
+    return np.mean( np.abs(E_-E_true)**2 ) / np.mean( np.abs(E_true)**2 )
 
 ## Check that V is a contraction
 def checkV(A):

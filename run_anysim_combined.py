@@ -33,7 +33,7 @@ matplotlib.use('TkAgg')
 
 import time
 
-from anysim_all import AnySim
+from anysim_combined import AnySim
 if __name__ == '__main__':
 
     # s1 = time.time()

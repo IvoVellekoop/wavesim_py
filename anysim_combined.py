@@ -1,4 +1,4 @@
-import os
+import os, time
 import numpy as np
 from datetime import date
 from scipy.linalg import eigvals
@@ -26,7 +26,7 @@ class AnySim():
 		self.small_circ_prob = small_circ_prob # True (V0 as in AnySim) or False (V0 as in WaveSim)
 		self.wrap_around = wrap_around # 'boundaries', 'L_Omega', OR 'L_corr'
 
-		self.max_iters = int(7.e+5)		# Maximum number of iterations
+		self.max_iters = int(6.e+5)		# Maximum number of iterations
 		self.iters = self.max_iters - 1
 		self.lambd = 1.				# Wavelength in um (micron)
 		self.N_roi = 128			# Num of points in ROI (Region of Interest)
@@ -46,6 +46,7 @@ class AnySim():
 			os.makedirs(self.run_loc)
 
 	def runit(self)	:
+		s1 = time.time()
 		self.init_setup()
 		self.print_details()
 		self.make_medium()
@@ -71,6 +72,7 @@ class AnySim():
 			re = self.relative_error(self.u, self.E_theory)
 			print('Relative error {:.2e}'.format(re))
 			
+		print('Simulation done (Time {} s). Plotting...'.format(np.round(time.time()-s1,2)))
 		self.plot_details()
 		return self.u
 
@@ -245,7 +247,7 @@ class AnySim():
 			residual.append(residual_i)
 			if residual_i < 1.e-6:
 				self.iters = i
-				print('breaking @ iter {}, residual {:.2e}'.format(self.iters+1, residual_i))
+				print('Stopping simulation at iter {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, residual_i))
 				break
 			self.u = self.u - (self.alpha * t1)
 			u_iter.append(self.u)
@@ -255,7 +257,6 @@ class AnySim():
 		self.residual = np.array(residual)
 
 	def plot_details(self):
-		print('Simulations done. Plotting...')
 		self.plot_FieldNResidual()	# png
 		# self.plot_field_final()	# png
 		# self.plot_residual()		# png
@@ -336,6 +337,10 @@ class AnySim():
 		x = np.arange(self.N_roi)*self.pixel_size
 
 		fig = plt.figure(figsize=(14.32,8))
+		if self.test == 'FreeSpace':
+			plt.plot(x, np.real(self.E_theory), 'k:', lw=0.75, label='Analytic solution')
+		elif self.test == '1D':
+			plt.plot(x, np.real(np.squeeze(loadmat('anysim_matlab/u.mat')['u'])), 'k:', lw=0.75, label='Matlab solution')
 		plt.xlabel("$x$")
 		plt.ylabel("Amplitude")
 		plt.xlim([x[0]-x[1]*2,x[-1]+x[1]*2])
@@ -345,7 +350,7 @@ class AnySim():
 		line.set_xdata(x)
 		title = plt.title('')
 
-		if self.iters >= 100:
+		if self.iters > 100:
 			plot_iters = 100
 			iters_trunc = np.linspace(0,self.iters-1,plot_iters).astype(int)
 			u_iter_trunc = self.u_iter[iters_trunc]
@@ -368,7 +373,6 @@ class AnySim():
 		    fps=10, metadata=dict(artist='Me'))#, bitrate=1800)
 		ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
 		plt.close()
-
 
 	## smallest circle problem
 	def center_scale(self):

@@ -17,9 +17,6 @@ except:
 from PIL.Image import open, BILINEAR, fromarray
 
 class AnySim():
-	# def __init__(self, FLAGS_dict):
-	# 	for name, val in FLAGS_dict.items():
-	# 		exec('self.'+name+' = val')
 	def __init__(self, topic='Helmholtz', test='FreeSpace', small_circ_prob=False, wrap_around='boundaries'):
 		self.topic = topic	# Helmholtz (the only one for now) or Maxwell
 		self.test = test 	# 'FreeSpace', '1D', '2D', OR '2D_low_contrast'
@@ -39,27 +36,29 @@ class AnySim():
 		if not os.path.exists(self.log_dir):
 			os.makedirs(self.log_dir)
 
-		# self.run_id = d1 +'_'+ self.topic + '_' + self.test + '_scp' + str(int(self.small_circ_prob)) + '_wrap_' + self.wrap_around
 		self.run_id = d1 + '_' + self.test + '_scp' + str(int(self.small_circ_prob)) + '_wrap_' + self.wrap_around
 		self.run_loc = self.log_dir + self.run_id
 		if not os.path.exists(self.run_loc):
 			os.makedirs(self.run_loc)
 
-	def runit(self)	:
+	def runit(self): 		# function that calls all the other 'main' functions
 		s1 = time.time()
-		self.init_setup()
-		self.print_details()
-		self.make_medium()
-		self.make_propagator()
+		self.init_setup()		# set up the grid, ROI, source, etc. based on the test
+		self.print_details()	# print the simulation details
+		self.make_medium()		# B = 1 - V
+		self.make_propagator()	# L and (L+1)^(-1)
 
+		# Scale the source term (and pad if boundaries)
 		if self.wrap_around == 'boundaries':
 			self.b = self.Tl * np.pad(self.b, self.N_dim*((self.bw_l,self.bw_r),), mode='constant') # source term y
 		else:
 			self.b = self.Tl * self.b
 		self.u = (np.zeros_like(self.b, dtype='complex_'))	# field u, initialize with 0
 
+		# AnySim update
 		self.iterate()
-
+		
+		# Truncate u to ROI
 		if self.wrap_around == 'boundaries':
 			if self.N_dim == 1:
 				self.u = self.u[self.bw_l:-self.bw_r]
@@ -68,12 +67,8 @@ class AnySim():
 				self.u = self.u[self.bw_l:-self.bw_r,self.bw_l:-self.bw_r]
 				self.u_iter = self.u_iter[:, self.bw_l:-self.bw_r,self.bw_l:-self.bw_r]
 
-		if self.test == 'FreeSpace':
-			re = self.relative_error(self.u, self.E_theory)
-			print('Relative error {:.2e}'.format(re))
-			
 		print('Simulation done (Time {} s). Plotting...'.format(np.round(time.time()-s1,2)))
-		self.plot_details()
+		self.plot_details()	# Plot the final field, residual vs. iterations, and animation of field with iterations
 		return self.u
 
 	def init_setup(self):
@@ -145,63 +140,62 @@ class AnySim():
 	def print_details(self):
 		# print('Topic: \t', self.topic)
 		print('Test: \t', self.test)
-		print('Tackling wrap-around effects with: ', self.wrap_around)
+		print('Smallest circle problem for V0?: \t', self.small_circ_prob)
+		print('Tackling wrap-around effects with: \t', self.wrap_around)
 		print('Boundaries width: ', self.boundaries_width)
 
+	# Medium. B = 1 - V
 	def make_medium(self):
+		Vraw = self.k0**2 * self.n**2
+		# give tiny non-zero minimum value to prevent division by zero in homogeneous media
+		try:
+			mu_min = 10.0/(self.boundaries_width * self.pixel_size)
+		except:
+			mu_min = 0
+		mu_min = max( mu_min, 1.e+0/(self.N*self.pixel_size) )
+		Vmin = np.imag( (self.k0 + 1j*np.max(mu_min))**2 )
+		Vmax = 0.95
 		if self.small_circ_prob == True:
-			if self.N_dim == 1:
-				self.Vraw = np.diag(-1j * self.k0**2 * self.n**2)
-			else:
-				self.Vraw = -1j * self.k0**2 * self.n**2
-			self.center_scale()
+			self.center_scale(-1j*Vraw, np.array([Vmin]), Vmax)
+			self.V0 = 1j*self.V0
 		else:
-			## make medium
-			self.Vraw = self.k0**2 * self.n**2
-			# give tiny non-zero minimum value to prevent division by zero in homogeneous media
-			try:
-				mu_min = 10.0/(self.boundaries_width * self.pixel_size)
-			except:
-				mu_min = 0
-			mu_min = max( mu_min, 1.e+0/(self.N*self.pixel_size) )
-			Vmin = np.imag( (self.k0 + 1j*np.max(mu_min))**2 )
-			self.V0 = (np.max(np.real(self.Vraw)) + np.min(np.real(self.Vraw)))/2 + 1j*Vmin
-			self.V = -1j * (self.Vraw - self.V0)
-			if self.wrap_around == 'L_corr':
-				cp = 20
-				F = self.DFT_matrix(self.N)
-				Finv = np.asarray(np.matrix(F).H/self.N)
-				p = 2*np.pi*np.fft.fftfreq(self.N, self.pixel_size)
-				L = p**2
-				Lw = Finv @ np.diag(L.flatten()) @ F
-				L_corr = -np.real(Lw)                          # copy -Lw
-				L_corr[:-cp,:-cp] = 0; L_corr[cp:,cp:] = 0  # Keep only upper and lower traingular corners of -Lw
-				self.V = np.diag(self.V) + 1j * L_corr
-			Vmax = 0.95
-			scaling = Vmax/self.checkV(self.V)
-			self.V = scaling * self.V
+			self.V0 = (np.max(np.real(Vraw)) + np.min(np.real(Vraw)))/2 + 1j*Vmin
+			self.V = -1j * (Vraw - self.V0)
+		if self.wrap_around == 'L_corr':
+			cp = 20
+			F = self.DFT_matrix(self.N)
+			Finv = np.asarray(np.matrix(F).H/self.N)
+			p = 2*np.pi*np.fft.fftfreq(self.N, self.pixel_size)
+			L = p**2
+			Lw = Finv @ np.diag(L.flatten()) @ F
+			L_corr = -np.real(Lw)                          # copy -Lw
+			L_corr[:-cp,:-cp] = 0; L_corr[cp:,cp:] = 0  # Keep only upper and lower traingular corners of -Lw
+			self.V = np.diag(self.V) + 1j * L_corr
+		scaling = Vmax/self.checkV(self.V)
+		self.V = scaling * self.V
 
-			self.Tr = np.sqrt(scaling)
-			self.Tl = 1j * self.Tr
+		self.Tr = np.sqrt(scaling)
+		self.Tl = 1j * self.Tr
 
-			## Check that ||V|| < 1 (0.95 here)
-			vc = self.checkV(self.V)
-			if vc < 1:
-				pass
-			else:
-				return print('||V|| not < 1, but {}'.format(vc))
+		## Check that ||V|| < 1 (0.95 here)
+		vc = self.checkV(self.V)
+		if vc < 1:
+			pass
+		else:
+			return print('||V|| not < 1, but {}'.format(vc))
 
-			## B = 1 - V
-			if self.wrap_around == 'L_corr':
-				B = np.eye(self.N) - self.V
-				self.medium = lambda x: B @ x
-			elif self.wrap_around == 'L_Omega':
-				B = 1 - self.V
-				self.medium = lambda x: B * x
-			else:
-				B = self.pad_func((1-self.V)).astype('complex_')
-				self.medium = lambda x: B * x
-	
+		## B = 1 - V
+		if self.wrap_around == 'L_corr':
+			B = np.eye(self.N) - self.V
+			self.medium = lambda x: B @ x
+		elif self.wrap_around == 'L_Omega':
+			B = 1 - self.V
+			self.medium = lambda x: B * x
+		else:
+			B = self.pad_func((1-self.V)).astype('complex_')
+			self.medium = lambda x: B * x	
+
+	# Propagator. (L+1)^(-1)
 	def make_propagator(self):
 		if self.wrap_around == 'L_Omega':
 			N = self.N*10
@@ -232,6 +226,7 @@ class AnySim():
 				if np.round(acc, 13) < 0:
 					return print('A is not accretive. ', acc)
 
+	# AnySim update
 	def iterate(self):
 		self.alpha = 0.75									# ~step size of the Richardson iteration \in (0,1]
 		residual = []
@@ -256,6 +251,7 @@ class AnySim():
 		self.u_iter = self.Tr.flatten() * np.array(u_iter)
 		self.residual = np.array(residual)
 
+	# Plotting functions
 	def plot_details(self):
 		self.plot_FieldNResidual()	# png
 		# self.plot_field_final()	# png
@@ -298,40 +294,6 @@ class AnySim():
 		plt.savefig(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_FieldNResidual.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
 		plt.draw()
 
-	def plot_field_final(self): # png
-		figf = plt.figure(figsize=figsize)
-		x = np.arange(self.N_roi)*self.pixel_size
-		if self.test == 'FreeSpace':
-			u_true = self.E_theory.copy()
-			plt.plot(x, np.real(u_true), 'k', lw=2., label='Analytic solution')
-		elif self.test == '1D':
-			u_true = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
-			plt.plot(x, np.real(u_true), 'k', lw=2., label='Matlab solution')
-		plt.plot(x, np.real(self.u), 'r', lw=1., label='RelErr = {:.2e}'.format(self.relative_error(self.u,u_true)))
-		plt.ylabel('Amplitude')
-		plt.xlabel('$x~[\lambda]$')
-		if self.wrap_around == 'boundaries':
-			plt.title(f'Tackling wrap-around effects with: {self.wrap_around} (width = {int(self.boundaries_width)})')
-		else:
-			plt.title(f'Tackling wrap-around effects with: {self.wrap_around}')
-		plt.legend()
-		plt.grid()
-		plt.savefig(f'{self.run_loc}/{self.run_id}_field_final.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
-		plt.draw()
-
-	def plot_residual(self): # png
-		plt.figure(figsize=figsize)
-		plt.loglog(np.arange(1,self.iters+1), self.residual, 'k', lw=1.5)
-		plt.ylabel('Residual')
-		plt.xlabel('Iterations')
-		if self.wrap_around == 'boundaries':
-			plt.title(f'Tackling wrap-around effects with: {self.wrap_around} (width = {int(self.boundaries_width)})')
-		else:
-			plt.title(f'Tackling wrap-around effects with: {self.wrap_around}')
-		plt.grid()
-		plt.savefig(f'{self.run_loc}/{self.run_id}_residual.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
-		plt.draw()
-
 	def plot_field_iters(self): # movie/animation/GIF
 		self.u_iter = np.real(self.u_iter)
 		x = np.arange(self.N_roi)*self.pixel_size
@@ -350,6 +312,7 @@ class AnySim():
 		line.set_xdata(x)
 		title = plt.title('')
 
+		# Plot 100 or fewer frames. Takes much longer for any more frames.
 		if self.iters > 100:
 			plot_iters = 100
 			iters_trunc = np.linspace(0,self.iters-1,plot_iters).astype(int)
@@ -358,8 +321,8 @@ class AnySim():
 			plot_iters = self.iters
 			iters_trunc = np.arange(self.iters)
 			u_iter_trunc = self.u_iter
+
 		def animate(i):
-			# line.set_ydata(self.u_iter[i])		# update the data.
 			line.set_ydata(u_iter_trunc[i])		# update the data.
 			if self.wrap_around == 'boundaries':
 				title.set_text(f'Tackling wrap-around effects with: {self.wrap_around} (width = {int(self.boundaries_width)}). Iteration {iters_trunc[i]+1}')
@@ -367,18 +330,17 @@ class AnySim():
 				title.set_text(f'Tackling wrap-around effects with: {self.wrap_around}. Iteration {iters_trunc[i]+1}')
 			return line, title,
 		ani = animation.FuncAnimation(
-			# fig, animate, interval=100, blit=True, frames=self.iters)
 			fig, animate, interval=100, blit=True, frames=plot_iters)
 		writer = animation.FFMpegWriter(
-		    fps=10, metadata=dict(artist='Me'))#, bitrate=1800)
+		    fps=10, metadata=dict(artist='Me'))
 		ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
 		plt.close()
 
 	## smallest circle problem
-	def center_scale(self):
-		dim = sum(self.Vmin.shape[a-1]>1 for a in range(self.Vmin.ndim))
-		Vreshape = np.expand_dims(self.Vraw, axis=tuple(range(2-dim)))
-		self.Vmin = np.expand_dims(self.Vmin, axis=tuple(range(2-self.Vmin.ndim)))
+	def center_scale(self, Vraw, Vmin, Vmax):
+		dim = sum(Vmin.shape[a-1]>1 for a in range(Vmin.ndim))
+		Vreshape = np.expand_dims(Vraw, axis=tuple(range(2-dim)))
+		Vmin = np.expand_dims(Vmin, axis=tuple(range(2-Vmin.ndim)))
 		N = Vreshape.shape[0]
 		M = Vreshape.shape[1]
 		centers = np.zeros((N, M), dtype='complex_')
@@ -388,7 +350,7 @@ class AnySim():
 			for m in range(M):
 				c, r = self.smallest_circle((Vreshape[n,m,:]))
 				# adjust centers and radii so that the real part of centers+radii >= Vmin
-				re_diff = np.real(c) + r - self.Vmin[n, m]
+				re_diff = np.real(c) + r - Vmin[n, m]
 				if re_diff < 0:
 					c = c - re_diff/2
 					r = r - re_diff/2
@@ -397,43 +359,28 @@ class AnySim():
 				radii[n,m] = r
 		
 		if dim == 0: # potential is a scalar field
-			if self.Vraw.any() < 0:
+			if Vraw.any() < 0:
 				print('Vraw is not accretive')
-				# break
 			else:
-				Ttot = self.Vmax/radii
-				self.Tl = np.sqrt(Ttot)
-				self.Tr  = Tl.copy()
+				Ttot = Vmax/radii
+				Tl = np.sqrt(Ttot).flatten()
+				Tr  = Tl.copy()
 				self.V0 = centers.copy()
-				self.V = Ttot.flatten() * (np.asarray(self.Vraw) - self.V0.flatten())
-				if self.N_dim == 1:
-					n = len(V)
-					if self.boundaries_width == 0:
-						# cp = 2 # corner points
-						d_ut = Ttot.flatten() * self.Vraw[:self.cp,-self.cp:].copy()
-						d_lt = Ttot.flatten() * self.Vraw[-self.cp:,:self.cp].copy()
-					d = V.ravel()[::n+1]
-					values = d.copy()
-					V[:,:] = 0 + 1j*0
-					d[:] = values
-					if self.boundaries_width == 0:
-						V[:self.cp,-self.cp:] = d_ut
-						V[-self.cp:,:self.cp] = d_lt
-				if V.ndim==1:
-					V = np.expand_dims(V, axis=1)
+				# self.V = Ttot.flatten() * (Vraw - self.V0)
+				self.V = Vraw - self.V0.flatten()
 		elif dim == 1: # potential is a field of diagonal matrices, stored as column vectors
-			if self.Vraw.any() < 0:
+			if Vraw.any() < 0:
 				print('Vraw is not accretive')
-				# break
 			else:
 				if (radii < np.abs(centers) * 1.e-6).any():
 					radii = np.maximum(radii, np.abs(c)*1.e-6)
 					print('At least one of the components of the potential is (near-)constant, using threshold to avoid divergence in Tr')
-				TT = self.Vmax/radii.flatten()
-				Tl = np.sqrt(np.diag(TT))
-				Tr = Tl
-				V0 = np.diag(centers.flatten())
-				V = TT * (self.Vraw - np.diag(V0))
+				TT = Vmax/radii.flatten()
+				Tl = np.sqrt(np.diag(TT)).flatten()
+				Tr = Tl.copy()
+				self.V0 = np.diag(centers.flatten())
+				# self.V = TT * (Vraw - np.diag(self.V0))
+				self.V = Vraw - np.diag(self.V0)
 		# elif dim == 2: # potential is a field of full matrices, stored as pages
 		#     # check if matrix is near-singular
 		#     # and add a small offset to the singular values if it is
@@ -446,16 +393,9 @@ class AnySim():
 		#         ('At least one of the components of the potential is (near-)constant, using threshold to avoid divergence in Tr')
 		#     # compute scaling factor for the matrix
 		#     P, R, C = equilibriate(radii) ### python equivalent function? scipy.linalg.matrix_balance?
-		return Tl, Tr, V0, V
 
 	def smallest_circle(self, points, tolerance=1.e-10):
-		if self.N_dim == 1:
-			if self.boundaries_width==0:
-				points = np.concatenate((np.diag(points), points[:self.cp,-self.cp:].flatten(), points[-self.cp:,:self.cp].flatten()))
-			else:
-				points = np.diag(points).flatten()
-		else:
-			points = points.flatten()
+		points = points.flatten()
 		if np.isreal(points).all():
 			pmin = np.min(points)
 			pmax = np.max(points)

@@ -36,19 +36,19 @@ import time
 from anysim_combined import AnySim
 if __name__ == '__main__':
 
-    # s1 = time.time()
-    # anysim = AnySim()
-    # u1 = anysim.runit()
-    # e1 = time.time() - s1
-    # print('Total time (including plotting): ', np.round(e1,2))
-    # print('-'*50)
+    s1 = time.time()
+    anysim = AnySim()
+    u1 = anysim.runit()
+    e1 = time.time() - s1
+    print('Total time (including plotting): ', np.round(e1,2))
+    print('-'*50)
 
-    # s2 = time.time()
-    # anysim = AnySim(wrap_around='L_Omega')
-    # u2 = anysim.runit()
-    # e2 = time.time() - s2
-    # print('Total time (including plotting): ', np.round(e2,2))
-    # print('-'*50)
+    s2 = time.time()
+    anysim = AnySim(wrap_around='L_Omega')
+    u2 = anysim.runit()
+    e2 = time.time() - s2
+    print('Total time (including plotting): ', np.round(e2,2))
+    print('-'*50)
 
     s3 = time.time()
     anysim = AnySim(wrap_around='L_corr')

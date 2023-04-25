@@ -1,12 +1,15 @@
 import numpy as np
-from scipy.linalg import eigvals
+
+from anysim_separate import checkV, coordinates_f, DFT_matrix, pad_func, post_process, plot_FieldNResidual, plot_field_iters, relative_error
+
 
 ## AnySim (original implementation in MATLAB as on github: https://github.com/IvoVellekoop/anysim)
-def AnySim_small_circ_prob(boundaries_width, n, N_roi, pixel_size, k0, s, iters=int(1.e+4)):
+def AnySim_small_circ_prob(test, small_circ_prob, wrap_around, boundaries_width, n, N_roi, pixel_size, k0, s, u_true, max_iters=int(6.e+5)):
     N_dim = n.ndim
     N = int(N_roi+2*boundaries_width)
     bw_l = int(np.floor(boundaries_width))
     bw_r = int(np.ceil(boundaries_width))
+    iters = max_iters - 1
 
     ## make medium
     Vraw = -1j * k0**2 * n**2
@@ -56,7 +59,8 @@ def AnySim_small_circ_prob(boundaries_width, n, N_roi, pixel_size, k0, s, iters=
     u = (np.zeros_like(b, dtype='complex_'))    # field u, initialize with 0
     alpha = 0.75                                # ~step size of the Richardson iteration \in (0,1]
     residual = []
-    for i in range(iters):
+    u_iter = []
+    for i in range(max_iters):
         t1 = medium(u) + b
         t1 = propagator(t1)
         t1 = medium(u-t1)
@@ -66,19 +70,33 @@ def AnySim_small_circ_prob(boundaries_width, n, N_roi, pixel_size, k0, s, iters=
         residual_i = nr/normb
         residual.append(residual_i)
         if residual_i < 1.e-6:
-            print('breaking @ iter {}, residual {:.2e}'.format(i+1, residual_i))
+            iters = i
+            print('Stopping simulation at iter {}, residual {:.2e} <= 1.e-6'.format(iters+1, residual_i))
             break
         u = u - (alpha * t1)
-    u = (Tr.flatten()*u)#.astype('complex_')
+        u_iter.append(u)
 
+    # Scale back
+    u = Tr.flatten() * u
+    u_iter = Tr.flatten() * np.array(u_iter)
+
+    # Truncate u to ROI
     if N_dim == 1:
         u = u[bw_l:-bw_r]
+        u_iter = u_iter[:, bw_l:-bw_r]
     elif N_dim == 2:
         u = u[bw_l:-bw_r,bw_l:-bw_r]
-    return u, np.array(residual)
+        u_iter = u_iter[:, bw_l:-bw_r,bw_l:-bw_r]
+
+    residual = np.array(residual)
+
+    ## For plotting 
+    post_process(test, small_circ_prob, wrap_around, N_roi, pixel_size, u, iters, residual, u_iter, boundaries_width, u_true)
+
+    return u, residual, u_iter
 
 ## AnySim with wrap-around correction (WITH the smallest circle shifting for computing V0)
-def AnySim_wrap_small_circ_prob(n, N, pixel_size, k0, b, iters=int(1.e+4), cp=20):
+def AnySim_wrap_small_circ_prob(test, small_circ_prob, wrap_around, n, N, pixel_size, k0, b, u_true, iters=int(6.e+5), cp=20):
     # ## Correction term
     F = DFT_matrix(N)
     Finv = np.asarray(np.matrix(F).H/N)
@@ -366,55 +384,3 @@ def conjugate_inflated_triangle(points, r):
 
 def signed_surface(points):
     return np.imag((points[0]-points[1]) * np.conj(points[2]-points[1]))
-
-## pad (1-V) to size N = N_roi + (2*boundaries_width)
-def pad_func(M, boundaries_width, bw_l, bw_r, N_roi, N_dim, element_dimension=0):
-    sz = M.shape[element_dimension+0:N_dim]
-    if (boundaries_width != 0) & (sz == (1,)):
-        M = np.tile(M, (int((np.ones(1) * (N_roi-1) + 1)[0]),))
-    M = np.pad(M, ((bw_l,bw_r)), mode='edge')
-
-    for d in range(N_dim):
-        try:
-            w = boundaries_width[d]
-        except:
-            w = boundaries_width
-
-    if w>0:
-        left_boundary = boundaries_window(np.floor(w))
-        right_boundary = boundaries_window(np.ceil(w))
-        full_filter = np.concatenate((left_boundary, np.ones((N_roi,1)), np.flip(right_boundary)))
-        if N_dim == 1:
-            M = M * np.squeeze(full_filter)
-        else:
-            M = full_filter.T * M * full_filter
-    return M
-
-def boundaries_window(L):
-    x = np.expand_dims(np.arange(L)/(L-1), axis=1)
-    a2 = np.expand_dims(np.array([-0.4891775, 0.1365995/2, -0.0106411/3]) / (0.3635819 * 2 * np.pi), axis=1)
-    return np.sin(x * np.expand_dims(np.array([1, 2, 3]), axis=0) * 2 * np.pi) @ a2 + x
-
-## DFT matrix
-def DFT_matrix(N):
-    l, m = np.meshgrid(np.arange(N), np.arange(N))
-    omega = np.exp( - 2 * np.pi * 1j / N )
-    return np.power( omega, l * m )
-
-def coordinates_f(dimension, N, pixel_size):
-    pixel_size_f = 2 * np.pi/(pixel_size*N)
-    return np.expand_dims( fft_range(N) * pixel_size_f, axis=tuple(range(2-dimension)))
-
-def fft_range(N):
-    return np.fft.ifftshift(symrange(N))
-
-def symrange(N):
-    return range(-int(np.floor(N/2)),int(np.ceil(N/2)))
-
-## Relative error
-def relative_error(E_, E_true):
-    return np.mean( np.abs(E_-E_true)**2 ) / np.mean( np.abs(E_true)**2 )
-
-## Check that V is a contraction
-def checkV(A):
-    return np.max(np.abs(A))

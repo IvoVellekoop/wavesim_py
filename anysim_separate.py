@@ -11,7 +11,7 @@ font = {'family':'Times New Roman', # 'Times New Roman', 'Helvetica', 'Arial', '
 rc('font',**font)
 figsize = (8,8) #(14.32,8)
 try:
-	plt.rcParams['text.usetex'] = True
+	plt.rcParams['text.usetex'] = False
 except:
 	pass
 
@@ -50,7 +50,7 @@ def AnySim_wrap(test, small_circ_prob, wrap_around, n, N, pixel_size, k0, b, u_t
     mu_min = 1.e+0/(N*pixel_size)   # give tiny non-zero minimum value to prevent division by zero in homogeneous media
     Vmin = np.imag( (k0 + 1j*np.max(mu_min))**2 )
     V0 = (np.max(np.real(Vraw)) + np.min(np.real(Vraw)))/2 + 1j*Vmin
-    V = np.diag(-1j * (Vraw - V0)) + 1j * L_corr
+    V = np.diag(-1j * (Vraw - V0)) #+ 1j * L_corr # sign of -1j * (Vraw-V0)??
     Vmax = 0.95
     scaling = Vmax/np.linalg.norm(V,2) #checkV(V) #
     V = scaling * V
@@ -432,6 +432,6 @@ def plot_field_iters(test, small_circ_prob, wrap_around, run_id, run_loc, N_roi,
         fig, animate, interval=100, blit=True, frames=plot_iters)
     writer = animation.FFMpegWriter(
         fps=10, metadata=dict(artist='Me'))
-    ani.save(f'{run_loc}/{run_id}_{iters+1}iters_Field.mp4', writer=writer)
+    #ani.save(f'{run_loc}/{run_id}_{iters+1}iters_Field.mp4', writer=writer)
     plt.close()
 

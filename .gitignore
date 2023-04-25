@@ -1,0 +1,5 @@
+*.png
+*.mp4
+.ipynb_checkpoints
+logs
+__pycache__

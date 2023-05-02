@@ -21,10 +21,13 @@ matplotlib.use('TkAgg')
 # smallest_circle_problem = False
 """ True (V0 as in AnySim) or False (V0 as in WaveSim) """
 
-# wrap_around = 'boundaries'
+# abs_boundaries = False
+""" True (add absorbing boundaries) or False (don't add) """
+
+# wrap_around = 'L_w'
 """ 
-'boundaries'
-    (add absorbing boundaries), OR
+'L_w'
+    (Use the usual Laplacian and eliminate wrap-around effects with absorbing boundaries), OR
 'L_Omega'
     (Do the fast convolution over a much larger domain to eliminate wrap-around effects without absorbing boundaries), OR
 'L_corr'
@@ -37,9 +40,8 @@ from anysim_combined import AnySim
 if __name__ == '__main__':
 
     s1 = time.time()
+    anysim = AnySim(abs_boundaries=True)
     anysim = AnySim()
-    u1 = anysim.runit()
-    e1 = time.time() - s1
     print('Total time (including plotting): ', np.round(e1,2))
     print('-'*50)
 

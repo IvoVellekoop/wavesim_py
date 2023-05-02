@@ -11,19 +11,18 @@ font = {'family':'Times New Roman', # 'Times New Roman', 'Helvetica', 'Arial', '
         'size':18}                      # 8-10 pt
 rc('font',**font)
 figsize = (8,8) #(14.32,8)
-plt.rcParams['text.usetex'] = False
 from PIL.Image import open, BILINEAR, fromarray
 
 class AnySim():
 	def __init__(self, wrap_correction=False, absorbing_boundaries=True):
 		self.wrap_correction = wrap_correction				# True to use the new wrap-around correction
 		self.absorbing_boundaries = absorbing_boundaries	# True to add absorbing boundaries
-		self.max_iters = int(1000)		# Maximum number of iterations
+		self.max_iters = int(1.e+7)		# Maximum number of iterations
 		self.iters = self.max_iters - 1
 		self.lambd = 1.					# Wavelength in um (micron)
-		self.k0 = 2.*np.pi/self.lambd  	# wavevector k = 2*pi/lambda, where lambda = 1.0 um (micron), and thus k0 = 2*pi = 6.28...
+		self.k0 = 2.*np.pi/self.lambd  	# Wavevector k0=2*pi/lambda, where lambda=1.0 um (micron). Thus k0=2*pi=6.28...
 		self.pixel_size = self.lambd/4
-		self.N_roi = 128			# Num of points in ROI (Region of Interest)
+		self.N_roi = 128				# Num of points in ROI (Region of Interest)
 		if absorbing_boundaries:
 			self.boundaries_width = 128
 		else:
@@ -51,7 +50,7 @@ class AnySim():
 		if not os.path.exists(self.run_loc):
 			os.makedirs(self.run_loc)
 
-	def runit(self): 		# function that calls all the other 'main' functions
+	def runit(self):			# function that calls all the other 'main' functions
 		s1 = time.time()
 		self.init_setup()		# set up the grid, ROI, source, etc. based on the test
 		self.print_details()	# print the simulation details
@@ -63,11 +62,15 @@ class AnySim():
 
 		# AnySim update
 		self.iterate()
-		
+
 		# Truncate u to ROI
 		if self.absorbing_boundaries:
 			self.u = self.u[self.boundaries_width:-self.boundaries_width]
 			self.u_iter = self.u_iter[:, self.boundaries_width:-self.boundaries_width]
+
+		# Print relative error between u and analytic solution
+		self.rel_err = self.relative_error(self.u, self.E_theory)
+		print('Relative error: {:.2e}'.format(self.rel_err))
 
 		print('Simulation done (Time {} s). Plotting...'.format(np.round(time.time()-s1,2)))
 		self.plot_details()	# Plot the final field, residual vs. iterations, and animation of field with iterations
@@ -125,8 +128,8 @@ class AnySim():
 
 		# compute and apply scaling and shifting. Use a small minimum to avoid division by zero if the medium is completely homogeneous 
 		self.scaling = 0.95j / max(np.linalg.norm(Vraw, 2), 1)
-		self.V = self.scaling * Vraw
-		self.L = self.scaling * Lraw 
+		self.V = -self.scaling * Vraw
+		self.L = -self.scaling * Lraw
 
 		# assert accretivity
 		print(np.min(np.real(self.L)))
@@ -177,9 +180,8 @@ class AnySim():
 
 		plt.subplot(2,1,1)
 		x = np.arange(self.N_roi)*self.pixel_size
-		u_true = self.E_theory
-		plt.plot(x, np.real(u_true), 'k', lw=2., label='Analytic solution')
-		plt.plot(x, np.real(self.u), 'r', lw=1., label='RelErr = {:.2e}'.format(self.relative_error(self.u,u_true)))
+		plt.plot(x, np.real(self.E_theory), 'k', lw=2., label='Analytic solution')
+		plt.plot(x, np.real(self.u), 'r', lw=1., label='RelErr = {:.2e}'.format(self.rel_err))
 		plt.title('Field')
 		plt.ylabel('Amplitude')
 		plt.xlabel('$x~[\lambda]$')
@@ -195,6 +197,7 @@ class AnySim():
 		plt.xlabel('Iterations')
 		plt.grid()
 		plt.suptitle(self.run_id)
+		plt.tight_layout()
 		plt.savefig(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_FieldNResidual.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
 		plt.draw()
 
@@ -207,7 +210,7 @@ class AnySim():
 		plt.xlabel("$x$")
 		plt.ylabel("Amplitude")
 		plt.xlim([x[0]-x[1]*2,x[-1]+x[1]*2])
-		plt.ylim([np.min(self.u_iter), np.max(self.u_iter)])
+		plt.ylim([1.05*np.min(self.u_iter), 1.05*np.max(self.u_iter)])
 		plt.grid()
 		line, = plt.plot([] , [], 'b', lw=1., animated=True)
 		line.set_xdata(x)
@@ -225,14 +228,15 @@ class AnySim():
 
 		def animate(i):
 			line.set_ydata(u_iter_trunc[i])		# update the data.
-			title.set_text(self.run_id + ":" + str(i))
+			# title.set_text(self.run_id + ":" + str(i))
+			title.set_text(f'{self.run_id} : {iters_trunc[i]+1}')
 			return line, title,
 		ani = animation.FuncAnimation(
 			fig, animate, interval=100, blit=True, frames=plot_iters)
 		writer = animation.FFMpegWriter(
 		    fps=10, metadata=dict(artist='Me'))
-		#ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
-		plt.show()
+		ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
+		# plt.show()
 		plt.close()
 
 	
@@ -254,5 +258,5 @@ class AnySim():
 		return np.mean( np.abs(E_-E_true)**2 ) / np.mean( np.abs(E_true)**2 )
 
 	
-sim = AnySim(wrap_correction= True, absorbing_boundaries=False)
+sim = AnySim(wrap_correction=False, absorbing_boundaries=True)
 sim.runit()

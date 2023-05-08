@@ -13,7 +13,7 @@ figsize = (8,8) #(14.32,8)
 # from PIL.Image import open, BILINEAR, fromarray
 
 class AnySim():
-	def __init__(self, test='FreeSpace', absorbing_boundaries=True, boundaries_width=16, wrap_correction='None'):
+	def __init__(self, test='FreeSpace', absorbing_boundaries=True, boundaries_width=16, wrap_correction='None', cp=20):
 		self.test = test 									# 'FreeSpace', '1D', '2D', OR '2D_low_contrast'
 		self.absorbing_boundaries = absorbing_boundaries 	# True OR False
 		self.boundaries_width = boundaries_width
@@ -23,6 +23,7 @@ class AnySim():
 		else:
 			self.boundaries_width = 0
 		self.wrap_correction = wrap_correction				# 'L_w', 'L_omega', OR 'L_corr'
+		self.cp = cp										# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
 
 		self.max_iters = int(6.e+5)	# Maximum number of iterations
 		self.iters = self.max_iters - 1
@@ -145,12 +146,12 @@ class AnySim():
 		self.F = self.DFT_matrix(self.N)
 		self.Finv = np.asarray(np.matrix(self.F).H/self.N)
 		if self.wrap_correction == 'L_corr':
-			cp = 20
+			# self.cp = 20
 			p = 2*np.pi*np.fft.fftfreq(self.N, self.pixel_size)
 			Lw_p = p**2
 			Lw = self.Finv @ np.diag(Lw_p.flatten()) @ self.F
 			L_corr = -np.real(Lw)                          # copy -Lw
-			L_corr[:-cp,:-cp] = 0; L_corr[cp:,cp:] = 0  # Keep only upper and lower traingular corners of -Lw
+			L_corr[:-self.cp,:-self.cp] = 0; L_corr[self.cp:,self.cp:] = 0  # Keep only upper and lower traingular corners of -Lw
 			self.V = self.V + 1j*L_corr
 		self.scaling = Vmax/self.checkV(self.V)
 		self.V = self.scaling * self.V
@@ -227,7 +228,10 @@ class AnySim():
 	# Save details and stats
 	def save_details(self):
 		with open(self.stats_file_name,'a') as fileopen:
-			fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err))
+			if self.wrap_correction == 'L_corr':
+				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e}; corner points {} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err, self.cp))
+			else:
+				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err))
 
 	# Plotting functions
 	def plot_details(self):
@@ -272,7 +276,10 @@ class AnySim():
 		plt.suptitle(title_text)
 
 		plt.tight_layout()
-		plt.savefig(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_FieldNResidual.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
+		if self.wrap_correction == 'L_corr':
+			plt.savefig(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_FieldNResidual_cp{self.cp}.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
+		else:
+			plt.savefig(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_FieldNResidual.png', bbox_inches='tight', pad_inches=0.03, dpi=100)
 		# plt.draw()
 		plt.close()
 
@@ -313,11 +320,17 @@ class AnySim():
 			fig, animate, interval=100, blit=True, frames=plot_iters)
 		writer = animation.FFMpegWriter(
 		    fps=10, metadata=dict(artist='Me'))
-		ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
+		if self.wrap_correction == 'L_corr':
+			ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field_cp{self.cp}.mp4', writer=writer)
+		else:
+			ani.save(f'{self.run_loc}/{self.run_id}_{self.iters+1}iters_Field.mp4', writer=writer)
 		plt.close()
 
 	## pad boundaries
 	def pad_func(self, M):
+		# boundary_ = lambda x: (np.arange(1,x+1)-0.21).T/(x+0.66)
+		# left_boundary = boundary_(np.floor(self.boundaries_width))
+		# right_boundary = boundary_(np.ceil(self.boundaries_width))
 		left_boundary = self.boundaries_window(np.floor(self.boundaries_width))
 		right_boundary = self.boundaries_window(np.ceil(self.boundaries_width))
 		full_filter = np.concatenate((left_boundary, np.ones((self.N_roi,)), np.flip(right_boundary)))

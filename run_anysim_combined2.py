@@ -1,4 +1,5 @@
-import numpy as np
+# from time import sleep
+from gc import collect
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('TkAgg')
@@ -39,30 +40,66 @@ import time
 from anysim_combined2 import AnySim
 if __name__ == '__main__':
 
-    # for b in range(2,31):
-    #     anysim = AnySim(boundaries_width=b, wrap_correction='L_corr')
+    anysim = AnySim(test='1D', absorbing_boundaries=False, boundaries_width=0)
+    anysim.runit()
+    del anysim
+    collect()
+
+    for b in range(2,31):
+        anysim = AnySim(test='1D', boundaries_width=b)
+        anysim.runit()
+        del anysim
+        collect()
+
+    anysim = AnySim(test='1D', absorbing_boundaries=False, boundaries_width=0, wrap_correction='L_omega')
+    anysim.runit()
+    del anysim
+    collect()
+
+    for b in range(2,31):
+        anysim = AnySim(test='1D', boundaries_width=b, wrap_correction='L_omega')
+        anysim.runit()
+        del anysim
+        collect()
+
+    anysim = AnySim(test='1D', absorbing_boundaries=False, boundaries_width=0, wrap_correction='L_corr')
+    anysim.runit()
+    del anysim
+    collect()
+
+    for b in range(2,31):
+        anysim = AnySim(test='1D', boundaries_width=b, wrap_correction='L_corr')
+        anysim.runit()
+        del anysim
+        collect()
+
+
+    # for b in range(31):
+    #     anysim = AnySim(test='1D', boundaries_width=16, wrap_correction='L_corr', cp=b)
     #     anysim.runit()
+    #     del anysim
+    #     collect()
 
-    s1 = time.time()
-    anysim = AnySim()
-    u1 = anysim.runit()
-    e1 = time.time() - s1
-    print('Total time (including plotting): ', np.round(e1,2))
-    print('-'*50)
+    # s1 = time.time()
+    # anysim = AnySim()
+    # u1 = anysim.runit()
+    # e1 = time.time() - s1
+    # print('Total time (including plotting): ', np.round(e1,2))
+    # print('-'*50)
 
-    s2 = time.time()
-    anysim = AnySim(wrap_correction='L_omega')
-    u2 = anysim.runit()
-    e2 = time.time() - s2
-    print('Total time (including plotting): ', np.round(e2,2))
-    print('-'*50)
+    # s2 = time.time()
+    # anysim = AnySim(wrap_correction='L_omega')
+    # u2 = anysim.runit()
+    # e2 = time.time() - s2
+    # print('Total time (including plotting): ', np.round(e2,2))
+    # print('-'*50)
 
-    s3 = time.time()
-    anysim = AnySim(wrap_correction='L_corr')
-    u3 = anysim.runit()
-    e3 = time.time() - s3
-    print('Total time (including plotting): ', np.round(e3,2))
-    print('-'*50)
+    # s3 = time.time()
+    # anysim = AnySim(wrap_correction='L_corr')
+    # u3 = anysim.runit()
+    # e3 = time.time() - s3
+    # print('Total time (including plotting): ', np.round(e3,2))
+    # print('-'*50)
 
     print('Done')
 

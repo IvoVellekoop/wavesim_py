@@ -1,4 +1,5 @@
 # from time import sleep
+import numpy as np
 from gc import collect
 import matplotlib
 import matplotlib.pyplot as plt

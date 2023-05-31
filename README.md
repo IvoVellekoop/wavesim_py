@@ -1,4 +1,47 @@
-Below are the instructions for setting up Miniconda (a much lighter counterpart of Anaconda) to work in conda environments.
+## Running the code
+
+To run with the default options/flags:
+
+        python anysim_combined.py
+
+The flags that can be specified, along with the options for each of them are given below:
+
+topic = 'Helmholtz'
+
+""" Helmholtz (the only one for now) or Maxwell """
+
+# test = 'FreeSpace'
+""" 
+'FreeSpace'
+    (Simulates free-space propagation and compares the result to the analytical solution), OR
+'1D'
+    (Simulates 1-D propagation of light through a slab of glass), OR
+'2D'
+    (Simulates propagation of light in a 2-D structure made of iron (uses the scalar wave equation)), OR 
+'2D_low_contrast'
+    (Simulates propagation of light in a 2-D structure made of fat and water (uses the scalar wave equation)) 
+"""
+
+# smallest_circle_problem = False
+""" True (V0 as in AnySim) or False (V0 as in WaveSim) """
+
+# absorbing_boundaries = False
+""" True (add absorbing boundaries) or False (don't add) """
+
+# wrap_correction = 'None'
+""" 
+'None'
+    (Use the usual Laplacian and eliminate wrap-around effects with absorbing boundaries), OR
+'L_omega'
+    (Do the fast convolution over a much larger domain to eliminate wrap-around effects without absorbing boundaries), OR
+'L_corr'
+    (Add the wrap-aroound correction term to V to correct for the wrap-around effects without absorbing boundaries)
+"""
+
+
+---
+
+Below are the instructions for setting up Miniconda (a much lighter counterpart of Anaconda) to work in conda environments, and the conda environment corresponding to this project.
 
 ---
 ## Installing Miniconda on a Linux system (or Windows Subsystem for Linux)
@@ -9,7 +52,7 @@ Assuming Linux for the step ahead. Instructions also available at https://conda.
 
 2. In the directory where the installer was downloaded, in the terminal window, run:
 
-        bash Miniconda3-latest-Linux-x86_64.sh
+        bash setting_up/Miniconda3-latest-Linux-x86_64.sh
 
 3. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later.
 
@@ -47,7 +90,11 @@ Avoid using the base environment altogether. It is a good backup environment to 
 
     * a .yml file in the current directory
 
-                conda env create -f <filename>.yml
+                conda env create -f setting_up/anysim_cluster.yml
+
+4. To update the current conda environment from a .yml file:
+
+        conda env update --name anysim_cluster --file setting_up/anysim_cluster.yml --prune
 
 4. To export current environment to a .yml file:
 
@@ -67,73 +114,6 @@ Avoid using the base environment altogether. It is a good backup environment to 
         conda clean --all
 
 ---
-## Working with conda and jupyter notebooks (.ipynb)
-
-We need to add the conda environment to jupyter notebooks so that it can be selected in the Select Kernel option in a jupyter notebook
-
-1. Activate the desired conda environment
-
-        conda activate <environment name>
-
-2. Install the ipykernel package
-
-        conda install ipykernel
-
-3. Add/install the environment to the ipykernel
-
-        python -m ipykernel install --user --name=<environment name>
-
-### Additional step for Visual Studio code
-
-4. Install the Jupyter extension through the gui
-
-### To open in browser (google chrome)
-
-4. Although these packages should already be installed through the .yml file while setting up the environment, if the current working directory does not open jupyter in a browser window after entering the command:
-
-        jupyter notebook
-        
-    1. Set up jupyterlab and jupyter notebook with the following commands
-
-            conda install -c conda-forge jupyterlab
-            conda install -c anaconda notebook
-
-    2. Run the below command again, and now jupyter should open in a browser window:
-
-            jupyter notebook
-
-5. The environment should now be visible in the Select Kernel dropdown.
-
-
-### To convert the current jupyter notebook into a presentation (plotly plots stay interactive)
-
-1. Open the jupter notebook in a browser window and check that running all cells gives the expected output
-
-2. In the toolbar at the top, Click **View** --> **Cell Toolbar** ---> **Slideshow**
-
-3. Each cell in the notebook will now have a toolbar at the top with a dropdown named **Slide Type**. In the dropdown, select **Slide** for all the cells you want to include in the presentation.
-
-4. Convert the .ipynb notebook to a .html presentation with the command(s and the options as below)
-
-    * Default options
-
-            jupyter nbconvert --to slides <filename>.ipynb
-
-    * If you don't want to show the code, and just the outputs
-
-            jupyter nbconvert --to slides --no-input <filename>.ipynb
-
-    * In addition to above, if you don't want any transitions
-
-            jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none
-
-    * In addition to above, if you want a specific theme (here, serif)
-
-            jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none --SlidesExporter.reveal_theme=serif
-
-6. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
-
-7. To convert the .html slides to pdf, add _?print-pdf_ in the URL in the web browser between _html_ and _#_.
 
 ## If problem with specifying fonts in matplotlib.rc 
 

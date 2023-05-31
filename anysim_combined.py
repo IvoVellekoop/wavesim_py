@@ -26,7 +26,7 @@ class AnySim():
 		self.domain_decomp = domain_decomp					# Use domain decomposition (True by default) or not (False)
 		self.cp = cp										# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
 
-		self.max_iters = 2100# int(6.e+5)	# Maximum number of iterations
+		self.max_iters = int(1.e+5)# int(6.e+5)	# Maximum number of iterations
 		self.iters = self.max_iters - 1
 		self.N_dim = 1				# currently tackling only 1D problem, so number of dimensions = 1
 		self.lambd = 1.				# Wavelength in um (micron)
@@ -116,7 +116,7 @@ class AnySim():
 			self.u_true = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
 
 		self.rel_err = self.relative_error(self.u, self.u_true)
-		# print('\n')
+		print('\n')
 		print('Relative error: {:.2e}'.format(self.rel_err))
 
 		self.sim_time = time.time()-s1
@@ -238,6 +238,7 @@ class AnySim():
 
 	# AnySim update
 	def iterate(self):
+		self.iter_step = 1
 		residual = []
 		u_iter = []
 		for i in range(self.max_iters):
@@ -261,7 +262,6 @@ class AnySim():
 		self.residual = np.array(residual)
 
 	''' Domain decomposition ''' ## (Restrictive) Additive Schwarz Method
-
 	## Use global approximations as iterates
 	def RAS_domain_decomp_n_iterate(self, B, L_plus_1_inv):
 
@@ -347,6 +347,7 @@ class AnySim():
 			u.append(R[j]@self.u)
 			b.append(R[j]@self.b)
 
+		self.iter_step = 1
 		tj = [0] * self.N_domains
 		normb = [0] * self.N_domains
 		residual_i = [1.0] * self.N_domains
@@ -356,31 +357,35 @@ class AnySim():
 		for i in range(self.max_iters):
 			for j in range(self.N_domains):
 				print('Iteration {}, sub-domain {}.'.format(i+1,j+1), end='\r')
-				u[j] = R[j] @ self.u
+				### Main update from here ---
+				if i % self.iter_step == 0:
+					u[j] = R[j] @ self.u
 				tj[j] = self.operators[j][0](u[j]) + b[j]
 				tj[j] = self.operators[j][1](tj[j])
 				tj[j] = self.operators[j][0](u[j] - tj[j])       # subdomain residual
 				u[j] = self.alpha * tj[j]
-				self.u = self.u - R[j].T @ D[j] @ u[j]
+				if i % self.iter_step == 0:
+					self.u = self.u - R[j].T @ D[j] @ u[j]
+				### --- to here
 
-				## Residual collection and checking				
-				if i==0:
-					normb[j] = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
-				nr = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
-				residual_i[j] = nr/normb[j]
-				if i==0:
-					residual[j] = [residual_i[j]]
-				else:
-					residual[j].append(residual_i[j])
-				if np.array([val < 1.e-6 for val in residual_i]).all():
-				# if residual_i[j] < 1.e-6:
-					self.iters = i
-					print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, j+1, residual_i[j]))
-					self.residual_i = residual_i[j]
-					if j == 0:
-						residual[1].append(np.nan)
-					breaker = True
-					break
+					## Residual collection and checking				
+					if i==0:
+						normb[j] = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
+					nr = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
+					residual_i[j] = nr/normb[j]
+					if i==0:
+						residual[j] = [residual_i[j]]
+					else:
+						residual[j].append(residual_i[j])
+					# if np.array([val < 1.e-6 for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
+					if residual_i[j] < 1.e-6: ## break when either domain's residual goes below threshold
+						self.iters = i
+						print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, j+1, residual_i[j]))
+						self.residual_i = residual_i[j]
+						if j == 0:
+							residual[1].append(np.nan)
+						breaker = True
+						break
 			if breaker:
 				break
 			u_iter.append(self.u)
@@ -438,7 +443,7 @@ class AnySim():
 
 		plt.subplot(2,1,2)
 		try:
-			res_plots = plt.loglog(np.arange(1,self.iters+2), self.residual, lw=1.5)
+			res_plots = plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.residual, lw=1.5)
 			if self.domain_decomp:
 				plt.legend(iter(res_plots), ('Subdomain 1', 'Subdomain 2'))
 		except:

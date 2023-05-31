@@ -372,8 +372,8 @@ class AnySim():
 					residual[j] = [residual_i[j]]
 				else:
 					residual[j].append(residual_i[j])
-				# if np.array([val < 1.e-6 for val in residual_i]).all():
-				if residual_i[j] < 1.e-6:
+				if np.array([val < 1.e-6 for val in residual_i]).all():
+				# if residual_i[j] < 1.e-6:
 					self.iters = i
 					print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, j+1, residual_i[j]))
 					self.residual_i = residual_i[j]
@@ -387,9 +387,9 @@ class AnySim():
 		self.u = self.Tr * self.u
 		self.u_iter = self.Tr.flatten() * np.array(u_iter)
 		try:
-			self.residual = np.array(residual[j])
-			# if self.residual.shape[0] < self.residual.shape[1]:
-			# 	self.residual = self.residual.T
+			self.residual = np.array(residual)
+			if self.residual.shape[0] < self.residual.shape[1]:
+				self.residual = self.residual.T
 		except:
 			pass
 
@@ -438,11 +438,14 @@ class AnySim():
 
 		plt.subplot(2,1,2)
 		try:
-			plt.loglog(np.arange(1,self.iters+2), self.residual, 'k', lw=1.5)
+			res_plots = plt.loglog(np.arange(1,self.iters+2), self.residual, lw=1.5)
+			if self.domain_decomp:
+				plt.legend(iter(res_plots), ('Subdomain 1', 'Subdomain 2'))
 		except:
 			pass
 		plt.axhline(y=1.e-6, c='k', ls=':')
-		plt.yticks([1.e+0, 1.e-2, 1.e-4, 1.e-6])
+		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
+		plt.ylim([0.8*np.nanmin(self.residual), 1.2*np.nanmax(self.residual)])
 		plt.title('Residual. Iterations = {:.2e}'.format(self.iters+1))
 		plt.ylabel('Residual')
 		plt.xlabel('Iterations')
@@ -552,18 +555,18 @@ e1 = time.time() - s1
 print('Total time (including plotting): ', np.round(e1,2))
 print('-'*50)
 
-s2 = time.time()
-anysim = AnySim(wrap_correction='L_omega')
-anysim.runit()
-e2 = time.time() - s2
-print('Total time (including plotting): ', np.round(e2,2))
-print('-'*50)
+# s2 = time.time()
+# anysim = AnySim(wrap_correction='L_omega')
+# anysim.runit()
+# e2 = time.time() - s2
+# print('Total time (including plotting): ', np.round(e2,2))
+# print('-'*50)
 
-s3 = time.time()
-anysim = AnySim(wrap_correction='L_corr')
-anysim.runit()
-e3 = time.time() - s3
-print('Total time (including plotting): ', np.round(e3,2))
-print('-'*50)
+# s3 = time.time()
+# anysim = AnySim(wrap_correction='L_corr')
+# anysim.runit()
+# e3 = time.time() - s3
+# print('Total time (including plotting): ', np.round(e3,2))
+# print('-'*50)
 
 print('Done')

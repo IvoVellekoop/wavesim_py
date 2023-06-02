@@ -26,7 +26,7 @@ class AnySim():
 		self.domain_decomp = domain_decomp					# Use domain decomposition (True by default) or not (False)
 		self.cp = cp										# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
 
-		self.max_iters = int(1.e+5)# int(6.e+5)	# Maximum number of iterations
+		self.max_iters = int(1.e+4)# int(6.e+5)	# Maximum number of iterations
 		self.iters = self.max_iters - 1
 		self.N_dim = 1				# currently tackling only 1D problem, so number of dimensions = 1
 		self.lambd = 1.				# Wavelength in um (micron)
@@ -98,6 +98,7 @@ class AnySim():
 
 		# AnySim update
 		self.alpha = 1.0						# ~step size of the Richardson iteration \in (0,1]
+		self.threshold_residual = 1.e-6
 		if self.domain_decomp:
 			''' Domain decomposition approaches '''
 			# self.medium, self.propagator, B, L_plus_1_inv = self.make_operators(Vraw)	# Medium B = 1 - V, and Propagator (L+1)^(-1)
@@ -250,9 +251,9 @@ class AnySim():
 			nr = np.linalg.norm(t1)
 			self.residual_i = nr/normb
 			residual.append(self.residual_i)
-			if self.residual_i < 1.e-6:
+			if self.residual_i < self.threshold_residual:
 				self.iters = i
-				print('Stopping simulation at iter {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, self.residual_i))
+				print('Stopping simulation at iter {}, residual {:.2e} <= {}'.format(self.iters+1, self.residual_i, self.threshold_residual))
 				break
 			self.u = self.u - (self.alpha * t1)
 			u_iter.append(self.u)
@@ -296,9 +297,9 @@ class AnySim():
 			nr = np.linalg.norm(t1)
 			self.residual_i = nr/normb
 			residual.append(self.residual_i)
-			if self.residual_i < 1.e-6:
+			if self.residual_i < self.threshold_residual:
 				self.iters = i
-				print('Stopping simulation at iter {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, self.residual_i))
+				print('Stopping simulation at iter {}, residual {:.2e} <= {}'.format(self.iters+1, self.residual_i, self.threshold_residual))
 				break
 
 			# ## Additive Schwarz Method [More amenabla to theory]
@@ -377,10 +378,10 @@ class AnySim():
 						residual[j] = [residual_i[j]]
 					else:
 						residual[j].append(residual_i[j])
-					# if np.array([val < 1.e-6 for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
-					if residual_i[j] < 1.e-6: ## break when either domain's residual goes below threshold
+					# if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
+					if residual_i[j] < self.threshold_residual: ## break when either domain's residual goes below threshold
 						self.iters = i
-						print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= 1.e-6'.format(self.iters+1, j+1, residual_i[j]))
+						print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= {}'.format(self.iters+1, j+1, residual_i[j], self.threshold_residual))
 						self.residual_i = residual_i[j]
 						if j == 0:
 							residual[1].append(np.nan)
@@ -448,7 +449,7 @@ class AnySim():
 				plt.legend(iter(res_plots), ('Subdomain 1', 'Subdomain 2'))
 		except:
 			pass
-		plt.axhline(y=1.e-6, c='k', ls=':')
+		plt.axhline(y=self.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
 		plt.ylim([0.8*np.nanmin(self.residual), 1.2*np.nanmax(self.residual)])
 		plt.title('Residual. Iterations = {:.2e}'.format(self.iters+1))

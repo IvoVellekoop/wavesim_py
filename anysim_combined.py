@@ -40,7 +40,7 @@ class AnySim():
 		# self.p = 2 * np.pi * np.fft.fftfreq(self.N, self.pixel_size)
 
 		print(self.N, 'self.N before')
-		self.N_domains = 2
+		self.N_domains = 3 #2 #
 		self.overlap = self.boundaries_width 	## Especially for the RAS_subdomain() method.
 		# self.overlap = 1
 		while (self.N-self.overlap)%self.N_domains != 0:
@@ -79,12 +79,15 @@ class AnySim():
 		Vraw = np.pad(Vraw, (self.boundaries_width, self.boundaries_width), mode='edge')
 
 		if self.domain_decomp:
-			self.n1 = int(np.ceil((self.N + self.overlap)/2))
-			# nd = int((self.N-self.overlap)/self.N_domains + self.overlap)
-			# n = [nd]*(self.N_domains)
+			# self.n1 = int(np.ceil((self.N + self.overlap)/2))
+			self.n1 = int((self.N-self.overlap)/self.N_domains + self.overlap)
+			# n = [self.n1]*(self.N_domains)
 
 			self.operators = []
+			# self.operators.append( self.make_operators(Vraw[:self.n1], 'left')[:2] )
+			# self.operators.append( self.make_operators(Vraw[-self.n1:], 'right')[:2] )
 			self.operators.append( self.make_operators(Vraw[:self.n1], 'left')[:2] )
+			self.operators.append( self.make_operators(Vraw[self.n1-self.overlap:-self.n1+self.overlap], None)[:2] )
 			self.operators.append( self.make_operators(Vraw[-self.n1:], 'right')[:2] )
 		else:
 			self.medium, self.propagator, _, _ = self.make_operators(Vraw)	# Medium B = 1 - V, and Propagator (L+1)^(-1)
@@ -162,7 +165,7 @@ class AnySim():
 		print('Boundaries width: \t', self.boundaries_width)
 
 	# Make the operators: Medium B = 1 - V and Propagator (L+1)^(-1)
-	def make_operators(self, Vraw, which_end=None):
+	def make_operators(self, Vraw, which_end='Both'):
 		N = Vraw.shape[0]
 		# give tiny non-zero minimum value to prevent division by zero in homogeneous media
 		if self.absorbing_boundaries:
@@ -198,8 +201,8 @@ class AnySim():
 
 		## B = 1 - V
 		B = np.eye(N) - V
-		if self.absorbing_boundaries:
-			if which_end == None:
+		if self.absorbing_boundaries and which_end != None:
+			if which_end == 'Both':
 				N_roi = self.N_roi
 			else:
 				N_roi = N - self.boundaries_width
@@ -268,16 +271,16 @@ class AnySim():
 
 		# restriction operators
 		R1 = np.zeros((self.n1,self.N))
-		R2 = R1.copy()
+		R_end = R1.copy()
 		ones = np.eye(self.n1)
 		R1[:,:self.n1] = ones
-		R2[:,-self.n1:] = ones
-		R = [R1, R2]
+		R_end[:,-self.n1:] = ones
+		R = [R1, R_end]
 
 		# partition of unity
 		D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), 0.5*np.ones(self.overlap))) )
-		D2 = np.diag( np.concatenate((0.5*np.ones(self.overlap), np.ones(self.n1-self.overlap))) )
-		D = [D1, D2]
+		D_end = np.diag( np.concatenate((0.5*np.ones(self.overlap), np.ones(self.n1-self.overlap))) )
+		D = [D1, D_end]
 
 		A = (B) - (B @ L_plus_1_inv @ B)
 		A1 = np.linalg.pinv(A[:self.n1,:self.n1].copy())
@@ -328,19 +331,22 @@ class AnySim():
 	## Use subdomain approximations as iterates
 	def RAS_subdomain(self):
 		# restriction operators
+		R = []
 		R1 = np.zeros((self.n1,self.N))
 		R2 = R1.copy()
+		R_end = R1.copy()
 		ones = np.eye(self.n1)
-		R1[:,:self.n1] = ones
-		R2[:,-self.n1:] = ones
-		R = [R1, R2]
+		R1[:,:self.n1] = ones;										R.append(R1)
+		R2[:,self.n1-self.overlap:-self.n1+self.overlap] = ones;		R.append(R2)
+		R_end[:,-self.n1:] = ones; 									R.append(R_end)
 
 		# partition of unity
 		fnc_interp = lambda x: np.interp(np.arange(x), [0,x-1], [0,1])
 		decay = fnc_interp(self.overlap)
-		D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) )
-		D2 = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) )
-		D = [D1, D2]
+		D = []
+		D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) );			D.append(D1)
+		D2 = np.diag( np.concatenate((decay, np.ones(self.n1-2*self.overlap), np.flip(decay))) );	D.append(D2)
+		D_end = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) ); 					D.append(D_end)
 
 		u = []
 		b = []
@@ -378,8 +384,8 @@ class AnySim():
 						residual[j] = [residual_i[j]]
 					else:
 						residual[j].append(residual_i[j])
-					# if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
-					if residual_i[j] < self.threshold_residual: ## break when either domain's residual goes below threshold
+					if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
+					# if residual_i[j] < self.threshold_residual: ## break when either domain's residual goes below threshold
 						self.iters = i
 						print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= {}'.format(self.iters+1, j+1, residual_i[j], self.threshold_residual))
 						self.residual_i = residual_i[j]
@@ -520,12 +526,12 @@ class AnySim():
 		plt.close()
 
 	## pad boundaries
-	def pad_func(self, M, M_roi, which_end=None):
+	def pad_func(self, M, M_roi, which_end='Both'):
 		# boundary_ = lambda x: (np.arange(1,x+1)-0.21).T/(x+0.66)
 		boundary_ = lambda x: np.interp(np.arange(x), [0,x-1], [0.04981993,0.95018007])
 		left_boundary = boundary_(np.floor(self.boundaries_width))
 		right_boundary = boundary_(np.ceil(self.boundaries_width))
-		if which_end == None:
+		if which_end == 'Both':
 			full_filter = np.concatenate((left_boundary, np.ones((M_roi,)), np.flip(right_boundary)))
 		elif which_end == 'left':
 			full_filter = np.concatenate((left_boundary, np.ones((M_roi,))))

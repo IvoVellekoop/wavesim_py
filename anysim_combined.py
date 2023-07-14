@@ -13,7 +13,7 @@ figsize = (8,8) #(14.32,8)
 # from PIL.Image import open, BILINEAR, fromarray
 
 class AnySim():
-	def __init__(self, test='FreeSpace', absorbing_boundaries=True, boundaries_width=16, wrap_correction='None', domain_decomp=True, cp=20):
+	def __init__(self, test='FreeSpace', absorbing_boundaries=True, boundaries_width=20, N_domains=2, overlap=20, wrap_correction='None', domain_decomp=True, cp=20):
 		self.test = test 									# 'FreeSpace', '1D', '2D', OR '2D_low_contrast'
 		self.absorbing_boundaries = absorbing_boundaries 	# True OR False
 		self.boundaries_width = boundaries_width
@@ -40,8 +40,8 @@ class AnySim():
 		# self.p = 2 * np.pi * np.fft.fftfreq(self.N, self.pixel_size)
 
 		print(self.N, 'self.N before')
-		self.N_domains = 3 #2 #
-		self.overlap = self.boundaries_width 	## Especially for the RAS_subdomain() method.
+		self.N_domains = N_domains# 2 #3 #
+		self.overlap = overlap# self.boundaries_width 	## Especially for the RAS_subdomain() method.
 		# self.overlap = 1
 		while (self.N-self.overlap)%self.N_domains != 0:
 			self.N_roi += 1
@@ -57,10 +57,12 @@ class AnySim():
 			os.makedirs(self.log_dir)
 
 		self.run_id = d1 + '_' + self.test
+		if self.domain_decomp:
+			self.run_id += '_Ndoms' + str(self.N_domains)
 		if self.wrap_correction != 'None':
 			self.run_id += '_' + self.wrap_correction
-		if self.absorbing_boundaries:
-			self.run_id += '_abs' + str(self.boundaries_width)
+		# if self.absorbing_boundaries:
+		# 	self.run_id += '_abs' + str(self.boundaries_width)
 
 		self.run_loc = self.log_dir + self.run_id
 		if not os.path.exists(self.run_loc):
@@ -79,15 +81,12 @@ class AnySim():
 		Vraw = np.pad(Vraw, (self.boundaries_width, self.boundaries_width), mode='edge')
 
 		if self.domain_decomp:
-			# self.n1 = int(np.ceil((self.N + self.overlap)/2))
 			self.n1 = int((self.N-self.overlap)/self.N_domains + self.overlap)
-			# n = [self.n1]*(self.N_domains)
 
 			self.operators = []
-			# self.operators.append( self.make_operators(Vraw[:self.n1], 'left')[:2] )
-			# self.operators.append( self.make_operators(Vraw[-self.n1:], 'right')[:2] )
 			self.operators.append( self.make_operators(Vraw[:self.n1], 'left')[:2] )
-			self.operators.append( self.make_operators(Vraw[self.n1-self.overlap:-self.n1+self.overlap], None)[:2] )
+			if self.N_domains == 3:
+				self.operators.append( self.make_operators(Vraw[self.n1-self.overlap:-self.n1+self.overlap], None)[:2] )
 			self.operators.append( self.make_operators(Vraw[-self.n1:], 'right')[:2] )
 		else:
 			self.medium, self.propagator, _, _ = self.make_operators(Vraw)	# Medium B = 1 - V, and Propagator (L+1)^(-1)
@@ -163,6 +162,8 @@ class AnySim():
 		print('Absorbing boundaries: \t', self.absorbing_boundaries)
 		print('Wrap correction: \t', self.wrap_correction)
 		print('Boundaries width: \t', self.boundaries_width)
+		print('Sub-domains: \t\t', self.N_domains)
+		print('Overlap: \t\t', self.overlap)
 
 	# Make the operators: Medium B = 1 - V and Propagator (L+1)^(-1)
 	def make_operators(self, Vraw, which_end='Both'):
@@ -333,20 +334,29 @@ class AnySim():
 		# restriction operators
 		R = []
 		R1 = np.zeros((self.n1,self.N))
-		R2 = R1.copy()
+		if self.N_domains == 3:
+			R2 = R1.copy()
 		R_end = R1.copy()
 		ones = np.eye(self.n1)
-		R1[:,:self.n1] = ones;										R.append(R1)
-		R2[:,self.n1-self.overlap:-self.n1+self.overlap] = ones;		R.append(R2)
-		R_end[:,-self.n1:] = ones; 									R.append(R_end)
+		R1[:,:self.n1] = ones
+		R.append(R1)
+		if self.N_domains == 3:
+			R2[:,self.n1-self.overlap:-self.n1+self.overlap] = ones
+			R.append(R2)
+		R_end[:,-self.n1:] = ones
+		R.append(R_end)
 
 		# partition of unity
 		fnc_interp = lambda x: np.interp(np.arange(x), [0,x-1], [0,1])
 		decay = fnc_interp(self.overlap)
 		D = []
-		D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) );			D.append(D1)
-		D2 = np.diag( np.concatenate((decay, np.ones(self.n1-2*self.overlap), np.flip(decay))) );	D.append(D2)
-		D_end = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) ); 					D.append(D_end)
+		D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) )
+		D.append(D1)
+		if self.N_domains == 3:
+			D2 = np.diag( np.concatenate((decay, np.ones(self.n1-2*self.overlap), np.flip(decay))) )
+			D.append(D2)
+		D_end = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) )
+		D.append(D_end)
 
 		u = []
 		b = []
@@ -363,6 +373,7 @@ class AnySim():
 		breaker = False
 		for i in range(self.max_iters):
 			for j in range(self.N_domains):
+			# for j in [0,1,2,1]:
 				print('Iteration {}, sub-domain {}.'.format(i+1,j+1), end='\r')
 				### Main update from here ---
 				if i % self.iter_step == 0:
@@ -377,20 +388,24 @@ class AnySim():
 
 					## Residual collection and checking				
 					if i==0:
-						normb[j] = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
-					nr = np.linalg.norm(tj[j][self.boundaries_width:-self.overlap])
+						normb[j] = np.linalg.norm(tj[j])#[self.boundaries_width:-self.overlap])
+					nr = np.linalg.norm(tj[j])#[self.boundaries_width:-self.overlap])
 					residual_i[j] = nr/normb[j]
 					if i==0:
 						residual[j] = [residual_i[j]]
 					else:
 						residual[j].append(residual_i[j])
-					if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when BOTH subdomains' residual goes below threshold
-					# if residual_i[j] < self.threshold_residual: ## break when either domain's residual goes below threshold
+
+					# if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when BOTH/ALL subdomains' residual goes below threshold
+					if residual_i[j] < self.threshold_residual: ## break when either domain's residual goes below threshold
 						self.iters = i
 						print('Stopping simulation at iter {}, sub-domain {}, residual {:.2e} <= {}'.format(self.iters+1, j+1, residual_i[j], self.threshold_residual))
 						self.residual_i = residual_i[j]
-						if j == 0:
+						while len(residual[1]) != len(residual[0]):
 							residual[1].append(np.nan)
+						if self.N_domains == 3:
+							while len(residual[2]) != len(residual[0]):
+								residual[2].append(np.nan)
 						breaker = True
 						break
 			if breaker:
@@ -398,12 +413,11 @@ class AnySim():
 			u_iter.append(self.u)
 		self.u = self.Tr * self.u
 		self.u_iter = self.Tr.flatten() * np.array(u_iter)
-		try:
-			self.residual = np.array(residual)
-			if self.residual.shape[0] < self.residual.shape[1]:
-				self.residual = self.residual.T
-		except:
-			pass
+
+		# residual[1] = residual[1][::2]	# if update order is 0-1-2-1-0-... (i.e., 1 is repeated twice in one global iteration)
+		self.residual = np.array(residual)
+		if self.residual.shape[0] < self.residual.shape[1]:
+			self.residual = self.residual.T
 
 	# Save details and stats
 	def save_details(self):
@@ -413,9 +427,9 @@ class AnySim():
 			self.residual_i = np.nan
 		with open(self.stats_file_name,'a') as fileopen:
 			if self.wrap_correction == 'L_corr':
-				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e}; corner points {} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err, self.cp))
+				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; overlap {}; overlap {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e}; corner points {} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.N_domains, self.overlap, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err, self.cp))
 			else:
-				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err))
+				fileopen.write('Test {}; absorbing boundaries {}; boundaries width {}; overlap {}; overlap {}; wrap correction {}; {:>2.2f} sec; {} iterations; final residual {:>2.2e}; relative error {:>2.2e} \n'.format(self.test, str(self.absorbing_boundaries), self.boundaries_width, self.N_domains, self.overlap, self.wrap_correction, self.sim_time, self.iters+1, self.residual_i, self.rel_err))
 
 	# Plotting functions
 	def plot_details(self):
@@ -437,8 +451,11 @@ class AnySim():
 
 		plt.subplot(2,1,1)
 		if self.domain_decomp:
-			plt.axvline(x=(self.N_roi-self.overlap)/2*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-			plt.axvline(x=(self.N_roi+self.overlap)/2*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			plt.axvline(x=(self.n1-self.boundaries_width-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+			plt.axvline(x=(self.n1-self.boundaries_width)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			if self.N_domains == 3:
+				plt.axvline(x=(2*(self.n1-self.overlap)-self.boundaries_width)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=(2*self.n1-self.boundaries_width-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 		plt.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
 		plt.plot(self.x, np.real(self.u), 'r', lw=1., label='AnySim')
 		plt.xlim([self.x[0]-self.x[1]*2,self.x[-1]+self.x[1]*2])
@@ -452,12 +469,15 @@ class AnySim():
 		try:
 			res_plots = plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.residual, lw=1.5)
 			if self.domain_decomp:
-				plt.legend(iter(res_plots), ('Subdomain 1', 'Subdomain 2'))
+				plt.legend(iter(res_plots), ('Subdomain 1', 'Subdomain 2', 'Subdomain 3'))
 		except:
 			pass
 		plt.axhline(y=self.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
-		plt.ylim([0.8*np.nanmin(self.residual), 1.2*np.nanmax(self.residual)])
+		try:
+			plt.ylim([0.8*np.nanmin(self.residual), 1.2*np.nanmax(self.residual)])
+		except:
+			pass
 		plt.title('Residual. Iterations = {:.2e}'.format(self.iters+1))
 		plt.ylabel('Residual')
 		plt.xlabel('Iterations')
@@ -483,8 +503,11 @@ class AnySim():
 
 		fig = plt.figure(figsize=(14.32,8))
 		if self.domain_decomp:
-			plt.axvline(x=(self.N_roi-self.overlap)/2*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-			plt.axvline(x=(self.N_roi+self.overlap)/2*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			plt.axvline(x=(self.n1-self.boundaries_width-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+			plt.axvline(x=(self.n1-self.boundaries_width)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			if self.N_domains == 3:
+				plt.axvline(x=(2*(self.n1-self.overlap)-self.boundaries_width)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=(2*self.n1-self.boundaries_width-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 		plt.plot(self.x, np.real(self.u_true), 'k', lw=0.75, label=self.label)
 		plt.xlabel("$x$")
 		plt.ylabel("Amplitude")
@@ -560,6 +583,8 @@ class AnySim():
 		return np.linalg.norm(A,2)
 
 
+# for bw in range(2,41,2):
+# for ov in range(0,11,1):
 s1 = time.time()
 anysim = AnySim()
 anysim.runit()

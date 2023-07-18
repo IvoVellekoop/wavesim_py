@@ -14,7 +14,7 @@ figsize = (8,8) #(14.32,8)
 
 class AnySim():
 	def __init__(self, test='custom', lambd=1, ppw=4, boundaries_width=20, N=256, n=[0], source_amplitude=1., source_location=0, N_domains=2, overlap=20, wrap_correction='None', cp=20):
-		self.test = test 									# 'FreeSpace', '1D', '2D', OR '2D_low_contrast'
+		self.test = test 									# 'FreeSpace', '1DGlassPlate', '2D', OR '2D_low_contrast'
 
 		self.absorbing_boundaries = True 	# True OR False
 		self.boundaries_width = boundaries_width
@@ -46,12 +46,7 @@ class AnySim():
 		self.b[self.source_location] = self.source_amplitude
 
 		self.n = n
-		## construct the refractive index map if needed
-		if self.test != 'custom':
-			self.n = np.ones(self.N_roi)
-			if self.test == '1D':
-				self.n[99:130] = 1.5
-		self.N_dim = np.ndim(self.n)# 1		# currently tackling only 1D problem, so number of dimensions = 1
+		self.N_dim = self.n.ndim# 1 			# currently tackling only 1D problem, so number of dimensions = 1
 
 		self.wrap_correction = wrap_correction	# 'L_w', 'L_omega', OR 'L_corr'
 		self.cp = cp							# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
@@ -76,10 +71,49 @@ class AnySim():
 
 		self.stats_file_name = self.log_dir + self.test + '_stats.txt'
 
-	def runit(self):			# function that calls all the other 'main' functions
-		s1 = time.time()
 		self.print_details()	# print the simulation details
+		self.init_setup()		# set up operators
 
+	def runit(self, u_true):
+		s1 = time.time()
+		self.iterate()
+
+		# Truncate u to ROI
+		if self.absorbing_boundaries:
+			self.u = self.u[self.bw_l:-self.bw_r]
+			self.u_iter = self.u_iter[:, self.bw_l:-self.bw_r]
+
+		# Print relative error between u and analytic solution (or Matlab result)
+		self.u_true = u_true
+
+		if self.u_true.shape[0] != self.N_roi:
+			self.N_roi = self.N_roi_orig
+			self.u = self.u[:self.N_roi_orig]
+			self.u_iter = self.u_iter[:, :self.N_roi_orig]
+
+		self.rel_err = self.relative_error(self.u, self.u_true)
+		print('Relative error: {:.2e}'.format(self.rel_err))
+
+		self.sim_time = time.time()-s1
+		print('Simulation done (Time {} s)'.format(np.round(self.sim_time,2)))
+		print('Saving stats and Plotting...')
+		self.save_details()
+		print('Saving stats done.')
+		self.plot_details()	# Plot the final field, residual vs. iterations, and animation of field with iterations
+		print('-'*50)
+		return self.rel_err
+
+	def print_details(self):
+		print(f'\n {self.N_dim} dimensional problem')
+		if self.test != 'custom':
+			print('Test: \t\t\t', self.test)
+		if self.wrap_correction != 'None':
+			print('Wrap correction: \t', self.wrap_correction)
+		print('Boundaries width: \t', self.boundaries_width)
+		if self.N_domains > 1:
+			print(f'Decomposing into {self.N_domains} domains, with overlap {self.overlap}')
+
+	def init_setup(self):			# function that calls all the other 'main' functions
 		# Make operators: Medium B = 1 - V, and Propagator (L+1)^(-1)
 		Vraw = self.k0**2 * self.n**2
 		Vraw = np.pad(Vraw, (self.boundaries_width, self.boundaries_width), mode='edge')
@@ -107,58 +141,7 @@ class AnySim():
 		self.alpha = 0.9				# ~step size of the Richardson iteration \in (0,1]
 		self.threshold_residual = 1.e-6
 		self.iter_step = 1
-		self.iterate()
-
-		# Truncate u to ROI
-		if self.absorbing_boundaries:
-			self.u = self.u[self.bw_l:-self.bw_r]
-			self.u_iter = self.u_iter[:, self.bw_l:-self.bw_r]
-
-		# Print relative error between u and analytic solution (or Matlab result)
-		if self.test == 'FreeSpace' or self.test == 'custom':
-			## Compare with the analytic solution
-			x = np.arange(0,self.N_roi*self.pixel_size,self.pixel_size)
-			x = np.pad(x, (64,64), mode='constant')
-			h = self.pixel_size
-			k = self.k0
-			phi = k * x
-
-			E_theory = 1.0j*h/(2*k) * np.exp(1.0j*phi) - h/(4*np.pi*k) * (np.exp(1.0j * phi) * ( np.exp(1.0j * (k-np.pi/h) * x) - np.exp(1.0j * (k+np.pi/h) * x)) - np.exp(-1.0j * phi) * ( -np.exp(-1.0j * (k-np.pi/h) * x) + np.exp(-1.0j * (k+np.pi/h) * x)))
-			# special case for values close to 0
-			small = np.abs(k*x) < 1.e-10
-			E_theory[small] = 1.0j * h/(2*k) * (1 + 2j * np.arctanh(h*k/np.pi)/np.pi); # exact value at 0.
-			self.u_true = E_theory[64:-64]
-		elif self.test == '1D':
-			self.u_true = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
-
-		if self.u_true.shape[0] != self.N_roi:
-			self.N_roi = self.N_roi_orig
-			self.u = self.u[:self.N_roi_orig]
-			self.u_iter = self.u_iter[:, :self.N_roi_orig]
-
-		self.rel_err = self.relative_error(self.u, self.u_true)
-		print('\n')
-		print('Relative error: {:.2e}'.format(self.rel_err))
-
-		self.sim_time = time.time()-s1
-		print('Simulation done (Time {} s)'.format(np.round(self.sim_time,2)))
-		print('Saving stats and Plotting...')
-		self.save_details()
-		print('Saving stats done.')
-		self.plot_details()	# Plot the final field, residual vs. iterations, and animation of field with iterations
-		print('-'*50)
-		return self.u
-
-	def print_details(self):
-		print(f'{self.N_dim} dimensional problem')
-		if self.test != 'custom':
-			print('Test: \t\t\t', self.test)
-		if self.wrap_correction != 'None':
-			print('Wrap correction: \t', self.wrap_correction)
-		print('Boundaries width: \t', self.boundaries_width)
-		if self.N_domains > 1:
-			print(f'Decomposing into {self.N_domains} domains, with overlap {self.overlap}')
-
+	
 	# Make the operators: Medium B = 1 - V and Propagator (L+1)^(-1)
 	def make_operators(self, Vraw, which_end='Both'):
 		N = Vraw.shape[0]
@@ -174,7 +157,8 @@ class AnySim():
 		V0 = V0 - Vmin
 		V = np.diag(-1j*(Vraw - V0))
 		F = self.DFT_matrix(N)
-		Finv = np.asarray(np.matrix(F).H/N)
+		# Finv = np.asarray(np.matrix(F).H/N)
+		Finv = np.asarray(np.conj(F).T/N)
 		if self.wrap_correction == 'L_corr':
 			p = 2*np.pi*np.fft.fftfreq(N, self.pixel_size)
 			Lw_p = p**2
@@ -219,7 +203,8 @@ class AnySim():
 			Omega = np.zeros((N, N_FastConv))
 			Omega[:,:N] = Ones
 			F_Omega = self.DFT_matrix(N_FastConv)
-			Finv_Omega = np.asarray(np.matrix(F_Omega).H/(N_FastConv))
+			# Finv_Omega = np.asarray(np.matrix(F_Omega).H/(N_FastConv))
+			Finv_Omega = np.asarray(np.conj(F_Omega).T/(N_FastConv))
 			L_plus_1_inv = Omega @ Finv_Omega @ np.diag(Lp_inv.flatten()) @ F_Omega @ Omega.T
 		else:
 			# propagator = lambda x: (np.fft.ifftn(Lp_inv * np.fft.fftn(x)))
@@ -228,7 +213,8 @@ class AnySim():
 
 		## Check that A = L + V is accretive
 		A = np.linalg.inv(L_plus_1_inv) - B
-		acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.matrix(A).H))))
+		# acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.matrix(A).H))))
+		acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.conj(A).T))))
 		if np.round(acc, 7) < 0:
 			raise Exception('A is not accretive. ', acc)
 		
@@ -345,7 +331,7 @@ class AnySim():
 		self.x = np.arange(self.N_roi)*self.pixel_size
 		if self.test == 'FreeSpace' or self.test == 'custom':
 			self.label = 'Analytic solution'
-		elif self.test == '1D':
+		elif self.test == '1DGlassPlate':
 			self.label = 'Matlab solution'
 
 		self.plot_FieldNResidual()	# png

@@ -11,19 +11,27 @@ N = 256         # medium size in pixels
 n = np.ones(N)  # refractive index distribution
 source_amplitude = 1.
 source_location = 0
-N_domains = [1,3]# np.arange(1,6)# 
+N_domains = [1,3]# np.arange(1,6)#      # Number of sub-domains for domain decomposition (=[1] for no domain decomposition)
 
 s1 = time.time()
 
-for i in N_domains:
-    # anysim = AnySim(N=N, n=n, source_amplitude=source_amplitude, source_location=source_location, N_domains=i)
-    # anysim.runit()
+for idx,i in enumerate(N_domains):
+    anysim = AnySim(N=N, n=n, source_amplitude=source_amplitude, source_location=source_location, N_domains=i)
+    
+    if idx==0:
+        x = np.arange(0,anysim.N_roi*anysim.pixel_size,anysim.pixel_size)
+        x = np.pad(x, (64,64), mode='constant')
+        h = anysim.pixel_size
+        k = anysim.k0
+        phi = k * x
 
-    anysim = AnySim(test='FreeSpace', N_domains=i)
-    anysim.runit()
+        E_theory = 1.0j*h/(2*k) * np.exp(1.0j*phi) - h/(4*np.pi*k) * (np.exp(1.0j * phi) * ( np.exp(1.0j * (k-np.pi/h) * x) - np.exp(1.0j * (k+np.pi/h) * x)) - np.exp(-1.0j * phi) * ( -np.exp(-1.0j * (k-np.pi/h) * x) + np.exp(-1.0j * (k+np.pi/h) * x)))
+        # special case for values close to 0
+        small = np.abs(k*x) < 1.e-10
+        E_theory[small] = 1.0j * h/(2*k) * (1 + 2j * np.arctanh(h*k/np.pi)/np.pi); # exact value at 0.
+        u_true = E_theory[64:-64]
 
-    anysim = AnySim(test='1D', N_domains=i)
-    anysim.runit()
+    anysim.runit(u_true)
 
 e1 = time.time() - s1
 print('Total time (including plotting): ', np.round(e1,2))

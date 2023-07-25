@@ -7,6 +7,8 @@ dependencies:
   - _openmp_mutex=5.1=1_gnu
   - _sysroot_linux-64_curr_repodata_hack=3=haa98f57_10
   - absl-py=1.3.0=py310h06a4308_0
+  - aiofiles=22.1.0=py310h06a4308_0
+  - aiosqlite=0.18.0=py310h06a4308_0
   - anyio=3.5.0=py310h06a4308_0
   - appdirs=1.4.4=pyhd3eb1b0_0
   - argon2-cffi=21.3.0=pyhd3eb1b0_0
@@ -18,25 +20,26 @@ dependencies:
   - beautifulsoup4=4.12.2=py310h06a4308_0
   - binutils_impl_linux-64=2.38=h2a08ee3_1
   - binutils_linux-64=2.38.0=hc2dff05_0
-  - blas=1.0=mkl
+  - blas=1.0=openblas
   - bleach=4.1.0=pyhd3eb1b0_0
   - bottleneck=1.3.5=py310ha9d4c09_0
   - brotli=1.0.9=h5eee18b_7
   - brotli-bin=1.0.9=h5eee18b_7
   - brotlipy=0.7.0=py310h7f8727e_1002
   - bzip2=1.0.8=h7b6447c_0
-  - ca-certificates=2023.01.10=h06a4308_0
+  - ca-certificates=2023.05.30=h06a4308_0
+  - cairo=1.16.0=hb05425b_4
   - certifi=2023.5.7=py310h06a4308_0
   - cffi=1.15.1=py310h5eee18b_3
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
   - comm=0.1.2=py310h06a4308_0
   - contourpy=1.0.5=py310hdb19cb5_0
-  - cryptography=39.0.1=py310h9ce1e76_0
+  - cryptography=39.0.1=py310h9ce1e76_1
   - cycler=0.11.0=pyhd3eb1b0_0
   - dbus=1.13.18=hb2f20db_0
   - debugpy=1.5.1=py310h295c915_0
-  - decorator=5.1.1=pyhd3eb1b0_0
   - defusedxml=0.7.1=pyhd3eb1b0_0
+  - eigen=3.3.7=hd09550d_1
   - entrypoints=0.4=py310h06a4308_0
   - executing=0.8.3=pyhd3eb1b0_0
   - expat=2.4.9=h6a678d5_0
@@ -55,10 +58,13 @@ dependencies:
   - glib=2.69.1=he621ea3_2
   - gmp=6.2.1=h295c915_3
   - gnutls=3.6.15=he1e5248_0
+  - graphite2=1.3.14=h295c915_1
   - gst-plugins-base=1.14.1=h6a678d5_1
   - gstreamer=1.14.1=h5eee18b_1
   - gxx_impl_linux-64=11.2.0=h1234567_1
   - gxx_linux-64=11.2.0=hc2dff05_0
+  - harfbuzz=4.3.0=hf52aaf7_1
+  - hdf5=1.10.6=h3ffc7dd_1
   - icu=58.2=he6710b0_3
   - idna=3.4=py310h06a4308_0
   - intel-openmp=2023.1.0=hdb19cb5_46305
@@ -74,8 +80,13 @@ dependencies:
   - jsonschema=4.17.3=py310h06a4308_0
   - jupyter_client=8.1.0=py310h06a4308_0
   - jupyter_core=5.3.0=py310h06a4308_0
-  - jupyter_server=1.23.4=py310h06a4308_0
-  - jupyterlab=3.5.3=py310h06a4308_0
+  - jupyter_events=0.6.3=py310h06a4308_0
+  - jupyter_server=2.5.0=py310h06a4308_0
+  - jupyter_server_fileid=0.9.0=py310h06a4308_0
+  - jupyter_server_terminals=0.4.4=py310h06a4308_0
+  - jupyter_server_ydoc=0.8.0=py310h06a4308_0
+  - jupyter_ydoc=0.2.4=py310h06a4308_0
+  - jupyterlab=3.6.3=py310h06a4308_0
   - jupyterlab_pygments=0.1.2=py_0
   - jupyterlab_server=2.22.0=py310h06a4308_0
   - jupyterlab_widgets=3.0.5=py310h06a4308_0
@@ -103,9 +114,11 @@ dependencies:
   - libgomp=11.2.0=h1234567_1
   - libidn2=2.3.4=h5eee18b_0
   - libllvm14=14.0.6=hdb19cb5_3
+  - libopenblas=0.3.21=h043d6bf_0
   - libopus=1.3.1=h7b6447c_0
   - libpng=1.6.39=h5eee18b_0
   - libpq=12.9=h16c4e8d_3
+  - libprotobuf=3.20.3=he621ea3_0
   - libsodium=1.0.18=h7b6447c_0
   - libstdcxx-devel_linux-64=11.2.0=h1234567_1
   - libstdcxx-ng=11.2.0=h1234567_1
@@ -130,8 +143,6 @@ dependencies:
   - mistune=0.8.4=py310h7f8727e_1000
   - mkl=2023.1.0=h6d00ec8_46342
   - mkl-service=2.4.0=py310h5eee18b_1
-  - mkl_fft=1.3.6=py310h1128e8f_1
-  - mkl_random=1.2.2=py310h1128e8f_1
   - mpi=1.0=mpich
   - mpich=4.1.1=hbae89fd_0
   - mscorefonts=0.0.1=3
@@ -145,13 +156,15 @@ dependencies:
   - nettle=3.7.3=hbbd107a_1
   - notebook=6.5.4=py310h06a4308_0
   - notebook-shim=0.2.2=py310h06a4308_0
-  - nspr=4.33=h295c915_0
-  - nss=3.74=h0370c37_0
-  - numexpr=2.8.4=py310h85018f9_1
-  - numpy=1.24.3=py310h5f9d8c6_1
-  - numpy-base=1.24.3=py310hb5e798b_1
+  - nspr=4.35=h6a678d5_0
+  - nss=3.89.1=h6a678d5_0
+  - numexpr=2.8.4=py310h757a811_1
+  - numpy=1.24.3=py310hac523dd_0
+  - numpy-base=1.24.3=py310h375b286_0
+  - opencv=4.6.0=py310h1128e8f_3
   - openh264=2.1.1=h4ff587b_0
-  - openssl=1.1.1t=h7f8727e_0
+  - openjpeg=2.4.0=h3ad879b_0
+  - openssl=1.1.1u=h7f8727e_0
   - packaging=23.0=py310h06a4308_0
   - pandas=1.5.3=py310h1128e8f_0
   - pandocfilters=1.5.0=pyhd3eb1b0_0
@@ -160,6 +173,7 @@ dependencies:
   - pexpect=4.8.0=pyhd3eb1b0_3
   - pickleshare=0.7.5=pyhd3eb1b0_1003
   - pillow=9.4.0=py310h6a678d5_0
+  - pixman=0.40.0=h7f8727e_1
   - platformdirs=2.5.2=py310h06a4308_0
   - ply=3.11=py310h06a4308_0
   - pooch=1.4.0=pyhd3eb1b0_0
@@ -179,17 +193,21 @@ dependencies:
   - python=3.10.11=h7a1cb2a_2
   - python-dateutil=2.8.2=pyhd3eb1b0_0
   - python-fastjsonschema=2.16.2=py310h06a4308_0
+  - python-json-logger=2.0.7=py310h06a4308_0
   - python-kaleido=0.2.1=pyhd8ed1ab_0
   - pytz=2022.7=py310h06a4308_0
+  - pyyaml=6.0=py310h5eee18b_1
   - pyzmq=25.0.2=py310h6a678d5_0
   - qt-main=5.15.2=h8373d8f_8
   - qt-webengine=5.15.9=hbbf29b9_6
   - qtwebkit=5.212=h3fafdc1_5
   - readline=8.2=h5eee18b_0
   - requests=2.29.0=py310h06a4308_0
-  - scipy=1.10.1=py310h5f9d8c6_1
+  - rfc3339-validator=0.1.4=py310h06a4308_0
+  - rfc3986-validator=0.1.1=py310h06a4308_0
+  - scipy=1.10.1=py310heeff2f4_1
   - send2trash=1.8.0=pyhd3eb1b0_1
-  - setuptools=66.0.0=py310h06a4308_0
+  - setuptools=67.8.0=py310h06a4308_0
   - sip=6.6.2=py310h6a678d5_0
   - six=1.16.0=pyhd3eb1b0_1
   - sniffio=1.2.0=py310h06a4308_1
@@ -209,7 +227,7 @@ dependencies:
   - typing-extensions=4.5.0=py310h06a4308_0
   - typing_extensions=4.5.0=py310h06a4308_0
   - tzdata=2023c=h04d1e81_0
-  - urllib3=1.26.15=py310h06a4308_0
+  - urllib3=1.26.16=py310h06a4308_0
   - wcwidth=0.2.5=pyhd3eb1b0_0
   - webencodings=0.5.1=py310h06a4308_1
   - websocket-client=0.58.0=py310h06a4308_4
@@ -217,20 +235,34 @@ dependencies:
   - widgetsnbextension=3.5.2=py310h06a4308_0
   - x264=1!157.20191217=h7b6447c_0
   - xz=5.4.2=h5eee18b_0
+  - y-py=0.5.9=py310h52d8a92_0
+  - yaml=0.2.5=h7b6447c_0
+  - ypy-websocket=0.8.2=py310h06a4308_0
   - zeromq=4.3.4=h2531618_0
   - zlib=1.2.13=h5eee18b_0
   - zstd=1.5.5=hc292b87_0
   - pip:
       - asteval==0.9.28
       - chart-studio==1.1.0
+      - decorator==4.4.2
+      - exceptiongroup==1.1.2
+      - execnet==2.0.2
       - ffmpeg-python==0.2.0
       - future==0.18.3
+      - imageio==2.31.1
+      - imageio-ffmpeg==0.4.8
+      - iniconfig==2.0.0
       - lmfit==1.1.0
+      - moviepy==1.0.3
       - mpi4py==3.1.4
-      - pip==23.1.2
+      - pip==23.2
       - plotly==5.14.1
+      - pluggy==1.2.0
+      - proglog==0.1.10
       - pyproject-toml==0.0.10
       - pyqt5-sip==12.11.0
+      - pytest==7.4.0
+      - pytest-xdist==3.3.1
       - retrying==1.3.4
       - tenacity==8.2.0
       - uncertainties==3.1.7

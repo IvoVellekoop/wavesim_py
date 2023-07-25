@@ -1,6 +1,7 @@
 import os, time
 import numpy as np
 from datetime import date
+from itertools import product
 from scipy.linalg import eigvals
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
@@ -14,7 +15,7 @@ figsize = (8,8) #(14.32,8)
 
 class AnySim():
 	def __init__(self, 
-	      test='custom', 						# 'Test_1DFreeSpace', 'Test_1DGlassPlate', '2DLogo', OR '2DLowContrast'
+	      test='custom', 						# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', 'Test_3DDisordered'
 		  n=np.ones(256), 						# Refractive index distribution
 		  N_roi=np.array([256]), 				# Size of medium (in pixels)
 		  lambd=1., 							# Wavelength in um (micron)
@@ -29,20 +30,16 @@ class AnySim():
 		  cp=20, 								# Corner points to include in case of 'L_corr' wrap-around correction
 		  max_iters=int(1.1e+3)):				# Maximum number iterations
 
-		self.test = test	# 'Test_1DFreeSpace', 'Test_1DGlassPlate', '2DLogo', OR '2DLowContrast'
+		self.test = test	# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', 'Test_3DDisordered'
 
 		self.n = n
 		self.N_dim = self.n.ndim				# Number of dimensions in problem
 
-		if not isinstance(N_roi, np.ndarray) or N_roi.shape[0] != self.N_dim:
-			N_roi = np.tile(N_roi, self.N_dim)
-		self.N_roi_orig = N_roi.copy()
-		self.N_roi = N_roi.copy()							# Num of points in ROI (Region of Interest)
+		self.N_roi = self.check_input(N_roi)	# Num of points in ROI (Region of Interest)
+		self.N_roi_orig = self.N_roi.copy()
 
-		self.absorbing_boundaries = True 	# True OR False
-		self.boundary_widths = boundary_widths
-		if not isinstance(self.boundary_widths, np.ndarray) or self.boundary_widths.shape[0] != self.N_dim:
-			self.boundary_widths = np.tile(self.boundary_widths, self.N_dim)
+		self.absorbing_boundaries = True 		# True OR False
+		self.boundary_widths = self.check_input(boundary_widths)
 
 		if self.absorbing_boundaries:
 			self.bw_l = np.floor(self.boundary_widths).astype(int)
@@ -57,19 +54,17 @@ class AnySim():
 
 		self.N = self.N_roi+(2*self.boundary_widths).astype(int)
 
-		self.N_domains = N_domains				# Number of subdomains to decompose into, in each dimension
-		if not isinstance(self.N_domains, np.ndarray) or self.N_domains.shape[0] != self.N_dim:
-			self.N_domains = np.tile(self.N_domains, self.N_dim)
+		self.N_domains = self.check_input(N_domains)	# Number of subdomains to decompose into, in each dimension
+		self.total_domains = np.prod(self.N_domains)
+		self.range_total_domains = range(self.total_domains)
 
-		self.overlap = overlap 					# Overlap between subdomains in each dimension
-		if not isinstance(self.overlap, np.ndarray) or self.overlap.shape[0] != self.N_dim:
-			self.overlap = np.tile(self.overlap, self.N_dim)
-		self.overlap = self.overlap.astype(int)
+		self.overlap = self.check_input(overlap).astype(int)	# Overlap between subdomains in each dimension
 		
 		## Add more points to N to ensure subdomains are of the same size after domain decomposition
 		for i in range(self.N_dim):
 			while (self.N[i]-self.overlap[i])%self.N_domains[i] != 0:
 				self.N_roi[i] += 1
+				# self.bw_r[i] += 1
 				self.N[i] = self.N_roi[i]+(2*self.boundary_widths[i]).astype(int)
 		assert np.array((self.N-self.overlap)%self.N_domains == 0).all()
 
@@ -120,7 +115,7 @@ class AnySim():
 		if self.wrap_correction:
 			print('Wrap correction: \t', self.wrap_correction)
 		print('Boundaries width: \t', self.boundary_widths)
-		if (self.N_domains > 1).any():
+		if self.total_domains > 1:
 			print(f'Decomposing into {self.N_domains} domains, with overlap {self.overlap}')
 
 	def init_setup(self):			# function that calls all the other 'main' functions
@@ -130,20 +125,16 @@ class AnySim():
 
 		self.n1 = ((self.N-self.overlap)/self.N_domains + self.overlap).astype(int)
 		self.operators = []
-		if (self.N_domains==1).all():
+		if self.total_domains==1:
 			self.operators.append( self.make_operators(Vraw) )
 		else:
-			# self.operators.append( self.make_operators(Vraw[:self.n1], 'left') )
 			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.n1[i]) for i in range(self.N_dim)])], 'left') )
-			for d in range(1,self.N_domains[0]-1):
-				# self.operators.append( self.make_operators(Vraw[d*(self.n1-self.overlap):d*(self.n1-self.overlap)+self.n1], None) )
+			for d in range(1,self.total_domains-1):
 				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.n1[i]-self.overlap[i]), d*(self.n1[i]-self.overlap[i])+self.n1[i]) for i in range(self.N_dim)])], None) )
-			# self.operators.append( self.make_operators(Vraw[-self.n1:], 'right') )
 			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.n1[i],None) for i in range(self.N_dim)])], 'right') )
 
 		# Scale the source term (and pad if boundaries)
 		if self.absorbing_boundaries:
-			# self.b = self.Tl * np.pad(self.b, self.N_dim*((self.bw_l,self.bw_r),), mode='constant') # source term y
 			self.b = self.Tl * np.pad(self.b, (tuple([[self.bw_l[i], self.bw_r[i]] for i in range(self.N_dim)])), mode='constant') # source term y
 		else:
 			self.b = self.Tl * self.b
@@ -217,7 +208,7 @@ class AnySim():
 		## Construct restriction operators (R) and partition of unity operators (D)
 		u = []
 		b = []
-		if (self.N_domains==1).all():
+		if self.total_domains==1:
 			u.append(self.u)
 			b.append(self.b)
 			## To Normalize subdomain residual wrt preconditioned source
@@ -227,7 +218,7 @@ class AnySim():
 			D = []
 			ones = np.eye(self.n1[0])
 			R_0 = np.zeros((self.n1[0],self.N[0]))
-			for i in range(self.N_domains[0]):
+			for i in self.range_total_domains:
 				R_mid = R_0.copy()
 				R_mid[:,i*(self.n1[0]-self.overlap[0]):i*(self.n1[0]-self.overlap[0])+self.n1[0]] = ones
 				R.append(R_mid)
@@ -237,34 +228,33 @@ class AnySim():
 			D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) )
 			D.append(D1)
 			D_mid = np.diag( np.concatenate((decay, np.ones(self.n1-2*self.overlap), np.flip(decay))) )
-			for _ in range(1,self.N_domains[0]-1):
+			for _ in range(1,self.total_domains-1):
 				D.append(D_mid)
 			D_end = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) )
 			D.append(D_end)
 
-			for j in range(self.N_domains[0]):
+			for j in self.range_total_domains:
 				u.append(R[j]@self.u)
 				b.append(R[j]@self.b)
 
 			## To Normalize subdomain residual wrt preconditioned source
-			full_normGB = np.linalg.norm(np.sum(np.array([(R[j].T @ D[j] @ self.operators[j][medium](self.operators[j][propagator](b[j]))) for j in range(self.N_domains[0])]), axis=0))
+			full_normGB = np.linalg.norm(np.sum(np.array([(R[j].T @ D[j] @ self.operators[j][medium](self.operators[j][propagator](b[j]))) for j in self.range_total_domains]), axis=0))
 
-
-		tj = [0.0] * self.N_domains[0]
-		normb = [0.0] * self.N_domains[0]
-		residual_i = [1.0] * self.N_domains[0]
-		residual = [[0.0]] * self.N_domains[0]
+		tj = [None for _ in self.range_total_domains]
+		normb = [None for _ in self.range_total_domains]
+		residual_i = [None for _ in self.range_total_domains]
+		residual = [[] for _ in self.range_total_domains]
 		u_iter = []
 		breaker = False
 
 		full_residual = []
 
 		for i in range(self.max_iters):
-			for j in range(self.N_domains[0]):
+			for j in self.range_total_domains:
 				print('Iteration {}, sub-domain {}.'.format(i+1,j+1), end='\r')
 				### Main update START ---
 				# if i % self.iter_step == 0:
-				if (self.N_domains==1).all():
+				if self.total_domains==1:
 					u[j] = self.u.copy()
 				else:
 					u[j] = R[j] @ self.u
@@ -274,64 +264,29 @@ class AnySim():
 				### --- continued below ---
 
 				''' Residual collection and checking '''
-
 				## To Normalize subdomain residual wrt preconditioned source
-				if (self.N_domains==1).all():
+				if self.total_domains==1:
 					nr = np.linalg.norm( tj[j] )
 				else:
 					nr = np.linalg.norm(D[j] @ tj[j])
 
-				if i==0:
-					residual[j] = [nr/full_normGB]
-				if i>0:
-					residual_i[j] = nr/full_normGB
-					residual[j].append(residual_i[j])
-
-				# ## Normalize subdomain residual with global residual at 1st iteration [Same as above (at least for the homogeneous medium), but starting from iteration 2]
-				# if i==0:
-				# 	residual[j] = [np.nan]
-				# if i>0:
-				# 	nr = np.linalg.norm(D[j] @ tj[j])
-				# 	residual_i[j] = nr/full_normb
-				# 	residual[j].append(residual_i[j])
-
-				## Normalize subdomain residual with that subdomain's residual at 1st iteration
-				# if i==0:
-				# 	normb[j] = np.linalg.norm(D[j] @ tj[j])
-				# nr = np.linalg.norm(D[j] @ tj[j])
-				# residual_i[j] = nr/normb[j]
-				# if i==0:
-				# 	residual[j] = [residual_i[j]]
-				# else:
-				# 	residual[j].append(residual_i[j])
-
-				# # if np.array([val < self.threshold_residual for val in residual_i]).all():	## break only when ALL subdomains' residual goes below threshold
-				# if residual_i[j] < self.threshold_residual: ## break when any domain's residual goes below threshold
-				# 	self.iters = i
-				# 	print(f'Stopping simulation at iter {self.iters+1}, sub-domain {j+1}, residual {residual_i[j]:.2e} <= {self.threshold_residual}')
-				# 	self.residual_i = residual_i[j]
-				# 	for m in range(1,self.N_domains):
-				# 		while len(residual[m]) != len(residual[0]):
-				# 			residual[m].append(np.nan)
-				# 	# breaker = True
-				# 	# break
+				residual_i[j] = nr/full_normGB
+				residual[j].append(residual_i[j])
 
 				### --- continued below ---
 				u[j] = self.alpha * tj[j]
 				# if i % self.iter_step == 0:
-				if (self.N_domains==1).all():
+				if self.total_domains==1:
 					self.u = self.u - u[j]		# instead of this, simply update on overlapping regions?
 				else:
 					self.u = self.u - R[j].T @ D[j] @ u[j]		# instead of this, simply update on overlapping regions?
 				### Main update END ---
 
 			### Full Residual
-			# if i==0:
-			# 	full_normb = np.linalg.norm(np.sum(np.array([(R[j].T @ D[j] @ tj[j]) for j in range(self.N_domains)]), axis=0))
-			if (self.N_domains==1).all():
+			if self.total_domains==1:
 				full_nr = np.linalg.norm( tj[0] )
 			else:
-				full_nr = np.linalg.norm(np.sum(np.array([(R[j].T @ D[j] @ tj[j]) for j in range(self.N_domains[0])]), axis=0))
+				full_nr = np.linalg.norm(np.sum(np.array([(R[j].T @ D[j] @ tj[j]) for j in self.range_total_domains]), axis=0))
 
 			full_residual.append(full_nr/full_normGB)
 			if full_residual[i] < self.threshold_residual:
@@ -348,7 +303,8 @@ class AnySim():
 		# self.u_iter = self.Tr.flatten() * np.array(u_iter)		## getting killed here
 
 		# residual[1] = residual[1][::2]	# if update order is 0-1-2-1-0-... (i.e., 1 is repeated twice in one global iteration)
-		self.residual = np.array(residual)
+		self.residual = np.array(residual).T
+		print(self.residual.shape)
 		if self.residual.shape[0] < self.residual.shape[1]:
 			self.residual = self.residual.T
 		self.full_residual = np.array(full_residual)
@@ -358,13 +314,20 @@ class AnySim():
 			self.u = self.u[self.crop_to_roi]
 			# self.u_iter = self.u_iter[tuple((slice(None),))+self.crop_to_roi]
 
-			# self.u = self.u[self.bw_l:-self.bw_r]
-			# self.u_iter = self.u_iter[:, self.bw_l:-self.bw_r]
-
 		self.sim_time = time.time()-s1
 		print('Simulation done (Time {} s)'.format(np.round(self.sim_time,2)))
 
 		return self.u
+
+	def check_input(self, A):
+		if not isinstance(A, np.ndarray):
+			if isinstance(A, list) or isinstance(A, tuple):
+				A = np.array(A)
+			else:
+				A = np.array([A])
+		if A.shape[0] != self.N_dim:
+			A = np.tile(A, self.N_dim)
+		return A
 
 	## Spectral radius
 	def checkV(self, A):
@@ -399,7 +362,6 @@ class AnySim():
 	def coordinates_f(self, dimension, N):
 		pixel_size_f = 2 * np.pi/(self.pixel_size*np.array(N))
 		k = self.fft_range(N[dimension]) * pixel_size_f[dimension]
-		# k = np.expand_dims( k, axis=tuple(range(dimension+1,2-dimension)))
 		return k
 
 	def fft_range(self, N):
@@ -455,10 +417,10 @@ class AnySim():
 		print('Plotting done.')
 
 	def plot_basics(self, plt):
-		if self.N_domains > 1:
+		if self.total_domains > 1:
 			plt.axvline(x=(self.n1-self.boundary_widths-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 			plt.axvline(x=(self.n1-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
-			for i in range (1,self.N_domains[0]-1):
+			for i in range (1,self.total_domains-1):
 				plt.axvline(x=((i+1)*(self.n1-self.overlap)-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 				plt.axvline(x=(i*(self.n1-self.overlap)+self.n1-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 		if "Test_" in self.test:
@@ -483,8 +445,8 @@ class AnySim():
 
 		plt.subplot(2,1,2)
 		res_plots = plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.residual, lw=1.5)
-		if self.N_domains > 1:
-			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in range(self.N_domains[0])), title='Subdomains', ncols=int(self.N_domains/4)+1, framealpha=0.5)
+		if self.total_domains > 1:
+			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in self.range_total_domains), title='Subdomains', ncols=int(self.N_domains/4)+1, framealpha=0.5)
 		plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.full_residual, lw=3., c='k', ls='dashed', label='Full Residual')
 		plt.axhline(y=self.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])

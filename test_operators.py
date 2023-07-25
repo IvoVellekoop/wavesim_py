@@ -16,14 +16,6 @@ def test_Accretive():
     B = anysim.medium(np.eye(anysim.N_FastConv[0]))
     A = L_plus_1 - B
 
-    # if self.N_dim == 1:
-    # 	L_p = np.diag(np.squeeze(L_p)[self.bw_l:-self.bw_r])
-    # 	V = np.diag(V[self.bw_l:-self.bw_r])
-    # else:
-    #     L_p = L_p[self.bw_l:-self.bw_r, self.bw_l:-self.bw_r]
-    #     V = V[self.bw_l:-self.bw_r, self.bw_l:-self.bw_r]
-    # A = L_p + V
-    # acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.matrix(A).H))))
     acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.conj(A).T))))
     
     assert np.round(acc, 7) >= 0, f'A is not accretive. {acc}'

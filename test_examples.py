@@ -12,13 +12,13 @@ def relative_error(E_, E_true):
 
 @pytest.fixture
 def setup_1DFreeSpace():
-    anysim = AnySim(test='Test_1DFreeSpace', N_domains=1)
+    anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_domains=1)
 
     ## Compare with the analytic solution
-    x = np.arange(0,anysim.N_roi*anysim.pixel_size,anysim.pixel_size)
+    x = np.arange(0,anysim1D_FS.N_roi*anysim1D_FS.pixel_size,anysim1D_FS.pixel_size)
     x = np.pad(x, (64,64), mode='constant')
-    h = anysim.pixel_size
-    k = anysim.k0
+    h = anysim1D_FS.pixel_size
+    k = anysim1D_FS.k0
     phi = k * x
 
     E_theory = 1.0j*h/(2*k) * np.exp(1.0j*phi) - h/(4*np.pi*k) * (np.exp(1.0j * phi) * ( np.exp(1.0j * (k-np.pi/h) * x) - np.exp(1.0j * (k+np.pi/h) * x)) - np.exp(-1.0j * phi) * ( -np.exp(-1.0j * (k-np.pi/h) * x) + np.exp(-1.0j * (k+np.pi/h) * x)))
@@ -29,11 +29,11 @@ def setup_1DFreeSpace():
 
 @pytest.mark.parametrize("N_domains", [1, 2, 5, 10])
 def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
-    anysim = AnySim(test='Test_1DFreeSpace', N_domains=N_domains)
-    anysim.iterate()
-    rel_err = anysim.compare(setup_1DFreeSpace)
-    anysim.save_details()
-    anysim.plot_details()
+    anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_domains=N_domains)
+    anysim1D_FS.iterate()
+    rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
+    anysim1D_FS.save_details()
+    anysim1D_FS.plot_details()
     assert rel_err <= 1.e-3
 
 
@@ -46,20 +46,20 @@ def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
     N_roi = np.array([256])
     n = np.ones(tuple(N_roi))
     n[99:130] = 1.5
-    anysim = AnySim(test='Test_1DGlassPlate', N_roi=N_roi, n=n, N_domains=N_domains)
-    anysim.iterate()
-    rel_err = anysim.compare(setup_1DGlassPlate)
-    anysim.save_details()
-    anysim.plot_details()
+    anysim1D_GP = AnySim(test='Test_1DGlassPlate', N_roi=N_roi, n=n, N_domains=N_domains)
+    anysim1D_GP.iterate()
+    rel_err = anysim1D_GP.compare(setup_1DGlassPlate)
+    anysim1D_GP.save_details()
+    anysim1D_GP.plot_details()
     assert rel_err <= 1.e-3
 
 
 @pytest.fixture
-def setup_2DLogo():
+def setup_2DHighContrast():
     yield loadmat('anysim_matlab/u2d.mat')['u2d']
 
 @pytest.mark.parametrize("N_domains", [1])#, 2, 5, 10])
-def test_2DLogo(setup_2DLogo, N_domains):
+def test_2DHighContrast(setup_2DHighContrast, N_domains):
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png'))/255
     n_iron = 2.8954 + 2.9179j
@@ -75,11 +75,11 @@ def test_2DLogo(setup_2DLogo, N_domains):
     lambd = 0.532
     ppw = 3*np.max(abs(n_contrast+1))
 
-    anysim2dlogo = AnySim(test='Test_2DLogo', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains, max_iters=max_iters)
-    anysim2dlogo.iterate()
-    rel_err = anysim2dlogo.compare(setup_2DLogo)
-    anysim2dlogo.save_details()
-    anysim2dlogo.plot_details()
+    anysim2D_HC = AnySim(test='Test_2DHighContrast', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains, max_iters=max_iters)
+    anysim2D_HC.iterate()
+    rel_err = anysim2D_HC.compare(setup_2DHighContrast)
+    anysim2D_HC.save_details()
+    anysim2D_HC.plot_details()
     assert rel_err <= 1.e-3
 
 
@@ -122,7 +122,7 @@ def test_3DHomogeneous(N_roi, boundary_widths):
     source_amplitude = 1.
     source_location = np.array([N_roi[0]/2-1,N_roi[1]/2-1,N_roi[2]/2-1]).astype(int)
 
-    anysim3D_H = AnySim(test='Test_3D_Homogeneous', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D_H = AnySim(test='Test_3DHomogeneous', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
     anysim3D_H.iterate()
     rel_err = anysim3D_H.compare(u_true)
@@ -141,7 +141,7 @@ def test_3DDisordered():
     source_amplitude = 1.
     source_location = np.array([N_roi[0]/2-1,N_roi[1]/2-1,N_roi[2]/2-1]).astype(int)
 
-    anysim3D = AnySim(test='Test_3D_Disordered', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D = AnySim(test='Test_3DDisordered', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
     anysim3D.iterate()
     rel_err = anysim3D.compare(u_true)

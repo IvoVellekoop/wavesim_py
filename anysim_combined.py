@@ -11,7 +11,6 @@ font = {'family':'Times New Roman', # 'Times New Roman', 'Helvetica', 'Arial', '
         'size':18}                      # 8-10 pt
 rc('font',**font)
 figsize = (8,8) #(14.32,8)
-# from PIL.Image import open, BILINEAR, fromarray
 
 class AnySim():
 	def __init__(self, 

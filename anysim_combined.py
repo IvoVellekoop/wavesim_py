@@ -14,7 +14,7 @@ figsize = (8,8) #(14.32,8)
 
 class AnySim():
 	def __init__(self, 
-	      test='custom', 						# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', 'Test_3DDisordered'
+	      test='custom', 						# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', OR 'Test_3DDisordered'
 		  n=np.ones(256), 						# Refractive index distribution
 		  N_roi=np.array([256]), 				# Size of medium (in pixels)
 		  lambd=1., 							# Wavelength in um (micron)

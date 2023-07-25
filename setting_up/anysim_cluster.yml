@@ -6,7 +6,7 @@ dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=1_gnu
   - _sysroot_linux-64_curr_repodata_hack=3=haa98f57_10
-  - absl-py=1.3.0=py310h06a4308_0
+  - absl-py=1.4.0=py310h06a4308_0
   - aiofiles=22.1.0=py310h06a4308_0
   - aiosqlite=0.18.0=py310h06a4308_0
   - anyio=3.5.0=py310h06a4308_0
@@ -28,13 +28,13 @@ dependencies:
   - brotlipy=0.7.0=py310h7f8727e_1002
   - bzip2=1.0.8=h7b6447c_0
   - ca-certificates=2023.05.30=h06a4308_0
-  - cairo=1.16.0=hb05425b_4
-  - certifi=2023.5.7=py310h06a4308_0
+  - cairo=1.16.0=hb05425b_5
+  - certifi=2023.7.22=py310h06a4308_0
   - cffi=1.15.1=py310h5eee18b_3
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
   - comm=0.1.2=py310h06a4308_0
   - contourpy=1.0.5=py310hdb19cb5_0
-  - cryptography=39.0.1=py310h9ce1e76_1
+  - cryptography=41.0.2=py310h774aba0_0
   - cycler=0.11.0=pyhd3eb1b0_0
   - dbus=1.13.18=hb2f20db_0
   - debugpy=1.5.1=py310h295c915_0
@@ -49,6 +49,7 @@ dependencies:
   - font-ttf-source-code-pro=2.030=hd3eb1b0_0
   - font-ttf-ubuntu=0.83=h8b1ccd4_0
   - fontconfig=2.14.1=h4c34cd2_2
+  - fonts-anaconda=1=h8fa9717_0
   - fonts-conda-forge=1=0
   - fonttools=4.25.0=pyhd3eb1b0_0
   - freetype=2.12.1=h4a9f257_0
@@ -83,14 +84,14 @@ dependencies:
   - jupyter_events=0.6.3=py310h06a4308_0
   - jupyter_server=2.5.0=py310h06a4308_0
   - jupyter_server_fileid=0.9.0=py310h06a4308_0
-  - jupyter_server_terminals=0.4.4=py310h06a4308_0
-  - jupyter_server_ydoc=0.8.0=py310h06a4308_0
+  - jupyter_server_terminals=0.4.4=py310h06a4308_1
+  - jupyter_server_ydoc=0.8.0=py310h06a4308_1
   - jupyter_ydoc=0.2.4=py310h06a4308_0
   - jupyterlab=3.6.3=py310h06a4308_0
   - jupyterlab_pygments=0.1.2=py_0
   - jupyterlab_server=2.22.0=py310h06a4308_0
   - jupyterlab_widgets=3.0.5=py310h06a4308_0
-  - kaleido-core=0.2.1=h3644ca4_0
+  - kaleido-core=0.2.1=h7c8854e_0
   - kernel-headers_linux-64=3.10.0=h57e8cba_10
   - kiwisolver=1.4.4=py310h6a678d5_0
   - krb5=1.19.4=h568e23c_0
@@ -159,8 +160,8 @@ dependencies:
   - nspr=4.35=h6a678d5_0
   - nss=3.89.1=h6a678d5_0
   - numexpr=2.8.4=py310h757a811_1
-  - numpy=1.24.3=py310hac523dd_0
-  - numpy-base=1.24.3=py310h375b286_0
+  - numpy=1.25.0=py310heeff2f4_0
+  - numpy-base=1.25.0=py310h8a23956_0
   - opencv=4.6.0=py310h1128e8f_3
   - openh264=2.1.1=h4ff587b_0
   - openjpeg=2.4.0=h3ad879b_0
@@ -185,19 +186,19 @@ dependencies:
   - py-mathjax=2.7.7.2=py_0
   - pycparser=2.21=pyhd3eb1b0_0
   - pygments=2.15.1=py310h06a4308_1
-  - pyopenssl=23.0.0=py310h06a4308_0
+  - pyopenssl=23.2.0=py310h06a4308_0
   - pyparsing=3.0.9=py310h06a4308_0
   - pyqt=5.15.7=py310h6a678d5_1
   - pyrsistent=0.18.0=py310h7f8727e_0
   - pysocks=1.7.1=py310h06a4308_0
-  - python=3.10.11=h7a1cb2a_2
+  - python=3.10.12=h7a1cb2a_0
   - python-dateutil=2.8.2=pyhd3eb1b0_0
   - python-fastjsonschema=2.16.2=py310h06a4308_0
   - python-json-logger=2.0.7=py310h06a4308_0
-  - python-kaleido=0.2.1=pyhd8ed1ab_0
+  - python-kaleido=0.2.1=py310h06a4308_0
   - pytz=2022.7=py310h06a4308_0
   - pyyaml=6.0=py310h5eee18b_1
-  - pyzmq=25.0.2=py310h6a678d5_0
+  - pyzmq=25.1.0=py310h6a678d5_0
   - qt-main=5.15.2=h8373d8f_8
   - qt-webengine=5.15.9=hbbf29b9_6
   - qtwebkit=5.212=h3fafdc1_5
@@ -224,8 +225,8 @@ dependencies:
   - tornado=6.2=py310h5eee18b_0
   - tqdm=4.65.0=py310h2f386ee_0
   - traitlets=5.7.1=py310h06a4308_0
-  - typing-extensions=4.5.0=py310h06a4308_0
-  - typing_extensions=4.5.0=py310h06a4308_0
+  - typing-extensions=4.6.3=py310h06a4308_0
+  - typing_extensions=4.6.3=py310h06a4308_0
   - tzdata=2023c=h04d1e81_0
   - urllib3=1.26.16=py310h06a4308_0
   - wcwidth=0.2.5=pyhd3eb1b0_0

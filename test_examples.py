@@ -12,13 +12,13 @@ def relative_error(E_, E_true):
 
 @pytest.fixture
 def setup_1DFreeSpace():
-    anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_domains=1)
+    anysim1D_FS_setup = AnySim(test='Test_1DFreeSpace', N_domains=1)
 
     ## Compare with the analytic solution
-    x = np.arange(0,anysim1D_FS.N_roi*anysim1D_FS.pixel_size,anysim1D_FS.pixel_size)
+    x = np.arange(0,anysim1D_FS_setup.N_roi*anysim1D_FS_setup.pixel_size,anysim1D_FS_setup.pixel_size)
     x = np.pad(x, (64,64), mode='constant')
-    h = anysim1D_FS.pixel_size
-    k = anysim1D_FS.k0
+    h = anysim1D_FS_setup.pixel_size
+    k = anysim1D_FS_setup.k0
     phi = k * x
 
     E_theory = 1.0j*h/(2*k) * np.exp(1.0j*phi) - h/(4*np.pi*k) * (np.exp(1.0j * phi) * ( np.exp(1.0j * (k-np.pi/h) * x) - np.exp(1.0j * (k+np.pi/h) * x)) - np.exp(-1.0j * phi) * ( -np.exp(-1.0j * (k-np.pi/h) * x) + np.exp(-1.0j * (k+np.pi/h) * x)))

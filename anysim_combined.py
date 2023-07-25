@@ -36,7 +36,7 @@ class AnySim():
 		self.N_dim = self.n.ndim				# Number of dimensions in problem
 
 		self.N_roi = self.check_input(N_roi)	# Num of points in ROI (Region of Interest)
-		self.N_roi_orig = self.N_roi.copy()
+		self.N_roi_ = self.N_roi.copy()
 
 		self.absorbing_boundaries = True 		# True OR False
 		self.boundary_widths = self.check_input(boundary_widths)
@@ -63,16 +63,16 @@ class AnySim():
 		## Add more points to N to ensure subdomains are of the same size after domain decomposition
 		for i in range(self.N_dim):
 			while (self.N[i]-self.overlap[i])%self.N_domains[i] != 0:
-				self.N_roi[i] += 1
+				self.N_roi_[i] += 1
 				# self.bw_r[i] += 1
-				self.N[i] = self.N_roi[i]+(2*self.boundary_widths[i]).astype(int)
+				self.N[i] = self.N_roi_[i]+(2*self.boundary_widths[i]).astype(int)
 		assert np.array((self.N-self.overlap)%self.N_domains == 0).all()
 
 		if source is None:
 			self.source_amplitude = source_amplitude
 			self.source_location = source_location
 
-			self.b = np.zeros((tuple(self.N_roi)), dtype='complex_')
+			self.b = np.zeros((tuple(self.N_roi_)), dtype='complex_')
 			self.b[tuple(self.source_location)] = self.source_amplitude
 		else:
 			self.b = source
@@ -175,7 +175,7 @@ class AnySim():
 		B = 1 - self.V
 		if self.absorbing_boundaries and which_end != None:
 			if which_end == 'Both':
-				N_roi = self.N_roi
+				N_roi = self.N_roi_
 			else:
 				N_roi = N - self.boundary_widths.astype(int)
 			B = self.pad_func(M=B, N_roi=N_roi, which_end=which_end).astype('complex_')
@@ -375,10 +375,9 @@ class AnySim():
 		# Print relative error between u and analytic solution (or Matlab result)
 		self.u_true = u_true
 
-		if self.u_true.shape[0] != self.N_roi[0]:
-			self.N_roi = self.N_roi_orig.copy()
+		if self.u_true.shape[0] != self.N_roi_[0]:
 			self.u = self.u[tuple([slice(0,self.N_roi[i]) for i in range(self.N_dim)])]
-			# self.u_iter = self.u_iter[:, :self.N_roi_orig]
+			# self.u_iter = self.u_iter[:, :self.N_roi]
 
 		self.rel_err = self.relative_error(self.u, self.u_true)
 		print('Relative error: {:.2e}'.format(self.rel_err))

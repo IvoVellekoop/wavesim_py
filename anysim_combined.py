@@ -23,7 +23,7 @@ class AnySim():
 		  source_amplitude=1., 					# Amplitude of source
 		  source_location=np.array([0]), 		# Location of source w.r.t. N_roi
 		  source=None, 							# Direct source term instead of amplitude and location
-		  N_domains=np.array([1]),				# Number of subdomains to decompose into, in each dimension
+		  N_domains=None,						# Number of subdomains to decompose into, in each dimension
 		  overlap=np.array([20]), 				# Overlap between subdomains in each dimension
 		  wrap_correction=None, 				# Wrap-around correction. None, 'L_Omega' or 'L_corr'
 		  cp=20, 								# Corner points to include in case of 'L_corr' wrap-around correction
@@ -35,14 +35,13 @@ class AnySim():
 		self.N_dim = self.n.ndim				# Number of dimensions in problem
 
 		self.N_roi = self.check_input(N_roi)	# Num of points in ROI (Region of Interest)
-		self.N_roi_ = self.N_roi.copy()
 
 		self.absorbing_boundaries = True 		# True OR False
 		self.boundary_widths = self.check_input(boundary_widths)
 
 		if self.absorbing_boundaries:
-			self.bw_l = np.floor(self.boundary_widths).astype(int)
-			self.bw_r = np.ceil(self.boundary_widths).astype(int)
+			self.bw_l = np.floor(self.boundary_widths)
+			self.bw_r = np.ceil(self.boundary_widths)
 		else:
 			self.boundary_widths = np.array([0])
 
@@ -51,27 +50,35 @@ class AnySim():
 		self.k0 = (1.*2.*np.pi)/(self.lambd)	# wavevector k = 2*pi/lambda, where lambda = 1.0 um (micron), and thus k0 = 2*pi = 6.28...
 		self.pixel_size = self.lambd/self.ppw	# Grid pixel size in um (micron)
 
-		self.N = self.N_roi+(2*self.boundary_widths).astype(int)
+		self.N = self.N_roi + self.bw_l + self.bw_r
 
-		self.N_domains = self.check_input(N_domains)	# Number of subdomains to decompose into, in each dimension
+		if N_domains is None:
+			self.N_domains = self.N//100	# self.N / Max permissible size of sub-domain
+		else:
+			self.N_domains = self.check_input(N_domains).astype(int)	# Number of subdomains to decompose into, in each dimension
+
+		self.overlap = self.check_input(overlap).astype(int)		# Overlap between subdomains in each dimension
+
+		if (self.N_domains == 1).all():								# If 1 domain, implies no domain decomposition
+			self.domain_size = self.N.copy()
+		else:														# Else, domain decomposition
+			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+			self.check_domain_size_max()
+			self.check_domain_size_same()
+			self.check_domain_size_int()
+
+		self.bw_l = self.bw_l.astype(int)
+		self.bw_r = self.bw_r.astype(int)
+		self.domain_size = self.domain_size.astype(int)
+		
 		self.total_domains = np.prod(self.N_domains)
 		self.range_total_domains = range(self.total_domains)
-
-		self.overlap = self.check_input(overlap).astype(int)	# Overlap between subdomains in each dimension
 		
-		## Add more points to N to ensure subdomains are of the same size after domain decomposition
-		for i in range(self.N_dim):
-			while (self.N[i]-self.overlap[i])%self.N_domains[i] != 0:
-				self.N_roi_[i] += 1
-				# self.bw_r[i] += 1
-				self.N[i] = self.N_roi_[i]+(2*self.boundary_widths[i]).astype(int)
-		assert np.array((self.N-self.overlap)%self.N_domains == 0).all()
-
 		if source is None:
 			self.source_amplitude = source_amplitude
 			self.source_location = source_location
 
-			self.b = np.zeros((tuple(self.N_roi_)), dtype='complex_')
+			self.b = np.zeros((tuple(self.N_roi)), dtype='complex_')
 			self.b[tuple(self.source_location)] = self.source_amplitude
 		else:
 			self.b = source
@@ -115,22 +122,21 @@ class AnySim():
 			print('Wrap correction: \t', self.wrap_correction)
 		print('Boundaries width: \t', self.boundary_widths)
 		if self.total_domains > 1:
-			print(f'Decomposing into {self.N_domains} domains, with overlap {self.overlap}')
+			print(f'Decomposing into {self.N_domains} domains of size {self.domain_size}, with overlap {self.overlap}')
 
 	def init_setup(self):			# function that calls all the other 'main' functions
 		# Make operators: Medium B = 1 - V, and Propagator (L+1)^(-1)
 		Vraw = self.k0**2 * self.n**2
 		Vraw = np.pad(Vraw, (tuple([[self.bw_l[i], self.bw_r[i]] for i in range(self.N_dim)])), mode='edge')
 
-		self.n1 = ((self.N-self.overlap)/self.N_domains + self.overlap).astype(int)
 		self.operators = []
 		if self.total_domains==1:
 			self.operators.append( self.make_operators(Vraw) )
 		else:
-			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.n1[i]) for i in range(self.N_dim)])], 'left') )
+			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.domain_size[i]) for i in range(self.N_dim)])], 'left') )
 			for d in range(1,self.total_domains-1):
-				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.n1[i]-self.overlap[i]), d*(self.n1[i]-self.overlap[i])+self.n1[i]) for i in range(self.N_dim)])], None) )
-			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.n1[i],None) for i in range(self.N_dim)])], 'right') )
+				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dim)])], None) )
+			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.domain_size[i],None) for i in range(self.N_dim)])], 'right') )
 
 		# Scale the source term (and pad if boundaries)
 		if self.absorbing_boundaries:
@@ -174,9 +180,13 @@ class AnySim():
 		B = 1 - self.V
 		if self.absorbing_boundaries and which_end != None:
 			if which_end == 'Both':
-				N_roi = self.N_roi_
+				N_roi = self.N_roi
+			elif which_end == 'left':
+				N_roi = N - self.bw_l
+			elif which_end == 'right':
+				N_roi = N - self.bw_r
 			else:
-				N_roi = N - self.boundary_widths.astype(int)
+				N_roi = N - self.bw_l - self.bw_r
 			B = self.pad_func(M=B, N_roi=N_roi, which_end=which_end).astype('complex_')
 		self.medium = lambda x: B * x
 
@@ -215,21 +225,21 @@ class AnySim():
 		else:
 			R = []
 			D = []
-			ones = np.eye(self.n1[0])
-			R_0 = np.zeros((self.n1[0],self.N[0]))
+			ones = np.eye(self.domain_size[0])
+			R_0 = np.zeros((self.domain_size[0],self.N[0]))
 			for i in self.range_total_domains:
 				R_mid = R_0.copy()
-				R_mid[:,i*(self.n1[0]-self.overlap[0]):i*(self.n1[0]-self.overlap[0])+self.n1[0]] = ones
+				R_mid[:,i*(self.domain_size[0]-self.overlap[0]):i*(self.domain_size[0]-self.overlap[0])+self.domain_size[0]] = ones
 				R.append(R_mid)
 
 			fnc_interp = lambda x: np.interp(np.arange(x), [0,x-1], [0,1])
 			decay = fnc_interp(self.overlap[0])
-			D1 = np.diag( np.concatenate((np.ones(self.n1-self.overlap), np.flip(decay))) )
+			D1 = np.diag( np.concatenate((np.ones(self.domain_size-self.overlap), np.flip(decay))) )
 			D.append(D1)
-			D_mid = np.diag( np.concatenate((decay, np.ones(self.n1-2*self.overlap), np.flip(decay))) )
+			D_mid = np.diag( np.concatenate((decay, np.ones(self.domain_size-2*self.overlap), np.flip(decay))) )
 			for _ in range(1,self.total_domains-1):
 				D.append(D_mid)
-			D_end = np.diag( np.concatenate((decay, np.ones(self.n1-self.overlap))) )
+			D_end = np.diag( np.concatenate((decay, np.ones(self.domain_size-self.overlap))) )
 			D.append(D_end)
 
 			for j in self.range_total_domains:
@@ -328,6 +338,26 @@ class AnySim():
 			A = np.tile(A, self.N_dim)
 		return A
 
+	## Ensure that domain size is the same across every dim
+	def check_domain_size_same(self):
+		while (self.domain_size!=np.max(self.domain_size)).any():
+			self.bw_r = self.bw_r + self.N_domains * (np.max(self.domain_size) - self.domain_size)
+			self.N = self.N_roi + self.bw_l + self.bw_r
+			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+
+	## Ensure that domain size is less than 100 in every dim
+	def check_domain_size_max(self):
+		while (self.domain_size > 100).any():
+			self.N_domains[np.where(self.domain_size > 100)] += 1
+			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+
+	## Ensure that domain size is int
+	def check_domain_size_int(self):
+		while (self.domain_size%1 != 0).any() or (self.bw_r%1 != 0).any():
+			self.bw_r += np.round(self.N_domains * (np.ceil(self.domain_size) - self.domain_size),2)
+			self.N = self.N_roi + self.bw_l + self.bw_r
+			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+
 	## Spectral radius
 	def checkV(self, A):
 		return np.linalg.norm(A,2)
@@ -374,7 +404,7 @@ class AnySim():
 		# Print relative error between u and analytic solution (or Matlab result)
 		self.u_true = u_true
 
-		if self.u_true.shape[0] != self.N_roi_[0]:
+		if self.u_true.shape[0] != self.N_roi[0]:
 			self.u = self.u[tuple([slice(0,self.N_roi[i]) for i in range(self.N_dim)])]
 			# self.u_iter = self.u_iter[:, :self.N_roi]
 
@@ -416,11 +446,11 @@ class AnySim():
 
 	def plot_basics(self, plt):
 		if self.total_domains > 1:
-			plt.axvline(x=(self.n1-self.boundary_widths-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-			plt.axvline(x=(self.n1-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			plt.axvline(x=(self.domain_size-self.boundary_widths-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+			plt.axvline(x=(self.domain_size-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
 			for i in range (1,self.total_domains-1):
-				plt.axvline(x=((i+1)*(self.n1-self.overlap)-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-				plt.axvline(x=(i*(self.n1-self.overlap)+self.n1-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=((i+1)*(self.domain_size-self.overlap)-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=(i*(self.domain_size-self.overlap)+self.domain_size-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 		if "Test_" in self.test:
 			plt.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
 		plt.ylabel('Amplitude')

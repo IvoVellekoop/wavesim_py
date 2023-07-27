@@ -115,7 +115,6 @@ class AnySim():
 		self.stats_file_name = self.log_dir + self.test + '_stats.txt'
 
 		self.print_details()	# print the simulation details
-		self.init_setup()		# set up operators
 
 	def print_details(self):
 		print(f'\n{self.N_dim} dimensional problem')
@@ -127,7 +126,7 @@ class AnySim():
 		if self.total_domains > 1:
 			print(f'Decomposing into {self.N_domains} domains of size {self.domain_size}, with overlap {self.overlap}')
 
-	def init_setup(self):			# function that calls all the other 'main' functions
+	def setup_operators_n_init_variables(self):			# function that calls all the other 'main' functions
 		# Make operators: Medium B = 1 - V, and Propagator (L+1)^(-1)
 		Vraw = self.k0**2 * self.n**2
 		Vraw = np.pad(Vraw, (tuple([[self.bw_l[i], self.bw_r[i]] for i in range(self.N_dim)])), mode='edge')

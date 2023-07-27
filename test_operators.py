@@ -3,6 +3,7 @@ from anysim_combined import AnySim
 
 def test_Contraction():
     anysim = AnySim(test='Test_1DFreeSpace')
+    anysim.setup_operators_n_init_variables()
     # vc = np.max(np.abs(anysim.V))
     vc = np.linalg.norm(np.diag(anysim.V), 2)
     print(vc)
@@ -10,6 +11,7 @@ def test_Contraction():
 
 def test_Accretive():
     anysim = AnySim(test='Test_1DFreeSpace')
+    anysim.setup_operators_n_init_variables()
 
     L_plus_1_inv = anysim.propagator(np.eye(anysim.N_FastConv[0]))
     L_plus_1 = np.linalg.inv(L_plus_1_inv)

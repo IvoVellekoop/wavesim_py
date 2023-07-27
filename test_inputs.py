@@ -5,7 +5,7 @@ from anysim_combined import AnySim
 @pytest.fixture
 def setup_inputs():#N_roi):
     N_roi = 256
-    n = np.ones((N_roi))
+    n = np.ones((N_roi, N_roi))
     anysim = AnySim(test='Test_1DFreeSpace', N_roi=N_roi, n=n)
     yield anysim
 
@@ -22,13 +22,13 @@ def test_overlap(setup_inputs):
     assert np.array_equal( setup_inputs.overlap, 20*np.ones(setup_inputs.N_dim))
 
 ## Should work irrespective of input type of parameters (e.g. here, boundary_widths)
-@pytest.mark.parametrize('boundary_widths', [10., (10.), [10], np.array([10]) ])
+# @pytest.mark.parametrize('boundary_widths', [10., (10.), [10], np.array([10]) ])
+@pytest.mark.parametrize('boundary_widths', [10, (10,10), [10,10], np.array([10,10]) ])
 def test_input_boundary_widths(boundary_widths):
-    N_roi = np.array([256])
+    N_roi = np.array([256, 256])
     n = np.ones(tuple(N_roi))
     anysim_bw = AnySim(test='Test_2DLowContrast', N_roi=N_roi, n=n, boundary_widths=boundary_widths)
     assert np.array_equal( anysim_bw.boundary_widths, 10*np.ones(anysim_bw.N_dim))
 
 
 
-#### @pytest.mark.parametrize('boundary_widths', [10, (10,10), [10,10], np.array([10,10]) ])

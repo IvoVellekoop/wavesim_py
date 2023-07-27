@@ -30,6 +30,7 @@ def setup_1DFreeSpace():
 @pytest.mark.parametrize("N_domains", [1, 2, 5, 10])
 def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
     anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_domains=N_domains)
+    anysim1D_FS.setup_operators_n_init_variables()
     anysim1D_FS.iterate()
     rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
     anysim1D_FS.save_details()
@@ -47,6 +48,7 @@ def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
     n = np.ones(tuple(N_roi))
     n[99:130] = 1.5
     anysim1D_GP = AnySim(test='Test_1DGlassPlate', N_roi=N_roi, n=n, N_domains=N_domains)
+    anysim1D_GP.setup_operators_n_init_variables()
     anysim1D_GP.iterate()
     rel_err = anysim1D_GP.compare(setup_1DGlassPlate)
     anysim1D_GP.save_details()
@@ -76,6 +78,7 @@ def test_2DHighContrast(setup_2DHighContrast, N_domains):
     ppw = 3*np.max(abs(n_contrast+1))
 
     anysim2D_HC = AnySim(test='Test_2DHighContrast', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains, max_iters=max_iters)
+    anysim2D_HC.setup_operators_n_init_variables()
     anysim2D_HC.iterate()
     rel_err = anysim2D_HC.compare(setup_2DHighContrast)
     anysim2D_HC.save_details()
@@ -106,6 +109,7 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
     ppw = 3*abs(n_fat)
 
     anysim2D_LC = AnySim(test='Test_2DLowContrast', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains)
+    anysim2D_LC.setup_operators_n_init_variables()
     anysim2D_LC.iterate()
     rel_err = anysim2D_LC.compare(setup_2DLowContrast)
     anysim2D_LC.save_details()
@@ -124,6 +128,7 @@ def test_3DHomogeneous(N_roi, boundary_widths):
 
     anysim3D_H = AnySim(test='Test_3DHomogeneous', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
+    anysim3D_H.setup_operators_n_init_variables()
     anysim3D_H.iterate()
     rel_err = anysim3D_H.compare(u_true)
     anysim3D_H.save_details()
@@ -143,6 +148,7 @@ def test_3DDisordered():
 
     anysim3D = AnySim(test='Test_3DDisordered', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
+    anysim3D.setup_operators_n_init_variables()
     anysim3D.iterate()
     rel_err = anysim3D.compare(u_true)
     anysim3D.save_details()

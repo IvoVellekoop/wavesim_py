@@ -203,12 +203,12 @@ dependencies:
   - qt-webengine=5.15.9=hbbf29b9_6
   - qtwebkit=5.212=h3fafdc1_5
   - readline=8.2=h5eee18b_0
-  - requests=2.31.0=py310h06a4308_0
+  - requests=2.29.0=py310h06a4308_0
   - rfc3339-validator=0.1.4=py310h06a4308_0
   - rfc3986-validator=0.1.1=py310h06a4308_0
   - scipy=1.10.1=py310heeff2f4_1
   - send2trash=1.8.0=pyhd3eb1b0_1
-  - setuptools=68.0.0=py310h06a4308_0
+  - setuptools=67.8.0=py310h06a4308_0
   - sip=6.6.2=py310h6a678d5_0
   - six=1.16.0=pyhd3eb1b0_1
   - sniffio=1.2.0=py310h06a4308_1
@@ -225,8 +225,8 @@ dependencies:
   - tornado=6.2=py310h5eee18b_0
   - tqdm=4.65.0=py310h2f386ee_0
   - traitlets=5.7.1=py310h06a4308_0
-  - typing-extensions=4.7.1=py310h06a4308_0
-  - typing_extensions=4.7.1=py310h06a4308_0
+  - typing-extensions=4.6.3=py310h06a4308_0
+  - typing_extensions=4.6.3=py310h06a4308_0
   - tzdata=2023c=h04d1e81_0
   - urllib3=1.26.16=py310h06a4308_0
   - wcwidth=0.2.5=pyhd3eb1b0_0

@@ -52,8 +52,9 @@ class AnySim():
 
 		self.N = self.N_roi + self.bw_l + self.bw_r
 
+		self.max_domain_size = 500
 		if N_domains is None:
-			self.N_domains = self.N//100	# self.N / Max permissible size of sub-domain
+			self.N_domains = self.N//self.max_domain_size	# self.N / Max permissible size of sub-domain
 		else:
 			self.N_domains = self.check_input(N_domains).astype(int)	# Number of subdomains to decompose into, in each dimension
 
@@ -69,8 +70,10 @@ class AnySim():
 
 		self.bw_l = self.bw_l.astype(int)
 		self.bw_r = self.bw_r.astype(int)
+		self.N = self.N.astype(int)
+		self.N_domains = self.N_domains.astype(int)
 		self.domain_size = self.domain_size.astype(int)
-		
+
 		self.total_domains = np.prod(self.N_domains)
 		self.range_total_domains = range(self.total_domains)
 		
@@ -135,6 +138,8 @@ class AnySim():
 		else:
 			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.domain_size[i]) for i in range(self.N_dim)])], 'left') )
 			for d in range(1,self.total_domains-1):
+				# aa = Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dim)])]
+				# print(d, aa.shape)
 				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dim)])], None) )
 			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.domain_size[i],None) for i in range(self.N_dim)])], 'right') )
 
@@ -345,10 +350,10 @@ class AnySim():
 			self.N = self.N_roi + self.bw_l + self.bw_r
 			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 
-	## Ensure that domain size is less than 100 in every dim
+	## Ensure that domain size is less than 500 in every dim
 	def check_domain_size_max(self):
-		while (self.domain_size > 100).any():
-			self.N_domains[np.where(self.domain_size > 100)] += 1
+		while (self.domain_size > self.max_domain_size).any():
+			self.N_domains[np.where(self.domain_size > self.max_domain_size)] += 1
 			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 
 	## Ensure that domain size is int

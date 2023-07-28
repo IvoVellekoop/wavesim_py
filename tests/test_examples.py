@@ -29,7 +29,11 @@ def setup_1DFreeSpace():
 
 @pytest.mark.parametrize("N_domains", [1, 2, 5, 10])
 def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
-    anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_domains=N_domains)
+    N_roi = np.array([256])
+    n = np.ones(tuple(N_roi))
+    source = np.zeros_like(n, dtype='complex_')
+    source[0] = 1.
+    anysim1D_FS = AnySim(test='Test_1DFreeSpace', N_roi=N_roi, n=n, N_domains=N_domains, source=source)
     anysim1D_FS.setup_operators_n_init_variables()
     anysim1D_FS.iterate()
     rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
@@ -46,7 +50,9 @@ def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
     N_roi = np.array([256])
     n = np.ones(tuple(N_roi))
     n[99:130] = 1.5
-    anysim1D_GP = AnySim(test='Test_1DGlassPlate', N_roi=N_roi, n=n, N_domains=N_domains)
+    source = np.zeros_like(n, dtype='complex_')
+    source[0] = 1.
+    anysim1D_GP = AnySim(test='Test_1DGlassPlate', N_roi=N_roi, n=n, N_domains=N_domains, source=source)
     anysim1D_GP.setup_operators_n_init_variables()
     anysim1D_GP.iterate()
     rel_err = anysim1D_GP.compare(setup_1DGlassPlate)
@@ -72,10 +78,10 @@ def test_2DHighContrast(setup_2DHighContrast, N_domains):
     source = np.asarray(fromarray(im[:,:,1]).resize((N_roi,N_roi), BILINEAR))
     boundary_widths = 31.5
     max_iters = int(1.e+4)  # 1.e+4 iterations gives relative error 1.65e-4 with the matlab test result, but takes ~140s
-    lambd = 0.532
+    wavelength = 0.532
     ppw = 3*np.max(abs(n_contrast+1))
 
-    anysim2D_HC = AnySim(test='Test_2DHighContrast', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains, max_iters=max_iters)
+    anysim2D_HC = AnySim(test='Test_2DHighContrast', wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains, max_iters=max_iters)
     anysim2D_HC.setup_operators_n_init_variables()
     anysim2D_HC.iterate()
     rel_err = anysim2D_HC.compare(setup_2DHighContrast)
@@ -100,10 +106,10 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
 
     source = np.asarray(fromarray(im[:,:,1]).resize((N_roi,N_roi), BILINEAR))
     boundary_widths = 75
-    lambd = 0.532
+    wavelength = 0.532
     ppw = 3*abs(n_fat)
 
-    anysim2D_LC = AnySim(test='Test_2DLowContrast', lambd=lambd, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains)
+    anysim2D_LC = AnySim(test='Test_2DLowContrast', wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, N_roi=N_roi, n=n, source=source, N_domains=N_domains)
     anysim2D_LC.setup_operators_n_init_variables()
     anysim2D_LC.iterate()
     rel_err = anysim2D_LC.compare(setup_2DLowContrast)
@@ -117,10 +123,10 @@ def test_3DHomogeneous(N_roi, boundary_widths):
     u_true = loadmat(f'anysim_matlab/u3d_{N_roi[0]}_{N_roi[1]}_{N_roi[2]}_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']
 
     n_sample = np.ones(tuple(N_roi))
-    source_amplitude = 1.
-    source_location = np.array([N_roi[0]/2-1,N_roi[1]/2-1,N_roi[2]/2-1]).astype(int)
+    source = np.zeros_like(n_sample, dtype='complex_')
+    source[int(N_roi[0]/2-1),int(N_roi[1]/2-1),int(N_roi[2]/2-1)] = 1.
 
-    anysim3D_H = AnySim(test='Test_3DHomogeneous', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D_H = AnySim(test='Test_3DHomogeneous', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source=source, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
     anysim3D_H.setup_operators_n_init_variables()
     anysim3D_H.iterate()
@@ -134,11 +140,10 @@ def test_3DDisordered():
     N_roi = np.array([128, 128, 128])
     u_true = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     n_sample = loadmat(f'anysim_matlab/n3d_disordered.mat')['n_sample']
+    source = np.zeros_like(n_sample, dtype='complex_')
+    source[int(N_roi[0]/2-1),int(N_roi[1]/2-1),int(N_roi[2]/2-1)] = 1.
 
-    source_amplitude = 1.
-    source_location = np.array([N_roi[0]/2-1,N_roi[1]/2-1,N_roi[2]/2-1]).astype(int)
-
-    anysim3D = AnySim(test='Test_3DDisordered', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source_amplitude=source_amplitude, source_location=source_location, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D = AnySim(test='Test_3DDisordered', boundary_widths=boundary_widths, N_roi=N_roi, n=n_sample, source=source, N_domains=np.array([1,1,1]), overlap=boundary_widths)
 
     anysim3D.setup_operators_n_init_variables()
     anysim3D.iterate()

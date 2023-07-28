@@ -33,8 +33,7 @@ def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
     anysim1D_FS.setup_operators_n_init_variables()
     anysim1D_FS.iterate()
     rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
-    anysim1D_FS.save_details()
-    anysim1D_FS.plot_details()
+
     assert rel_err <= 1.e-3
 
 
@@ -51,8 +50,7 @@ def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
     anysim1D_GP.setup_operators_n_init_variables()
     anysim1D_GP.iterate()
     rel_err = anysim1D_GP.compare(setup_1DGlassPlate)
-    anysim1D_GP.save_details()
-    anysim1D_GP.plot_details()
+
     assert rel_err <= 1.e-3
 
 
@@ -81,8 +79,7 @@ def test_2DHighContrast(setup_2DHighContrast, N_domains):
     anysim2D_HC.setup_operators_n_init_variables()
     anysim2D_HC.iterate()
     rel_err = anysim2D_HC.compare(setup_2DHighContrast)
-    anysim2D_HC.save_details()
-    anysim2D_HC.plot_details()
+
     assert rel_err <= 1.e-3
 
 
@@ -103,7 +100,6 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
 
     source = np.asarray(fromarray(im[:,:,1]).resize((N_roi,N_roi), BILINEAR))
     boundary_widths = 75
-    # max_iters = 130
     lambd = 0.532
     ppw = 3*abs(n_fat)
 
@@ -111,8 +107,7 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
     anysim2D_LC.setup_operators_n_init_variables()
     anysim2D_LC.iterate()
     rel_err = anysim2D_LC.compare(setup_2DLowContrast)
-    anysim2D_LC.save_details()
-    anysim2D_LC.plot_details()
+
     assert rel_err <= 1.e-3
 
 
@@ -130,8 +125,6 @@ def test_3DHomogeneous(N_roi, boundary_widths):
     anysim3D_H.setup_operators_n_init_variables()
     anysim3D_H.iterate()
     rel_err = anysim3D_H.compare(u_true)
-    anysim3D_H.save_details()
-    anysim3D_H.plot_details()
 
     assert rel_err <= 1.e-3
 
@@ -150,7 +143,5 @@ def test_3DDisordered():
     anysim3D.setup_operators_n_init_variables()
     anysim3D.iterate()
     rel_err = anysim3D.compare(u_true)
-    anysim3D.save_details()
-    anysim3D.plot_details()
 
     assert rel_err <= 1.e-3

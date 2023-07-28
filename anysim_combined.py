@@ -14,79 +14,64 @@ figsize = (8,8) #(14.32,8)
 
 class AnySim():
 	def __init__(self, 
-	      test='custom', 						# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', OR 'Test_3DDisordered'
-		  n=np.ones(256), 						# Refractive index distribution
-		  N_roi=np.array([256]), 				# Size of medium (in pixels)
-		  lambd=1., 							# Wavelength in um (micron)
-		  ppw=4, 								# points per wavelength
-		  boundary_widths=np.array([20.]), 		# Width of absorbing boundaries
-		  source_amplitude=1., 					# Amplitude of source
-		  source_location=np.array([0]), 		# Location of source w.r.t. N_roi
-		  source=None, 							# Direct source term instead of amplitude and location
-		  N_domains=None,						# Number of subdomains to decompose into, in each dimension
-		  overlap=np.array([20]), 				# Overlap between subdomains in each dimension
-		  wrap_correction=None, 				# Wrap-around correction. None, 'L_Omega' or 'L_corr'
-		  cp=20, 								# Corner points to include in case of 'L_corr' wrap-around correction
-		  max_iters=int(1.1e+3)):				# Maximum number iterations
+				test='custom', 							# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', OR 'Test_3DDisordered'
+				n=np.ones((1,1,1)),						# Refractive index distribution
+				wavelength=1., 							# Wavelength in um (micron)
+				ppw=4, 									# points per wavelength
+				boundary_widths=(0,0,0),	# Width of absorbing boundaries
+				source=np.zeros((1,1,1)),					# Direct source term instead of amplitude and location
+				N_domains=(1,1,1),						# Number of subdomains to decompose into, in each dimension
+				overlap=(0,0,0),			# Overlap between subdomains in each dimension
+				wrap_correction=None, 					# Wrap-around correction. None, 'L_Omega' or 'L_corr'
+				cp=20, 									# Corner points to include in case of 'L_corr' wrap-around correction
+				max_iters=int(1.1e+3)):						# Maximum number iterations
 
 		self.test = test	# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', 'Test_3DDisordered'
 
-		self.n = n
-		self.N_dim = self.n.ndim				# Number of dimensions in problem
+		self.n = self.check_input_dims(n)
+		self.N_dim = (np.squeeze(self.n)).ndim	# Number of dimensions in problem
 
-		self.N_roi = self.check_input(N_roi)	# Num of points in ROI (Region of Interest)
+		self.N_roi = np.array(self.n.shape)		# Num of points in ROI (Region of Interest)
 
-		self.absorbing_boundaries = True 		# True OR False
-		self.boundary_widths = self.check_input(boundary_widths)
+		self.boundary_widths = self.check_input_len(boundary_widths, 0)
+		self.bw_pre = np.floor(self.boundary_widths)
+		self.bw_post = np.ceil(self.boundary_widths)
 
-		if self.absorbing_boundaries:
-			self.bw_l = np.floor(self.boundary_widths)
-			self.bw_r = np.ceil(self.boundary_widths)
-		else:
-			self.boundary_widths = np.array([0])
-
-		self.lambd = lambd						# Wavelength in um (micron)
+		self.wavelength = wavelength						# Wavelength in um (micron)
 		self.ppw = ppw							# points per wavelength
-		self.k0 = (1.*2.*np.pi)/(self.lambd)	# wavevector k = 2*pi/lambda, where lambda = 1.0 um (micron), and thus k0 = 2*pi = 6.28...
-		self.pixel_size = self.lambd/self.ppw	# Grid pixel size in um (micron)
+		self.k0 = (1.*2.*np.pi)/(self.wavelength)	# wavevector k = 2*pi/lambda, where lambda = 1.0 um (micron), and thus k0 = 2*pi = 6.28...
+		self.pixel_size = self.wavelength/self.ppw	# Grid pixel size in um (micron)
 
-		self.N = self.N_roi + self.bw_l + self.bw_r
+		self.N = self.N_roi + self.bw_pre + self.bw_post
+		self.b = self.check_input_dims(source)
 
 		self.max_domain_size = 500
 		if N_domains is None:
-			self.N_domains = self.N//self.max_domain_size	# self.N / Max permissible size of sub-domain
+			self.N_domains = self.N//self.max_domain_size				# self.N / Max permissible size of sub-domain
 		else:
-			self.N_domains = self.check_input(N_domains).astype(int)	# Number of subdomains to decompose into, in each dimension
+			self.N_domains = self.check_input_len(N_domains, 1)	# Number of subdomains to decompose into, in each dimension
 
-		self.overlap = self.check_input(overlap).astype(int)		# Overlap between subdomains in each dimension
+		self.overlap = self.check_input_len(overlap, 0)			# Overlap between subdomains in each dimension
 
-		if (self.N_domains == 1).all():								# If 1 domain, implies no domain decomposition
+		if (self.N_domains == 1).all():									# If 1 domain, implies no domain decomposition
 			self.domain_size = self.N.copy()
-		else:														# Else, domain decomposition
+		else:															# Else, domain decomposition
 			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 			self.check_domain_size_max()
 			self.check_domain_size_same()
 			self.check_domain_size_int()
 
-		self.bw_l = self.bw_l.astype(int)
-		self.bw_r = self.bw_r.astype(int)
+		self.bw_pre = self.bw_pre.astype(int)
+		self.bw_post = self.bw_post.astype(int)
 		self.N = self.N.astype(int)
-		self.N_domains = self.N_domains.astype(int)
+		self.N_domains = self.N_domains
+		self.domain_size[self.N_dim:] = 0
 		self.domain_size = self.domain_size.astype(int)
 
 		self.total_domains = np.prod(self.N_domains)
 		self.range_total_domains = range(self.total_domains)
-		
-		if source is None:
-			self.source_amplitude = source_amplitude
-			self.source_location = source_location
 
-			self.b = np.zeros((tuple(self.N_roi)), dtype='complex_')
-			self.b[tuple(self.source_location)] = self.source_amplitude
-		else:
-			self.b = source
-
-		self.crop_to_roi = tuple([slice(self.bw_l[i], -self.bw_r[i]) for i in range(self.N_dim)])
+		self.crop_to_roi = tuple([slice(self.bw_pre[i], -self.bw_post[i]) for i in range(self.N_dim)])
 
 		self.wrap_correction = wrap_correction	# None, 'L_omega', OR 'L_corr'
 		self.cp = cp							# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
@@ -106,7 +91,6 @@ class AnySim():
 		if not os.path.exists(self.run_loc):
 			os.makedirs(self.run_loc)
 
-		# if self.absorbing_boundaries:
 		self.run_id += '_abs' + str(self.boundary_widths)
 		if self.wrap_correction:
 			self.run_id += '_' + self.wrap_correction
@@ -129,7 +113,35 @@ class AnySim():
 	def setup_operators_n_init_variables(self):			# function that calls all the other 'main' functions
 		# Make operators: Medium B = 1 - V, and Propagator (L+1)^(-1)
 		Vraw = self.k0**2 * self.n**2
-		Vraw = np.pad(Vraw, (tuple([[self.bw_l[i], self.bw_r[i]] for i in range(self.N_dim)])), mode='edge')
+		Vraw = np.pad(Vraw, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='edge')
+
+		# Vraw_blocks = [[] for _ in range(self.N_dim)]
+
+		# for j in range(self.N_domains[0]):
+		# 	Vraw_blocks[0].append(Vraw[j*(self.domain_size[0]-self.overlap):j*(self.domain_size[0]-self.overlap)+self.domain_size[0]])
+
+		# for i in range(self.N_dim-1):
+		# 	print(f'{i} main dimension')
+		# 	# temp_blocks = Vraw_blocks.copy()
+		# 	# Vraw_blocks = [[] for _ in range(self.N_dim)]
+		# 	temp_blocks = Vraw_blocks.copy()
+		# 	Vraw_blocks[i] = []
+		# 	print(f'range 0 to {i+1}')
+		# 	for j in range(self.N_dim):
+		# 		print('-'*50)
+		# 		print(f'{j} internal dimension for reassigning')
+		# 		print(f'size of temp_blocks[{i}] = {len(temp_blocks[i])}')
+		# 		for k in range(self.N_domains[i]):# range(len(temp_blocks[i])):
+		# 			print(f'pick element {j} in k[{i}]')
+		# 			print(f'assign to Vraw_blocks[{j}], elements {k*(self.domain_size[i+1]-self.overlap[i+1])} to {k*(self.domain_size[i+1]-self.overlap[i+1])+self.domain_size[i+1]}')
+
+		# 			assign_block = temp_blocks[i][j][..., k*(self.domain_size[i+1]-self.overlap[i+1]):k*(self.domain_size[i+1]-self.overlap[i+1])+self.domain_size[i+1] ]
+		# 			Vraw_blocks[j].append(assign_block)
+
+		# 			plt.imshow(np.abs(assign_block))
+		# 			plt.colorbar()
+		# 			plt.show()
+		# 			plt.close()
 
 		self.operators = []
 		if self.total_domains==1:
@@ -143,10 +155,7 @@ class AnySim():
 			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.domain_size[i],None) for i in range(self.N_dim)])], 'right') )
 
 		# Scale the source term (and pad if boundaries)
-		if self.absorbing_boundaries:
-			self.b = self.Tl * np.pad(self.b, (tuple([[self.bw_l[i], self.bw_r[i]] for i in range(self.N_dim)])), mode='constant') # source term y
-		else:
-			self.b = self.Tl * self.b
+		self.b = self.Tl * np.squeeze( np.pad(self.b, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='constant') ) # source term y
 		self.u = (np.zeros_like(self.b, dtype='complex_'))	# field u, initialize with 0
 
 		# AnySim update
@@ -156,10 +165,10 @@ class AnySim():
 	
 	# Make the operators: Medium B = 1 - V and Propagator (L+1)^(-1)
 	def make_operators(self, Vraw, which_end='Both'):
-		N = np.squeeze(Vraw).shape
+		N = Vraw.shape
 		# give tiny non-zero minimum value to prevent division by zero in homogeneous media
-		mu_min = (10.0/(self.boundary_widths * self.pixel_size)) if self.absorbing_boundaries else 0
-		mu_min = max( np.max(mu_min), np.max(1.e+0/(np.array(N)*self.pixel_size)) )
+		mu_min = (10.0/(self.boundary_widths[:self.N_dim] * self.pixel_size)) if (self.boundary_widths!=0).any() else 0
+		mu_min = max( np.max(mu_min), np.max(1.e+0/(np.array(N[:self.N_dim])*self.pixel_size)) )
 		Vmin = np.imag( (self.k0 + 1j*np.max(mu_min))**2 )
 		Vmax = 0.95
 		V0 = (np.max(np.real(Vraw)) + np.min(np.real(Vraw)))/2 
@@ -182,16 +191,18 @@ class AnySim():
 
 		## B = 1 - V
 		B = 1 - self.V
-		if self.absorbing_boundaries and which_end != None:
+		if which_end == None:
+			B = np.squeeze(B)
+		else:
 			if which_end == 'Both':
 				N_roi = self.N_roi
 			elif which_end == 'left':
-				N_roi = N - self.bw_l
+				N_roi = N - self.bw_pre
 			elif which_end == 'right':
-				N_roi = N - self.bw_r
+				N_roi = N - self.bw_post
 			else:
-				N_roi = N - self.bw_l - self.bw_r
-			B = self.pad_func(M=B, N_roi=N_roi, which_end=which_end).astype('complex_')
+				N_roi = N - self.bw_pre - self.bw_post
+			B = np.squeeze(self.pad_func(M=B, N_roi=N_roi, which_end=which_end).astype('complex_'))
 		self.medium = lambda x: B * x
 
 		## Make Propagator (L+1)^(-1)
@@ -209,6 +220,8 @@ class AnySim():
 			self.propagator = lambda x: (np.fft.ifftn(Lp_inv * np.fft.fftn( np.pad(x,(0,self.N_FastConv-N)) )))[:N]
 		else:
 			self.propagator = lambda x: (np.fft.ifftn(Lp_inv * np.fft.fftn(x)))
+
+		print('B.shape', B.shape, 'Lp_inv.shape', Lp_inv.shape)
 
 		return [self.medium, self.propagator]
 
@@ -238,12 +251,12 @@ class AnySim():
 
 			fnc_interp = lambda x: np.interp(np.arange(x), [0,x-1], [0,1])
 			decay = fnc_interp(self.overlap[0])
-			D1 = np.diag( np.concatenate((np.ones(self.domain_size-self.overlap), np.flip(decay))) )
+			D1 = np.diag( np.concatenate((np.ones(self.domain_size[0]-self.overlap[0]), np.flip(decay))) )
 			D.append(D1)
-			D_mid = np.diag( np.concatenate((decay, np.ones(self.domain_size-2*self.overlap), np.flip(decay))) )
+			D_mid = np.diag( np.concatenate((decay, np.ones(self.domain_size[0]-2*self.overlap[0]), np.flip(decay))) )
 			for _ in range(1,self.total_domains-1):
 				D.append(D_mid)
-			D_end = np.diag( np.concatenate((decay, np.ones(self.domain_size-self.overlap))) )
+			D_end = np.diag( np.concatenate((decay, np.ones(self.domain_size[0]-self.overlap[0]))) )
 			D.append(D_end)
 
 			for j in self.range_total_domains:
@@ -322,32 +335,42 @@ class AnySim():
 			self.residual = self.residual.T
 		self.full_residual = np.array(full_residual)
 
-		# Truncate u to ROI
-		if self.absorbing_boundaries:
-			self.u = self.u[self.crop_to_roi]
-			# self.u_iter = self.u_iter[tuple((slice(None),))+self.crop_to_roi]
+		## Truncate u to ROI
+		self.u = self.u[self.crop_to_roi]
+		# self.u_iter = self.u_iter[tuple((slice(None),))+self.crop_to_roi]
 
 		self.sim_time = time.time()-s1
 		print('Simulation done (Time {} s)'.format(np.round(self.sim_time,2)))
 
 		return self.u
 
-	def check_input(self, A):
-		if not isinstance(A, np.ndarray):
-			if isinstance(A, list) or isinstance(A, tuple):
-				A = np.array(A)
-			else:
-				A = np.array([A])
-		if A.shape[0] != self.N_dim:
-			A = np.tile(A, self.N_dim)
+	def check_input_dims(self, A):
+		for _ in range(3 - A.ndim):
+			A = np.expand_dims(A, axis=-1)
+		# if not isinstance(A, np.ndarray):
+		# 	if isinstance(A, list) or isinstance(A, tuple):
+		# 		A = np.array(A)
+		# 	else:
+		# 		A = np.array([A])
+		# if A.shape[0] != self.N_dim:
+			# A = np.tile(A, self.N_dim)
 		return A
+	
+	def check_input_len(self, A, x):
+		if isinstance(A, list) or isinstance(A, tuple):
+			A += (3-len(A))*(x,)
+		elif isinstance(A, int) or isinstance(A, float):
+			A = tuple((A,)) + (2)*(x,)
+		if isinstance(A, np.ndarray):
+			A = np.concatenate((A, np.zeros(3-len(A))))
+		return np.array(A).astype(int)
 
 	## Ensure that domain size is the same across every dim
 	def check_domain_size_same(self):
-		while (self.domain_size!=np.max(self.domain_size)).any():
-			self.bw_r = self.bw_r + self.N_domains * (np.max(self.domain_size) - self.domain_size)
-			self.N = self.N_roi + self.bw_l + self.bw_r
-			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+		while (self.domain_size[:self.N_dim]!=np.max(self.domain_size[:self.N_dim])).any():
+			self.bw_post[:self.N_dim] = self.bw_post[:self.N_dim] + self.N_domains[:self.N_dim] * (np.max(self.domain_size[:self.N_dim]) - self.domain_size[:self.N_dim])
+			self.N = self.N_roi + self.bw_pre + self.bw_post
+			self.domain_size[:self.N_dim] = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 
 	## Ensure that domain size is less than 500 in every dim
 	def check_domain_size_max(self):
@@ -357,9 +380,9 @@ class AnySim():
 
 	## Ensure that domain size is int
 	def check_domain_size_int(self):
-		while (self.domain_size%1 != 0).any() or (self.bw_r%1 != 0).any():
-			self.bw_r += np.round(self.N_domains * (np.ceil(self.domain_size) - self.domain_size),2)
-			self.N = self.N_roi + self.bw_l + self.bw_r
+		while (self.domain_size%1 != 0).any() or (self.bw_post%1 != 0).any():
+			self.bw_post += np.round(self.N_domains * (np.ceil(self.domain_size) - self.domain_size),2)
+			self.N = self.N_roi + self.bw_pre + self.bw_post
 			self.domain_size = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 
 	## Spectral radius
@@ -372,8 +395,8 @@ class AnySim():
 		boundary_ = lambda x: np.interp(np.arange(x), [0,x-1], [0.04981993,0.95018007])
 
 		for i in range(self.N_dim):
-			left_boundary = boundary_(np.floor(self.bw_l[i]))
-			right_boundary = boundary_(np.ceil(self.bw_r[i]))
+			left_boundary = boundary_(np.floor(self.bw_pre[i]))
+			right_boundary = boundary_(np.ceil(self.bw_post[i]))
 			if which_end == 'Both':
 				full_filter = np.concatenate((left_boundary, np.ones(N_roi[i]), np.flip(right_boundary)))
 			elif which_end == 'left':
@@ -381,8 +404,8 @@ class AnySim():
 			elif which_end == 'right':
 				full_filter = np.concatenate((np.ones(N_roi[i]), np.flip(right_boundary)))
 
-			M = np.moveaxis(M, i, self.N_dim-1)*full_filter
-			M = np.moveaxis(M, self.N_dim-1, i)
+			M = np.moveaxis(M, i, -1)*full_filter
+			M = np.moveaxis(M, -1, i)
 
 		return M
 	
@@ -419,7 +442,7 @@ class AnySim():
 	# Save some parameters and stats
 	def save_details(self):
 		print('Saving stats...')
-		save_string = f'Test {self.test}; absorbing boundaries {str(self.absorbing_boundaries)}; boundaries width {self.boundary_widths}; N_domains {self.N_domains}; overlap {self.overlap}; wrap correction {self.wrap_correction}; corner points {self.cp}; {self.sim_time:>2.2f} sec; {self.iters+1} iterations; final residual {self.residual_i:>2.2e}'
+		save_string = f'Test {self.test}; boundaries width {self.boundary_widths}; N_domains {self.N_domains}; overlap {self.overlap}; wrap correction {self.wrap_correction}; corner points {self.cp}; {self.sim_time:>2.2f} sec; {self.iters+1} iterations; final residual {self.residual_i:>2.2e}'
 		if "Test_" in self.test:
 			save_string += f'; relative error {self.rel_err:>2.2e}'
 		save_string += f' \n'
@@ -436,7 +459,7 @@ class AnySim():
 				self.label = 'Analytic solution'
 
 		if self.N_dim == 1:
-			self.x = np.arange(self.N_roi)*self.pixel_size
+			self.x = np.arange(self.N_roi[0])*self.pixel_size
 			self.plot_FieldNResidual()	# png
 			# if not "Test_" in self.test:
 			# 	self.plot_field_iters()		# movie/animation/GIF
@@ -450,15 +473,15 @@ class AnySim():
 
 	def plot_basics(self, plt):
 		if self.total_domains > 1:
-			plt.axvline(x=(self.domain_size-self.boundary_widths-self.overlap)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-			plt.axvline(x=(self.domain_size-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+			plt.axvline(x=(self.domain_size[0]-self.boundary_widths[0]-self.overlap[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+			plt.axvline(x=(self.domain_size[0]-self.boundary_widths[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
 			for i in range (1,self.total_domains-1):
-				plt.axvline(x=((i+1)*(self.domain_size-self.overlap)-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-				plt.axvline(x=(i*(self.domain_size-self.overlap)+self.domain_size-self.boundary_widths)*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=((i+1)*(self.domain_size[0]-self.overlap[0])-self.boundary_widths[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5)
+				plt.axvline(x=(i*(self.domain_size[0]-self.overlap[0])+self.domain_size[0]-self.boundary_widths[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 		if "Test_" in self.test:
 			plt.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
 		plt.ylabel('Amplitude')
-		plt.xlabel('$x~[\lambda]$')
+		plt.xlabel("$x~[\lambda]$")
 		plt.xlim([self.x[0]-self.x[1]*2,self.x[-1]+self.x[1]*2])
 		plt.grid()
 
@@ -478,7 +501,7 @@ class AnySim():
 		plt.subplot(2,1,2)
 		res_plots = plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.residual, lw=1.5)
 		if self.total_domains > 1:
-			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in self.range_total_domains), title='Subdomains', ncols=int(self.N_domains/4)+1, framealpha=0.5)
+			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in self.range_total_domains), title='Subdomains', ncols=int(self.N_domains[0]/4)+1, framealpha=0.5)
 		plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.full_residual, lw=3., c='k', ls='dashed', label='Full Residual')
 		plt.axhline(y=self.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
@@ -491,10 +514,9 @@ class AnySim():
 		plt.grid()
 
 		title_text = ''
-		if self.absorbing_boundaries:
-			title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
+		title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
 		if self.wrap_correction:
-			title_text = f'{title_text} Wrap correction: {self.wrap_correction}. '
+			title_text += f'{title_text} Wrap correction: {self.wrap_correction}. '
 		plt.suptitle(title_text)
 
 		plt.tight_layout()
@@ -528,10 +550,9 @@ class AnySim():
 		def animate(i):
 			# line.set_ydata(u_iter_trunc[i])		# update the data.
 			title_text = f'Iteration {iters_trunc[i]+1}. '
-			if self.absorbing_boundaries:
-				title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
+			title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
 			if self.wrap_correction:
-				title_text = f'{title_text} Wrap correction: {self.wrap_correction}. '
+				title_text += f'{title_text} Wrap correction: {self.wrap_correction}. '
 			title.set_text(title_text)
 			return line, title,
 		ani = animation.FuncAnimation(
@@ -587,10 +608,9 @@ class AnySim():
 		plt.tight_layout()
 
 		title_text = ''
-		if self.absorbing_boundaries:
-			title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
+		title_text = f'{title_text} Absorbing boundaries ({self.boundary_widths}). '
 		if self.wrap_correction:
-			title_text = f'{title_text} Wrap correction: {self.wrap_correction}. '
+			title_text += f'{title_text} Wrap correction: {self.wrap_correction}. '
 		plt.suptitle(title_text)
 
 		plt.tight_layout()

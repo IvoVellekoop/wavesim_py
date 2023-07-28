@@ -100,7 +100,6 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
     n_im = (np.where(im[:,:,2]>(0.25),1,0) * (n_fat-n_water)) + n_water
     N_roi = int(oversampling*n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((N_roi,N_roi), BILINEAR))
-    # n = loadmat('anysim_matlab/n2d_lc.mat')['n']
 
     source = np.asarray(fromarray(im[:,:,1]).resize((N_roi,N_roi), BILINEAR))
     boundary_widths = 75

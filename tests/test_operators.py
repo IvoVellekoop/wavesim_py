@@ -5,7 +5,7 @@ def test_Contraction():
     n = np.ones((256,1,1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim1D_FS = AnySim(test='Test_1DFreeSpace', n=n, source=source)
+    anysim1D_FS = AnySim(n=n, source=source)
     anysim1D_FS.setup_operators_n_init_variables()
     # vc = np.max(np.abs(anysim1D_FS.V))
     vc = np.linalg.norm(np.diag(np.squeeze(anysim1D_FS.V)), 2)
@@ -16,7 +16,7 @@ def test_Accretive():
     n = np.ones((256,1,1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim1D_FS = AnySim(test='Test_1DFreeSpace', n=n, source=source)
+    anysim1D_FS = AnySim(n=n, source=source)
     anysim1D_FS.setup_operators_n_init_variables()
 
     L_plus_1_inv = anysim1D_FS.propagator(np.eye(anysim1D_FS.N_FastConv[0]))

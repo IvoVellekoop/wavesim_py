@@ -14,7 +14,6 @@ figsize = (8,8) #(14.32,8)
 
 class AnySim():
 	def __init__(self, 
-				test='custom', 							# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', OR 'Test_3DDisordered'
 				n=np.ones((1,1,1)),						# Refractive index distribution
 				wavelength=1., 							# Wavelength in um (micron)
 				ppw=4, 									# points per wavelength
@@ -26,10 +25,8 @@ class AnySim():
 				cp=20, 									# Corner points to include in case of 'L_corr' wrap-around correction
 				max_iters=int(1.1e+3)):						# Maximum number iterations
 
-		self.test = test	# 'Test_1DFreeSpace', 'Test_1DGlassPlate', 'Test_2DHighContrast', 'Test_2DLowContrast', 'Test_3DHomogeneous', 'Test_3DDisordered'
-
 		self.n = self.check_input_dims(n)
-		self.N_dim = (np.squeeze(self.n)).ndim	# Number of dimensions in problem
+		self.N_dims = (np.squeeze(self.n)).ndim	# Number of dimensions in problem
 
 		self.N_roi = np.array(self.n.shape)		# Num of points in ROI (Region of Interest)
 
@@ -65,13 +62,13 @@ class AnySim():
 		self.bw_post = self.bw_post.astype(int)
 		self.N = self.N.astype(int)
 		self.N_domains = self.N_domains
-		self.domain_size[self.N_dim:] = 0
+		self.domain_size[self.N_dims:] = 0
 		self.domain_size = self.domain_size.astype(int)
 
 		self.total_domains = np.prod(self.N_domains)
 		self.range_total_domains = range(self.total_domains)
 
-		self.crop_to_roi = tuple([slice(self.bw_pre[i], -self.bw_post[i]) for i in range(self.N_dim)])
+		self.crop_to_roi = tuple([slice(self.bw_pre[i], -self.bw_post[i]) for i in range(self.N_dims)])
 
 		self.wrap_correction = wrap_correction	# None, 'L_omega', OR 'L_corr'
 		self.cp = cp							# number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
@@ -86,24 +83,22 @@ class AnySim():
 		if not os.path.exists(self.log_dir):
 			os.makedirs(self.log_dir)
 
-		self.run_id = d1 + '_' + self.test
+		self.run_id = d1
 		self.run_loc = self.log_dir + self.run_id
 		if not os.path.exists(self.run_loc):
 			os.makedirs(self.run_loc)
 
-		self.run_id += '_abs' + str(self.boundary_widths)
+		self.run_id += '_Ndims' + str(self.N_dims) + '_abs' + str(self.boundary_widths)
 		if self.wrap_correction:
 			self.run_id += '_' + self.wrap_correction
 		self.run_id += '_Ndoms' + str(self.N_domains)
 
-		self.stats_file_name = self.log_dir + self.test + '_stats.txt'
+		self.stats_file_name = self.log_dir + d1 + '_stats.txt'
 
 		self.print_details()	# print the simulation details
 
 	def print_details(self):
-		print(f'\n{self.N_dim} dimensional problem')
-		if self.test != 'custom':
-			print('Test: \t\t\t', self.test)
+		print(f'\n{self.N_dims} dimensional problem')
 		if self.wrap_correction:
 			print('Wrap correction: \t', self.wrap_correction)
 		print('Boundaries width: \t', self.boundary_widths)
@@ -115,19 +110,19 @@ class AnySim():
 		Vraw = self.k0**2 * self.n**2
 		Vraw = np.pad(Vraw, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='edge')
 
-		# Vraw_blocks = [[] for _ in range(self.N_dim)]
+		# Vraw_blocks = [[] for _ in range(self.N_dims)]
 
 		# for j in range(self.N_domains[0]):
 		# 	Vraw_blocks[0].append(Vraw[j*(self.domain_size[0]-self.overlap):j*(self.domain_size[0]-self.overlap)+self.domain_size[0]])
 
-		# for i in range(self.N_dim-1):
+		# for i in range(self.N_dims-1):
 		# 	print(f'{i} main dimension')
 		# 	# temp_blocks = Vraw_blocks.copy()
-		# 	# Vraw_blocks = [[] for _ in range(self.N_dim)]
+		# 	# Vraw_blocks = [[] for _ in range(self.N_dims)]
 		# 	temp_blocks = Vraw_blocks.copy()
 		# 	Vraw_blocks[i] = []
 		# 	print(f'range 0 to {i+1}')
-		# 	for j in range(self.N_dim):
+		# 	for j in range(self.N_dims):
 		# 		print('-'*50)
 		# 		print(f'{j} internal dimension for reassigning')
 		# 		print(f'size of temp_blocks[{i}] = {len(temp_blocks[i])}')
@@ -147,12 +142,12 @@ class AnySim():
 		if self.total_domains==1:
 			self.operators.append( self.make_operators(Vraw) )
 		else:
-			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.domain_size[i]) for i in range(self.N_dim)])], 'left') )
+			self.operators.append( self.make_operators(Vraw[tuple([slice(0,self.domain_size[i]) for i in range(self.N_dims)])], 'left') )
 			for d in range(1,self.total_domains-1):
-				# aa = Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dim)])]
+				# aa = Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dims)])]
 				# print(d, aa.shape)
-				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dim)])], None) )
-			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.domain_size[i],None) for i in range(self.N_dim)])], 'right') )
+				self.operators.append( self.make_operators(Vraw[tuple([slice(d*(self.domain_size[i]-self.overlap[i]), d*(self.domain_size[i]-self.overlap[i])+self.domain_size[i]) for i in range(self.N_dims)])], None) )
+			self.operators.append( self.make_operators(Vraw[tuple([slice(-self.domain_size[i],None) for i in range(self.N_dims)])], 'right') )
 
 		# Scale the source term (and pad if boundaries)
 		self.b = self.Tl * np.squeeze( np.pad(self.b, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='constant') ) # source term y
@@ -167,8 +162,8 @@ class AnySim():
 	def make_operators(self, Vraw, which_end='Both'):
 		N = Vraw.shape
 		# give tiny non-zero minimum value to prevent division by zero in homogeneous media
-		mu_min = (10.0/(self.boundary_widths[:self.N_dim] * self.pixel_size)) if (self.boundary_widths!=0).any() else 0
-		mu_min = max( np.max(mu_min), np.max(1.e+0/(np.array(N[:self.N_dim])*self.pixel_size)) )
+		mu_min = (10.0/(self.boundary_widths[:self.N_dims] * self.pixel_size)) if (self.boundary_widths!=0).any() else 0
+		mu_min = max( np.max(mu_min), np.max(1.e+0/(np.array(N[:self.N_dims])*self.pixel_size)) )
 		Vmin = np.imag( (self.k0 + 1j*np.max(mu_min))**2 )
 		Vmax = 0.95
 		V0 = (np.max(np.real(Vraw)) + np.min(np.real(Vraw)))/2 
@@ -212,7 +207,7 @@ class AnySim():
 			self.N_FastConv = N
 
 		L_p = (self.coordinates_f(0, self.N_FastConv)**2)
-		for d in range(1,self.N_dim):
+		for d in range(1,self.N_dims):
 			L_p = np.expand_dims(L_p, axis=-1) + np.expand_dims(self.coordinates_f(d, self.N_FastConv)**2, axis=0)
 		L_p = 1j * self.scaling * (L_p - V0)
 		Lp_inv = np.squeeze(1/(L_p+1))
@@ -352,8 +347,8 @@ class AnySim():
 		# 		A = np.array(A)
 		# 	else:
 		# 		A = np.array([A])
-		# if A.shape[0] != self.N_dim:
-			# A = np.tile(A, self.N_dim)
+		# if A.shape[0] != self.N_dims:
+			# A = np.tile(A, self.N_dims)
 		return A
 	
 	def check_input_len(self, A, x):
@@ -367,10 +362,10 @@ class AnySim():
 
 	## Ensure that domain size is the same across every dim
 	def check_domain_size_same(self):
-		while (self.domain_size[:self.N_dim]!=np.max(self.domain_size[:self.N_dim])).any():
-			self.bw_post[:self.N_dim] = self.bw_post[:self.N_dim] + self.N_domains[:self.N_dim] * (np.max(self.domain_size[:self.N_dim]) - self.domain_size[:self.N_dim])
+		while (self.domain_size[:self.N_dims]!=np.max(self.domain_size[:self.N_dims])).any():
+			self.bw_post[:self.N_dims] = self.bw_post[:self.N_dims] + self.N_domains[:self.N_dims] * (np.max(self.domain_size[:self.N_dims]) - self.domain_size[:self.N_dims])
 			self.N = self.N_roi + self.bw_pre + self.bw_post
-			self.domain_size[:self.N_dim] = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
+			self.domain_size[:self.N_dims] = (self.N+((self.N_domains-1)*self.overlap))/self.N_domains
 
 	## Ensure that domain size is less than 500 in every dim
 	def check_domain_size_max(self):
@@ -394,7 +389,7 @@ class AnySim():
 		# boundary_ = lambda x: (np.arange(1,x+1)-0.21).T/(x+0.66)
 		boundary_ = lambda x: np.interp(np.arange(x), [0,x-1], [0.04981993,0.95018007])
 
-		for i in range(self.N_dim):
+		for i in range(self.N_dims):
 			left_boundary = boundary_(np.floor(self.bw_pre[i]))
 			right_boundary = boundary_(np.ceil(self.bw_post[i]))
 			if which_end == 'Both':
@@ -432,7 +427,7 @@ class AnySim():
 		self.u_true = u_true
 
 		if self.u_true.shape[0] != self.N_roi[0]:
-			self.u = self.u[tuple([slice(0,self.N_roi[i]) for i in range(self.N_dim)])]
+			self.u = self.u[tuple([slice(0,self.N_roi[i]) for i in range(self.N_dims)])]
 			# self.u_iter = self.u_iter[:, :self.N_roi]
 
 		self.rel_err = self.relative_error(self.u, self.u_true)
@@ -442,8 +437,11 @@ class AnySim():
 	# Save some parameters and stats
 	def save_details(self):
 		print('Saving stats...')
-		save_string = f'Test {self.test}; boundaries width {self.boundary_widths}; N_domains {self.N_domains}; overlap {self.overlap}; wrap correction {self.wrap_correction}; corner points {self.cp}; {self.sim_time:>2.2f} sec; {self.iters+1} iterations; final residual {self.residual_i:>2.2e}'
-		if "Test_" in self.test:
+		save_string = f'N_dims {self.N_dims}; boundaries width {self.boundary_widths}; N_domains {self.N_domains}; overlap {self.overlap}'
+		if self.wrap_correction:
+			save_string += f'; wrap correction {self.wrap_correction}; corner points {self.cp}'
+		save_string += f'; {self.sim_time:>2.2f} sec; {self.iters+1} iterations; final residual {self.residual_i:>2.2e}'
+		if 'self.rel_err' in globals():
 			save_string += f'; relative error {self.rel_err:>2.2e}'
 		save_string += f' \n'
 		with open(self.stats_file_name,'a') as fileopen:
@@ -453,23 +451,21 @@ class AnySim():
 	def plot_details(self):
 		print('Plotting...')
 
-		if 'Test_' in self.test:
-			self.label = 'Matlab solution'
-			if self.test == 'Test_1DFreeSpace':
-				self.label = 'Analytic solution'
+		if 'self.u_true' in globals():
+			self.label = 'Reference solution'
 
-		if self.N_dim == 1:
+		if self.N_dims == 1:
 			self.x = np.arange(self.N_roi[0])*self.pixel_size
 			self.plot_FieldNResidual()	# png
-			# if not "Test_" in self.test:
-			# 	self.plot_field_iters()		# movie/animation/GIF
-		elif self.N_dim == 2:
+			# self.plot_field_iters()		# movie/animation/GIF
+		elif self.N_dims == 2:
 			self.image_FieldNResidual()	# png
-		elif self.N_dim == 3:
-			for z_slice in [0, int(self.u_true.shape[2]/2), int(self.u_true.shape[2]-1)]:
+		elif self.N_dims == 3:
+			for z_slice in [0, int(self.u.shape[2]/2), int(self.u.shape[2]-1)]:
 				self.image_FieldNResidual(z_slice)	# png
 		plt.close('all')
 		print('Plotting done.')
+		self.plotting_done = True
 
 	def plot_basics(self, plt):
 		if self.total_domains > 1:
@@ -478,7 +474,7 @@ class AnySim():
 			for i in range (1,self.total_domains-1):
 				plt.axvline(x=((i+1)*(self.domain_size[0]-self.overlap[0])-self.boundary_widths[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5)
 				plt.axvline(x=(i*(self.domain_size[0]-self.overlap[0])+self.domain_size[0]-self.boundary_widths[0])*self.pixel_size, c='b', ls='dashdot', lw=1.5)
-		if "Test_" in self.test:
+		if 'self.u_true' in globals():
 			plt.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
 		plt.ylabel('Amplitude')
 		plt.xlabel("$x~[\lambda]$")
@@ -492,7 +488,7 @@ class AnySim():
 		self.plot_basics(plt)
 		plt.plot(self.x, np.real(self.u), 'r', lw=1., label='AnySim')
 		title = 'Field'
-		if "Test_" in self.test:
+		if 'self.u_true' in globals():
 			plt.plot(self.x, np.real(self.u_true-self.u)*10, 'g', lw=1., label='Error*10')
 			title += f' (Relative Error = {self.rel_err:.2e})'
 		plt.title(title)
@@ -567,34 +563,31 @@ class AnySim():
 		plt.close('all')
 
 	def image_FieldNResidual(self, z_slice=0): # png
-		if self.N_dim == 3:
+		if self.N_dims == 3:
 			u = self.u[:,:,z_slice]
-			u_true = self.u_true[:,:,z_slice]
+			if 'self.u_true' in globals():
+				u_true = self.u_true[:,:,z_slice]
 		else:
 			u = self.u.copy()
-			u_true = self.u_true.copy()
-		plt.subplots(figsize=figsize, ncols=2, nrows=2)
+			if 'self.u_true' in globals():
+				u_true = self.u_true.copy()
+
+		if 'self.u_true' in globals():
+			nrows = 2
+			vlim = np.maximum(np.max(np.abs(np.real(u_true))), np.max(np.abs(np.real(u_true))))
+		else:
+			nrows = 1
+			vlim = np.maximum(np.max(np.abs(np.real(u))), np.max(np.abs(np.real(u))))
+		plt.subplots(figsize=figsize, ncols=2, nrows=nrows)
 		pad = 0.03; shrink = 0.65# 1.# 
 
-		plt.subplot(2,2,1)
-		if "Test_" in self.test:
-			vlim = np.maximum(np.max(np.abs(np.real(u_true))), np.max(np.abs(np.real(u_true))))
-			plt.imshow(np.real(u_true), cmap='seismic', vmin=-vlim, vmax=vlim)
-			plt.colorbar(shrink=shrink, pad=pad)
-			plt.title(self.label)
 
-		plt.subplot(2,2,2)
+		plt.subplot(2,2,1)
 		plt.imshow(np.real(u), cmap='seismic', vmin=-vlim, vmax=vlim)
 		plt.colorbar(shrink=shrink, pad=pad)
 		plt.title('AnySim')
 
-		plt.subplot(2,2,3)
-		if "Test_" in self.test:
-			plt.imshow(np.real(u_true-u), cmap='seismic')#, vmin=-vlim, vmax=vlim)
-			plt.colorbar(shrink=shrink, pad=pad)
-			plt.title(f'Difference. Relative error {self.rel_err:.2e}')
-
-		plt.subplot(2,2,4)
+		plt.subplot(2,2,2)
 		plt.loglog(np.arange(1,self.iters+2, self.iter_step), self.full_residual, lw=3., c='k', ls='dashed')
 		plt.axhline(y=self.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
@@ -605,6 +598,18 @@ class AnySim():
 		plt.ylabel('Residual')
 		plt.xlabel('Iterations')
 		plt.grid()
+
+		if 'self.u_true' in globals():
+			plt.subplot(2,2,3)
+			plt.imshow(np.real(u_true), cmap='seismic', vmin=-vlim, vmax=vlim)
+			plt.colorbar(shrink=shrink, pad=pad)
+			plt.title(self.label)
+
+			plt.subplot(2,2,4)
+			plt.imshow(np.real(u_true-u), cmap='seismic')#, vmin=-vlim, vmax=vlim)
+			plt.colorbar(shrink=shrink, pad=pad)
+			plt.title(f'Difference. Relative error {self.rel_err:.2e}')
+
 		plt.tight_layout()
 
 		title_text = ''

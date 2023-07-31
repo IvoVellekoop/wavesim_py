@@ -1,6 +1,6 @@
 import pytest 
 import numpy as np
-from anysim_combined import AnySim
+from anysim_main import AnySim
 
 @pytest.fixture
 def setup_inputs():

@@ -1,7 +1,7 @@
 import pytest
 
 import numpy as np
-from anysim_combined import AnySim
+from anysim_main import AnySim
 from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray ## needed for 2D tests
 

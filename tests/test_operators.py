@@ -1,5 +1,5 @@
 import numpy as np
-from anysim_combined import AnySim
+from anysim_main import AnySim
 
 def test_Contraction():
     n = np.ones((256,1,1))

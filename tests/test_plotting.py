@@ -1,7 +1,8 @@
 import pytest
 
 import numpy as np
-from anysim_combined import AnySim
+from anysim_main import AnySim
+from save_details import LogPlot
 from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray ## needed for 2D tests
 
@@ -38,8 +39,7 @@ def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
     anysim1D_FS.setup_operators_n_init_variables()
     anysim1D_FS.iterate()
     rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
-    anysim1D_FS.save_details()
-    anysim1D_FS.plot_details()
+    LogPlot()
 
     assert rel_err <= 1.e-3
 
@@ -52,10 +52,8 @@ def test_1DGlassPlate(N_domains):
     anysim1D_GP = AnySim(n=n, N_domains=N_domains, boundary_widths=20, source=source, overlap=20)
     anysim1D_GP.setup_operators_n_init_variables()
     anysim1D_GP.iterate()
-    anysim1D_GP.save_details()
-    anysim1D_GP.plot_details()
-
-    assert anysim1D_GP.plotting_done
+    lp = LogPlot()
+    assert lp.plotting_done
 
 
 @pytest.mark.parametrize("N_domains", [1])
@@ -78,10 +76,8 @@ def test_2DHighContrast(N_domains):
     anysim2D_HC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, N_domains=N_domains, overlap=boundary_widths, max_iters=max_iters)
     anysim2D_HC.setup_operators_n_init_variables()
     anysim2D_HC.iterate()
-    anysim2D_HC.save_details()
-    anysim2D_HC.plot_details()
-
-    assert anysim2D_HC.plotting_done
+    lp = LogPlot()
+    assert lp.plotting_done
 
 
 @pytest.mark.parametrize("N_domains", [1])
@@ -103,10 +99,8 @@ def test_2DLowContrast(N_domains):
     anysim2D_LC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, N_domains=N_domains, overlap=(20,20,0))
     anysim2D_LC.setup_operators_n_init_variables()
     anysim2D_LC.iterate()
-    anysim2D_LC.save_details()
-    anysim2D_LC.plot_details()
-
-    assert anysim2D_LC.plotting_done
+    lp = LogPlot()
+    assert lp.plotting_done
 
 
 @pytest.mark.parametrize("N_roi", [np.array([128, 128, 128]), np.array([128, 48, 96])])
@@ -120,10 +114,8 @@ def test_3DHomogeneous(N_roi, boundary_widths):
 
     anysim3D_H.setup_operators_n_init_variables()
     anysim3D_H.iterate()
-    anysim3D_H.save_details()
-    anysim3D_H.plot_details()
-
-    assert anysim3D_H.plotting_done
+    lp = LogPlot()
+    assert lp.plotting_done
 
 
 def test_3DDisordered():
@@ -137,7 +129,5 @@ def test_3DDisordered():
 
     anysim3D.setup_operators_n_init_variables()
     anysim3D.iterate()
-    anysim3D.save_details()
-    anysim3D.plot_details()
-
-    assert anysim3D.plotting_done
+    lp = LogPlot()
+    assert lp.plotting_done

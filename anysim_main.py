@@ -196,9 +196,9 @@ class AnySim():
 		else:
 			self.N_FastConv = N
 
-		L_p = (self.coordinates_f(0, self.N_FastConv)**2)
+		L_p = (2*np.pi*np.fft.fftfreq(self.N_FastConv[0], self.pixel_size))**2
 		for d in range(1,AnySim.N_dims):
-			L_p = np.expand_dims(L_p, axis=-1) + np.expand_dims(self.coordinates_f(d, self.N_FastConv)**2, axis=0)
+			L_p = np.expand_dims(L_p, axis=-1) + np.expand_dims((2*np.pi*np.fft.fftfreq(self.N_FastConv[d], self.pixel_size))**2, axis=0)
 		L_p = 1j * self.scaling * (L_p - V0)
 		Lp_inv = np.squeeze(1/(L_p+1))
 		if AnySim.wrap_correction == 'L_omega':
@@ -381,13 +381,13 @@ class AnySim():
 
 		for i in range(AnySim.N_dims):
 			left_boundary = boundary_(np.floor(AnySim.bw_pre[i]))
-			right_boundary = boundary_(np.ceil(AnySim.bw_post[i]))
+			right_boundary = np.flip(boundary_(np.ceil(AnySim.bw_post[i])))
 			if which_end == 'Both':
-				full_filter = np.concatenate((left_boundary, np.ones(N_roi[i]), np.flip(right_boundary)))
+				full_filter = np.concatenate((left_boundary, np.ones(N_roi[i]), right_boundary))
 			elif which_end == 'left':
 				full_filter = np.concatenate((left_boundary, np.ones(N_roi[i])))
 			elif which_end == 'right':
-				full_filter = np.concatenate((np.ones(N_roi[i]), np.flip(right_boundary)))
+				full_filter = np.concatenate((np.ones(N_roi[i]), right_boundary))
 
 			M = np.moveaxis(M, i, -1)*full_filter
 			M = np.moveaxis(M, -1, i)
@@ -399,17 +399,6 @@ class AnySim():
 		l, m = np.meshgrid(np.arange(N), np.arange(N))
 		omega = np.exp( - 2 * np.pi * 1j / N )
 		return np.power( omega, l * m )
-
-	def coordinates_f(self, dimension, N):
-		pixel_size_f = 2 * np.pi/(AnySim.pixel_size*np.array(N))
-		k = self.fft_range(N[dimension]) * pixel_size_f[dimension]
-		return k
-
-	def fft_range(self, N):
-		return np.fft.ifftshift(self.symrange(N))
-
-	def symrange(self, N):
-		return range(-int(np.floor(N/2)),int(np.ceil(N/2)))
 
 	## Compute and print relative error between u and some analytic/"ideal"/"expected" u_true
 	def compare(self, u_true):

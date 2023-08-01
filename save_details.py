@@ -18,10 +18,10 @@ class LogPlot(AnySim):
 	# Save some parameters and stats
 	def log_details(self):
 		print('Saving stats...')
-		save_string = f'N_dims {AnySim.N_dims}; boundaries width {AnySim.boundary_widths}; N_domains {AnySim.N_domains}; overlap {AnySim.overlap}'
+		save_string = f'n_dims {AnySim.n_dims}; boundaries width {AnySim.boundary_widths}; n_domains {AnySim.n_domains}; overlap {AnySim.overlap}'
 		if AnySim.wrap_correction:
 			save_string += f'; wrap correction {AnySim.wrap_correction}; corner points {AnySim.cp}'
-		save_string += f'; {AnySim.sim_time:>2.2f} sec; {AnySim.iters+1} iterations; final residual {AnySim.residual_i:>2.2e}'
+		save_string += f'; {AnySim.sim_time:>2.2f} sec; {AnySim.iterations+1} iterations; final residual {AnySim.residual_i:>2.2e}'
 		if 'AnySim.rel_err' in globals():
 			save_string += f'; relative error {AnySim.rel_err:>2.2e}'
 		save_string += f' \n'
@@ -35,13 +35,13 @@ class LogPlot(AnySim):
 		if 'AnySim.u_true' in globals():
 			self.label = 'Reference solution'
 
-		if AnySim.N_dims == 1:
-			self.x = np.arange(AnySim.N_roi[0])*AnySim.pixel_size
+		if AnySim.n_dims == 1:
+			self.x = np.arange(AnySim.n_roi[0])*AnySim.pixel_size
 			self.plot_FieldNResidual()	# png
 			# AnySim.plot_field_iters()		# movie/animation/GIF
-		elif AnySim.N_dims == 2:
+		elif AnySim.n_dims == 2:
 			self.image_FieldNResidual()	# png
-		elif AnySim.N_dims == 3:
+		elif AnySim.n_dims == 3:
 			for z_slice in [0, int(AnySim.u.shape[2]/2), int(AnySim.u.shape[2]-1)]:
 				self.image_FieldNResidual(z_slice)	# png
 		plt.close('all')
@@ -75,16 +75,16 @@ class LogPlot(AnySim):
 		plt.legend(ncols=2, framealpha=0.6)
 
 		plt.subplot(2,1,2)
-		res_plots = plt.loglog(np.arange(1,AnySim.iters+2, AnySim.iter_step), AnySim.residual, lw=1.5)
+		res_plots = plt.loglog(np.arange(1,AnySim.iterations+2, AnySim.iter_step), AnySim.residual, lw=1.5)
 		if AnySim.total_domains > 1:
-			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in AnySim.range_total_domains), title='Subdomains', ncols=int(AnySim.N_domains[0]/4)+1, framealpha=0.5)
-		plt.loglog(np.arange(1,AnySim.iters+2, AnySim.iter_step), AnySim.full_residual, lw=3., c='k', ls='dashed', label='Full Residual')
+			plt.legend(handles=iter(res_plots), labels=tuple(f'{i+1}' for i in AnySim.range_total_domains), title='Subdomains', ncols=int(AnySim.n_domains[0]/4)+1, framealpha=0.5)
+		plt.loglog(np.arange(1,AnySim.iterations+2, AnySim.iter_step), AnySim.full_residual, lw=3., c='k', ls='dashed', label='Full Residual')
 		plt.axhline(y=AnySim.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
 		ymin = np.minimum(6.e-7, 0.8*np.nanmin(AnySim.residual))
 		ymax = np.maximum(2.e+0, 1.2*np.nanmax(AnySim.residual))
 		plt.ylim([ymin, ymax])
-		plt.title('Residual. Iterations = {:.2e}'.format(AnySim.iters+1))
+		plt.title('Residual. Iterations = {:.2e}'.format(AnySim.iterations+1))
 		plt.ylabel('Residual')
 		plt.xlabel('Iterations')
 		plt.grid()
@@ -96,7 +96,7 @@ class LogPlot(AnySim):
 		plt.suptitle(title_text)
 
 		plt.tight_layout()
-		fig_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iters+1}iters_FieldNResidual'
+		fig_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iterations+1}iters_FieldNResidual'
 		if AnySim.wrap_correction == 'L_corr':
 			fig_name += f'_cp{AnySim.cp}'
 		fig_name += f'.png'
@@ -114,13 +114,13 @@ class LogPlot(AnySim):
 		plt.legend()
 
 		# Plot 100 or fewer frames. Takes much longer for any more frames.
-		if AnySim.iters > 100:
+		if AnySim.iterations > 100:
 			plot_iters = 100
-			iters_trunc = np.linspace(0,AnySim.iters-1,plot_iters).astype(int)
+			iters_trunc = np.linspace(0,AnySim.iterations-1,plot_iters).astype(int)
 			# u_iter_trunc = AnySim.u_iter[iters_trunc]
 		else:
-			plot_iters = AnySim.iters
-			iters_trunc = np.arange(AnySim.iters)
+			plot_iters = AnySim.iterations
+			iters_trunc = np.arange(AnySim.iterations)
 			# u_iter_trunc = AnySim.u_iter
 
 		def animate(i):
@@ -135,7 +135,7 @@ class LogPlot(AnySim):
 			fig, animate, interval=100, blit=True, frames=plot_iters)
 		writer = animation.FFMpegWriter(
 		    fps=10, metadata=dict(artist='Me'))
-		ani_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iters+1}iters_Field'
+		ani_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iterations+1}iters_Field'
 		if AnySim.wrap_correction == 'L_corr':
 			ani_name += f'_cp{AnySim.cp}'
 		ani_name += f'.mp4'
@@ -143,7 +143,7 @@ class LogPlot(AnySim):
 		plt.close('all')
 
 	def image_FieldNResidual(self, z_slice=0): # png
-		if AnySim.N_dims == 3:
+		if AnySim.n_dims == 3:
 			u = AnySim.u[:,:,z_slice]
 			if 'AnySim.u_true' in globals():
 				u_true = AnySim.u_true[:,:,z_slice]
@@ -168,13 +168,13 @@ class LogPlot(AnySim):
 		plt.title('AnySim')
 
 		plt.subplot(2,2,2)
-		plt.loglog(np.arange(1,AnySim.iters+2, AnySim.iter_step), AnySim.full_residual, lw=3., c='k', ls='dashed')
+		plt.loglog(np.arange(1,AnySim.iterations+2, AnySim.iter_step), AnySim.full_residual, lw=3., c='k', ls='dashed')
 		plt.axhline(y=AnySim.threshold_residual, c='k', ls=':')
 		plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
 		ymin = np.minimum(6.e-7, 0.8*np.nanmin(AnySim.residual))
 		ymax = np.maximum(2.e+0, 1.2*np.nanmax(AnySim.residual))
 		plt.ylim([ymin, ymax])
-		plt.title('Residual. Iterations = {:.2e}'.format(AnySim.iters+1))
+		plt.title('Residual. Iterations = {:.2e}'.format(AnySim.iterations+1))
 		plt.ylabel('Residual')
 		plt.xlabel('Iterations')
 		plt.grid()
@@ -199,7 +199,7 @@ class LogPlot(AnySim):
 		plt.suptitle(title_text)
 
 		plt.tight_layout()
-		fig_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iters+1}iters_FieldNResidual_{z_slice}'
+		fig_name = f'{AnySim.run_loc}/{AnySim.run_id}_{AnySim.iterations+1}iters_FieldNResidual_{z_slice}'
 		if AnySim.wrap_correction == 'L_corr':
 			fig_name += f'_cp{AnySim.cp}'
 		fig_name += f'.png'

@@ -9,10 +9,10 @@ def setup_inputs():
     yield anysim
 
 def test_N(setup_inputs):
-    assert np.array_equal( setup_inputs.N_roi, np.array([256, 256, 1]))
+    assert np.array_equal( setup_inputs.n_roi, np.array([256, 256, 1]))
 
 def test_N_domains(setup_inputs):
-    assert np.array_equal( setup_inputs.N_domains, np.ones(3))
+    assert np.array_equal( setup_inputs.n_domains, np.ones(3))
 
 ## Should work irrespective of input type of parameters (e.g. here, boundary_widths)
 @pytest.mark.parametrize('boundary_widths', [(10,10), [10,10], np.array([10,10]) ])

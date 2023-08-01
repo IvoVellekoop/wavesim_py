@@ -13,7 +13,7 @@ def relative_error(E_, E_true):
 @pytest.fixture
 def setup_1DFreeSpace():
     n = np.ones((256,1,1))
-    anysim1D_FS_setup = AnySim(n=n, N_domains=1, boundary_widths=20)
+    anysim1D_FS_setup = AnySim(n=n, n_domains=1, boundary_widths=20)
     print('anysim1D_FS_setup.N_roi', anysim1D_FS_setup.N_roi)
 
     ## Compare with the analytic solution
@@ -29,12 +29,12 @@ def setup_1DFreeSpace():
     E_theory[small] = 1.0j * h/(2*k) * (1 + 2j * np.arctanh(h*k/np.pi)/np.pi); # exact value at 0.
     yield E_theory[64:-64]
 
-@pytest.mark.parametrize("N_domains", [(1,1,1), (2,1,1), (5,1,1), (10,1,1)])
-def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
+@pytest.mark.parametrize("n_domains", [(1,1,1), (2,1,1), (5,1,1), (10,1,1)])
+def test_1DFreeSpace(setup_1DFreeSpace, n_domains):
     n = np.ones((256,1,1))
     source = np.zeros_like(n, dtype='complex_')
     source[0] = 1.
-    anysim1D_FS = AnySim(n=n, N_domains=N_domains, boundary_widths=20, source=source, overlap=20)
+    anysim1D_FS = AnySim(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
     anysim1D_FS.setup_operators_n_init_variables()
     anysim1D_FS.iterate()
     rel_err = anysim1D_FS.compare(setup_1DFreeSpace)
@@ -46,13 +46,13 @@ def test_1DFreeSpace(setup_1DFreeSpace, N_domains):
 def setup_1DGlassPlate():
     yield np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
 
-@pytest.mark.parametrize("N_domains", [(1,1,1), (2,1,1)])
-def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
+@pytest.mark.parametrize("n_domains", [(1,1,1), (2,1,1)])
+def test_1DGlassPlate(setup_1DGlassPlate, n_domains):
     n = np.ones((256,1,1))
     n[99:130] = 1.5
     source = np.zeros_like(n, dtype='complex_')
     source[0] = 1.
-    anysim1D_GP = AnySim(n=n, N_domains=N_domains, boundary_widths=20, source=source, overlap=20)
+    anysim1D_GP = AnySim(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
     anysim1D_GP.setup_operators_n_init_variables()
     anysim1D_GP.iterate()
     rel_err = anysim1D_GP.compare(setup_1DGlassPlate)
@@ -64,8 +64,8 @@ def test_1DGlassPlate(setup_1DGlassPlate, N_domains):
 def setup_2DHighContrast():
     yield loadmat('anysim_matlab/u2d.mat')['u2d']
 
-@pytest.mark.parametrize("N_domains", [1])
-def test_2DHighContrast(setup_2DHighContrast, N_domains):
+@pytest.mark.parametrize("n_domains", [1])
+def test_2DHighContrast(setup_2DHighContrast, n_domains):
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png'))/255
     n_iron = 2.8954 + 2.9179j
@@ -81,7 +81,7 @@ def test_2DHighContrast(setup_2DHighContrast, N_domains):
     wavelength = 0.532
     ppw = 3*np.max(abs(n_contrast+1))
 
-    anysim2D_HC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, N_domains=N_domains, overlap=boundary_widths, max_iters=max_iters)
+    anysim2D_HC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, n_domains=n_domains, overlap=boundary_widths, max_iterations=max_iters)
     anysim2D_HC.setup_operators_n_init_variables()
     anysim2D_HC.iterate()
     rel_err = anysim2D_HC.compare(setup_2DHighContrast)
@@ -93,8 +93,8 @@ def test_2DHighContrast(setup_2DHighContrast, N_domains):
 def setup_2DLowContrast():
     yield loadmat('anysim_matlab/u2d_lc.mat')['u2d']
 
-@pytest.mark.parametrize("N_domains", [1])
-def test_2DLowContrast(setup_2DLowContrast, N_domains):
+@pytest.mark.parametrize("n_domains", [1])
+def test_2DLowContrast(setup_2DLowContrast, n_domains):
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png'))/255
     n_water = 1.33
@@ -109,7 +109,7 @@ def test_2DLowContrast(setup_2DLowContrast, N_domains):
     wavelength = 0.532
     ppw = 3*abs(n_fat)
 
-    anysim2D_LC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, N_domains=N_domains, overlap=(20,20,0))
+    anysim2D_LC = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source, n_domains=n_domains, overlap=(20, 20, 0))
     anysim2D_LC.setup_operators_n_init_variables()
     anysim2D_LC.iterate()
     rel_err = anysim2D_LC.compare(setup_2DLowContrast)
@@ -126,7 +126,7 @@ def test_3DHomogeneous(N_roi, boundary_widths):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(N_roi[0]/2-1),int(N_roi[1]/2-1),int(N_roi[2]/2-1)] = 1.
 
-    anysim3D_H = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D_H = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
 
     anysim3D_H.setup_operators_n_init_variables()
     anysim3D_H.iterate()
@@ -143,7 +143,7 @@ def test_3DDisordered():
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(N_roi[0]/2-1),int(N_roi[1]/2-1),int(N_roi[2]/2-1)] = 1.
 
-    anysim3D = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, N_domains=np.array([1,1,1]), overlap=boundary_widths)
+    anysim3D = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
 
     anysim3D.setup_operators_n_init_variables()
     anysim3D.iterate()

@@ -9,16 +9,28 @@ font = {'family':'Times New Roman', # 'Times New Roman', 'Helvetica', 'Arial', '
 rc('font',**font)
 figsize = (8,8) #(14.32,8)
 
-class LogPlot(AnySim):
-	def __init__(self):
+
+def print_details(sim: AnySim):
+	print(f'\n{sim.n_dims} dimensional problem')
+	if sim.wrap_correction:
+		print('Wrap correction: \t', sim.wrap_correction)
+	print('Boundaries width: \t', sim.boundary_widths)
+	if sim.total_domains > 1:
+		print(
+			f'Decomposing into {sim.n_domains} domains of size {sim.domain_size}, overlap {sim.overlap}')
+
+
+class LogPlot:
+	def __init__(self, sim: AnySim):
+		self.sim = sim
 		self.log_details()
 		self.plot_details()
 		self.plotting_done = True
 
 	# Save some parameters and stats
-	def log_details(self):
+	def log_details(sim: Anysim):
 		print('Saving stats...')
-		save_string = f'n_dims {AnySim.n_dims}; boundaries width {AnySim.boundary_widths}; n_domains {AnySim.n_domains}; overlap {AnySim.overlap}'
+		save_string = f'n_dims {self.sim.n_dims}; boundaries width {AnySim.boundary_widths}; n_domains {AnySim.n_domains}; overlap {AnySim.overlap}'
 		if AnySim.wrap_correction:
 			save_string += f'; wrap correction {AnySim.wrap_correction}; corner points {AnySim.cp}'
 		save_string += f'; {AnySim.sim_time:>2.2f} sec; {AnySim.iterations+1} iterations; final residual {AnySim.residual_i:>2.2e}'

@@ -34,34 +34,6 @@ def relative_error(e, e_true):
 
 
 class AnySim:
-    k0 = None
-    n = None
-    n_dims = None
-    pixel_size = None
-    n_roi = None
-    n_ext = None
-
-    b = None
-    u = None
-
-    boundary_widths = None
-    bw_pre = None
-    bw_post = None
-
-    domain_size = None
-    max_domain_size = None
-    n_domains = None
-    total_domains = None
-    range_total_domains = None
-    overlap = None
-
-    wrap_correction = None
-
-    max_iterations = None
-    threshold_residual = None
-    iter_step = None
-    crop_to_roi = None
-
     def __init__(self,
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)
@@ -74,25 +46,19 @@ class AnySim:
                  cp=20,  # Corner points to include in case of 'L_corr' wrap-around correction
                  max_iterations=int(1.1e+3)):  # Maximum number iterations
 
-        AnySim.n = check_input_dims(n)
-        AnySim.n_dims = (np.squeeze(AnySim.n)).ndim  # Number of dimensions in problem
-
-        AnySim.n_roi = np.array(AnySim.n.shape)  # Num of points in ROI (Region of Interest)
-
-        AnySim.boundary_widths = check_input_len(boundary_widths, 0)
-        AnySim.bw_pre = np.floor(AnySim.boundary_widths)
-        AnySim.bw_post = np.ceil(AnySim.boundary_widths)
-
-        AnySim.wavelength = wavelength  # Wavelength in um (micron)
-        AnySim.ppw = ppw  # points per wavelength
-        AnySim.k0 = (1. * 2. * np.pi) / (
-            AnySim.wavelength)  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
-        AnySim.pixel_size = AnySim.wavelength / AnySim.ppw  # Grid pixel size in um (micron)
-
-        AnySim.n_ext = AnySim.n_roi + AnySim.bw_pre + AnySim.bw_post
-        AnySim.b = check_input_dims(source)
-
-        AnySim.max_domain_size = 500
+        self.n = check_input_dims(n)
+        self.n_dims = (np.squeeze(AnySim.n)).ndim  # Number of dimensions in problem
+        self.n_roi = np.array(AnySim.n.shape)  # Num of points in ROI (Region of Interest)
+        self.boundary_widths = check_input_len(boundary_widths, 0)
+        self.bw_pre = np.floor(AnySim.boundary_widths)
+        self.bw_post = np.ceil(AnySim.boundary_widths)
+        self.wavelength = wavelength  # Wavelength in um (micron)
+        self.ppw = ppw  # points per wavelength
+        self.k0 = (1. * 2. * np.pi) / (AnySim.wavelength)  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
+        self.pixel_size = AnySim.wavelength / AnySim.ppw  # Grid pixel size in um (micron)
+        self.n_ext = AnySim.n_roi + AnySim.bw_pre + AnySim.bw_post
+        self.b = check_input_dims(source)
+        self.max_domain_size = 500
         if n_domains is None:
             AnySim.n_domains = AnySim.n_ext // AnySim.max_domain_size  # n_ext/Max permissible size of sub-domain
         else:
@@ -154,15 +120,6 @@ class AnySim:
 
         self.print_details()  # print the simulation details
 
-    @staticmethod
-    def print_details():
-        print(f'\n{AnySim.n_dims} dimensional problem')
-        if AnySim.wrap_correction:
-            print('Wrap correction: \t', AnySim.wrap_correction)
-        print('Boundaries width: \t', AnySim.boundary_widths)
-        if AnySim.total_domains > 1:
-            print(
-                f'Decomposing into {AnySim.n_domains} domains of size {AnySim.domain_size}, overlap {AnySim.overlap}')
 
     def setup_operators_n_init_variables(self):  # function that calls all the other 'main' functions
         # Make operators: Medium b = 1 - v, and Propagator (L+1)^(-1)

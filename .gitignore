@@ -4,6 +4,7 @@
 *.ipynb
 *.html
 *.sh
+.idea
 .ipynb_checkpoints
 .pytest_cache
 .vscode

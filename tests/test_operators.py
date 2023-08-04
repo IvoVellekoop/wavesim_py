@@ -6,7 +6,7 @@ def test_Contraction():
     source = np.zeros_like(n)
     source[0] = 1.
     anysim1D_FS = AnySim(n=n, source=source)
-    anysim1D_FS.setup_operators_n_init_variables()
+    anysim1D_FS.setup_operators_n_initialize()
     # vc = np.max(np.abs(anysim1D_FS.v))
     vc = np.linalg.norm(np.diag(np.squeeze(anysim1D_FS.v)), 2)
     print(vc)
@@ -17,11 +17,11 @@ def test_Accretive():
     source = np.zeros_like(n)
     source[0] = 1.
     anysim1D_FS = AnySim(n=n, source=source)
-    anysim1D_FS.setup_operators_n_init_variables()
+    anysim1D_FS.setup_operators_n_initialize()
 
     L_plus_1_inv = anysim1D_FS.propagator(np.eye(anysim1D_FS.n_fast_conv[0]))
     L_plus_1 = np.linalg.inv(L_plus_1_inv)
-    B = anysim1D_FS.medium(np.eye(anysim1D_FS.n_fast_conv[0]))
+    B = anysim1D_FS.medium_operators[0](np.eye(anysim1D_FS.n_fast_conv[0]))
     A = L_plus_1 - B
 
     acc = np.min(np.real(np.linalg.eigvals(A + np.asarray(np.conj(A).T))))

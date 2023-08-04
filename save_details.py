@@ -43,6 +43,8 @@ class LogPlot:
         self.sim = sim
         self.u_true = u_true
         self.rel_err = rel_err
+        self.plotting_done = None
+        self.x = None
 
         # Create log folder / Check for existing log folder
         today = date.today()
@@ -96,7 +98,7 @@ class LogPlot:
 
         if self.sim.n_dims == 1:
             self.x = np.arange(self.sim.n_roi[0]) * self.sim.pixel_size
-            self.plot_FieldNResidual()  # png
+            self.plot_field_n_residual()  # png
             # self.sim.plot_field_iters()		# movie/animation/GIF
         elif self.sim.n_dims == 2:
             self.image_field_n_residual()  # png
@@ -106,27 +108,28 @@ class LogPlot:
         plt.close('all')
         print('Plotting done.')
 
-    def plot_basics(self, plt):
+    def plot_basics(self, plt_common):
         if self.sim.total_domains > 1:
-            plt.axvline(
+            plt_common.axvline(
                 x=(self.sim.domain_size[0] - self.sim.boundary_widths[0] - self.sim.overlap[0]) * self.sim.pixel_size,
                 c='b', ls='dashdot', lw=1.5)
-            plt.axvline(x=(self.sim.domain_size[0] - self.sim.boundary_widths[0]) * self.sim.pixel_size, c='b',
-                        ls='dashdot',
-                        lw=1.5, label='Subdomain boundaries')
+            plt_common.axvline(x=(self.sim.domain_size[0] - self.sim.boundary_widths[0]) * self.sim.pixel_size, c='b',
+                               ls='dashdot',
+                               lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.sim.total_domains - 1):
-                plt.axvline(x=((i + 1) * (self.sim.domain_size[0] - self.sim.overlap[0]) - self.sim.boundary_widths[
-                    0]) * self.sim.pixel_size, c='b', ls='dashdot', lw=1.5)
-                plt.axvline(x=(i * (self.sim.domain_size[0] - self.sim.overlap[0]) + self.sim.domain_size[0] -
-                               self.sim.boundary_widths[0]) * self.sim.pixel_size, c='b', ls='dashdot', lw=1.5)
+                plt_common.axvline(
+                    x=((i + 1) * (self.sim.domain_size[0] - self.sim.overlap[0]) - self.sim.boundary_widths[
+                        0]) * self.sim.pixel_size, c='b', ls='dashdot', lw=1.5)
+                plt_common.axvline(x=(i * (self.sim.domain_size[0] - self.sim.overlap[0]) + self.sim.domain_size[0] -
+                                      self.sim.boundary_widths[0]) * self.sim.pixel_size, c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_true'):
-            plt.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
-        plt.ylabel('Amplitude')
-        plt.xlabel("$x~[\lambda]$")
-        plt.xlim([self.x[0] - self.x[1] * 2, self.x[-1] + self.x[1] * 2])
-        plt.grid()
+            plt_common.plot(self.x, np.real(self.u_true), 'k', lw=2., label=self.label)
+        plt_common.ylabel('Amplitude')
+        plt_common.xlabel("$x~[\lambda]$")
+        plt_common.xlim([self.x[0] - self.x[1] * 2, self.x[-1] + self.x[1] * 2])
+        plt_common.grid()
 
-    def plot_FieldNResidual(self):  # png
+    def plot_field_n_residual(self):  # png
         plt.subplots(figsize=figsize, ncols=1, nrows=2)
 
         plt.subplot(2, 1, 1)

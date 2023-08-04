@@ -1,6 +1,7 @@
 import time
 import numpy as np
 
+
 def check_input_dims(a):
     for _ in range(3 - a.ndim):
         a = np.expand_dims(a, axis=-1)
@@ -44,7 +45,8 @@ class AnySim:
         if n_domains is None:
             self.n_domains = self.n_ext // self.max_domain_size  # n_ext/Max permissible size of sub-domain
         else:
-            self.n_domains = self.check_input_len(n_domains, 1)  # Number of subdomains to decompose into in each dimension
+            self.n_domains = self.check_input_len(n_domains,
+                                                  1)  # Number of subdomains to decompose into in each dimension
 
         self.overlap = self.check_input_len(overlap, 0)  # Overlap between subdomains in each dimension
 
@@ -67,10 +69,14 @@ class AnySim:
         self.range_total_domains = range(self.total_domains)
 
         self.medium_operators = []
+        self.n_subdomain = None
+        self.v0 = None
+        self.v = None
+        self.scaling = None
         self.Tl = None
         self.Tr = None
-        self.v = None
         self.n_fast_conv = None
+        self.propagator = None
         self.u = None
         self.residual = None
         self.residual_i = None
@@ -101,9 +107,11 @@ class AnySim:
             for d in range(1, self.total_domains - 1):
                 self.medium_operators.append(self.make_medium(v_raw[tuple([slice(
                     d * (self.domain_size[i] - self.overlap[i]),
-                    d * (self.domain_size[i] - self.overlap[i]) + self.domain_size[i]) for i in range(self.n_dims)])], None))
+                    d * (self.domain_size[i] - self.overlap[i]) + self.domain_size[i]) for i in range(self.n_dims)])],
+                                                              None))
             self.medium_operators.append(
-                self.make_medium(v_raw[tuple([slice(-self.domain_size[i], None) for i in range(self.n_dims)])], 'right'))
+                self.make_medium(v_raw[tuple([slice(-self.domain_size[i], None) for i in range(self.n_dims)])],
+                                 'right'))
         self.make_propagator()
 
         # Scale the source term (and pad if boundaries)
@@ -112,7 +120,7 @@ class AnySim:
                    mode='constant'))  # source term y
         self.u = (np.zeros_like(self.b, dtype='complex_'))  # field u, initialize with 0
 
-    def make_medium(self, v_raw, which_end=None): # Medium B = 1 - V
+    def make_medium(self, v_raw, which_end=None):  # Medium B = 1 - V
         self.n_subdomain = v_raw.shape
         # give tiny non-zero minimum value to prevent division by zero in homogeneous media
         mu_min = (10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
@@ -153,8 +161,8 @@ class AnySim:
             b = np.squeeze(self.pad_func(m=b, n_roi=n_roi, which_end=which_end).astype('complex_'))
         medium = lambda x: b * x
         return medium
-    
-    def make_propagator(self): # (L+1)^(-1)
+
+    def make_propagator(self):  # (L+1)^(-1)
         if self.wrap_correction == 'L_omega':
             self.n_fast_conv = self.n_subdomain * 10
         else:
@@ -167,7 +175,8 @@ class AnySim:
         l_p = 1j * self.scaling * (l_p - self.v0)
         l_p_inv = np.squeeze(1 / (l_p + 1))
         if self.wrap_correction == 'L_omega':
-            self.propagator = lambda x: (np.fft.ifftn(l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv - self.n_subdomain)))))[:self.n_subdomain]
+            self.propagator = lambda x: (np.fft.ifftn(
+                l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv - self.n_subdomain)))))[:self.n_subdomain]
         else:
             self.propagator = lambda x: (np.fft.ifftn(l_p_inv * np.fft.fftn(x)))
 
@@ -190,9 +199,8 @@ class AnySim:
             restrict0 = np.zeros((self.domain_size[0], self.n_ext[0]))
             for i in self.range_total_domains:
                 restrict_mid = restrict0.copy()
-                restrict_mid[:,
-                i * (self.domain_size[0] - self.overlap[0]):
-                i * (self.domain_size[0] - self.overlap[0]) + self.domain_size[0]] = ones
+                restrict_mid[:, i * (self.domain_size[0] - self.overlap[0]): 
+                             i * (self.domain_size[0] - self.overlap[0]) + self.domain_size[0]] = ones
                 restrict.append(restrict_mid)
 
             decay = overlap_decay(self.overlap[0])
@@ -291,13 +299,13 @@ class AnySim:
         self.sim_time = time.time() - s1
         print('Simulation done (Time {} s)'.format(np.round(self.sim_time, 2)))
 
-        return self.u
-
-    def check_input_len(self, a, x):    # if input int (for eg) but ndim 2, repeat input int once and add 0 or 1 for the 3rd element.
-        if isinstance(a, list) or isinstance(a, tuple):
+    def check_input_len(self, a, x):
+        if isinstance(a, int) or isinstance(a, float):
+            a = self.n_dims*tuple((a,)) + (3-self.n_dims) * (x,)
+        elif len(a) == 1:
+            a = self.n_dims*tuple(a) + (3-self.n_dims) * (x,)
+        elif isinstance(a, list) or isinstance(a, tuple):
             a += (3 - len(a)) * (x,)
-        elif isinstance(a, int) or isinstance(a, float):
-            a = tuple((a,)) + 2 * (x,)
         if isinstance(a, np.ndarray):
             a = np.concatenate((a, np.zeros(3 - len(a))))
         return np.array(a).astype(int)

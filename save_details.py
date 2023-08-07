@@ -1,3 +1,4 @@
+from anysim_base import AnySim_base
 from anysim_main import AnySim
 
 import os
@@ -13,14 +14,14 @@ rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
 
 
-def print_details(sim: AnySim):
-    print(f'\n{sim.n_dims} dimensional problem')
-    if sim.wrap_correction:
-        print('Wrap correction: \t', sim.wrap_correction)
-    print('Boundaries width: \t', sim.boundary_widths)
-    if sim.total_domains > 1:
+def print_details(base: AnySim_base):
+    print(f'\n{base.n_dims} dimensional problem')
+    if base.wrap_correction:
+        print('Wrap correction: \t', base.wrap_correction)
+    print('Boundaries width: \t', base.boundary_widths)
+    if base.total_domains > 1:
         print(
-            f'Decomposing into {sim.n_domains} domains of size {sim.domain_size}, overlap {sim.overlap}')
+            f'Decomposing into {base.n_domains} domains of size {base.domain_size}, overlap {base.overlap}')
 
 
 # Relative error
@@ -30,17 +31,17 @@ def relative_error(e, e_true):
 
 # Compute and print relative error between u and some analytic/"ideal"/"expected" u_true
 def compare(sim: AnySim, u_true):
-    if u_true.shape[0] != sim.n_roi[0]:
-        sim.u = sim.u[tuple([slice(0, sim.n_roi[i]) for i in range(sim.n_dims)])]
-        # sim.u_iter = sim.u_iter[:, :sim.n_roi]
-    rel_err = relative_error(sim.u, u_true)
+    if u_true.shape[0] != sim.base.n_roi[0]:
+        sim.base.u = sim.base.u[tuple([slice(0, sim.base.n_roi[i]) for i in range(sim.base.n_dims)])]
+        # sim.base.u_iter = sim.base.u_iter[:, :sim.base.n_roi]
+    rel_err = relative_error(sim.base.u, u_true)
     print('Relative error: {:.2e}'.format(rel_err))
     return rel_err
 
 
 class LogPlot:
     def __init__(self, sim: AnySim, u_true: np.array([]), rel_err: None):
-        self.sim = sim
+        self.sim = sim.base
         self.u_true = u_true
         self.rel_err = rel_err
         self.plotting_done = None
@@ -99,7 +100,7 @@ class LogPlot:
         if self.sim.n_dims == 1:
             self.x = np.arange(self.sim.n_roi[0]) * self.sim.pixel_size
             self.plot_field_n_residual()  # png
-            # self.sim.plot_field_iters()		# movie/animation/GIF
+            self.plot_field_iters()		# movie/animation/GIF
         elif self.sim.n_dims == 2:
             self.image_field_n_residual()  # png
         elif self.sim.n_dims == 3:
@@ -204,8 +205,7 @@ class LogPlot:
 
         ani = animation.FuncAnimation(
             fig, animate, interval=100, blit=True, frames=plot_iters)
-        writer = animation.FFMpegWriter(
-            fps=10, metadata=dict(artist='Me'))
+        writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.sim.iterations + 1}iters_Field'
         if self.sim.wrap_correction == 'L_corr':
             ani_name += f'_cp{self.sim.cp}'

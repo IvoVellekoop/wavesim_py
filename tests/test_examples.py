@@ -3,6 +3,7 @@ import numpy as np
 from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 
+from anysim_base import AnySim_base
 from anysim_main import AnySim
 from save_details import print_details, compare, LogPlot
 
@@ -10,14 +11,14 @@ from save_details import print_details, compare, LogPlot
 @pytest.fixture
 def setup_1d_homogeneous():
     n = np.ones((256, 1, 1))
-    anysim_1d_h_setup = AnySim(n=n, n_domains=1, boundary_widths=20)
-    print('anysim_1d_h_setup.n_roi', anysim_1d_h_setup.n_roi)
+    base_1d_h_setup = AnySim_base(n=n, n_domains=1, boundary_widths=20)
+    print('base_1d_h_setup.n_roi', base_1d_h_setup.n_roi)
 
     # Compare with the analytic solution
-    x = np.arange(0, anysim_1d_h_setup.n_roi[0] * anysim_1d_h_setup.pixel_size, anysim_1d_h_setup.pixel_size)
+    x = np.arange(0, base_1d_h_setup.n_roi[0] * base_1d_h_setup.pixel_size, base_1d_h_setup.pixel_size)
     x = np.pad(x, (64, 64), mode='constant')
-    h = anysim_1d_h_setup.pixel_size
-    k = anysim_1d_h_setup.k0
+    h = base_1d_h_setup.pixel_size
+    k = base_1d_h_setup.k0
     phi = k * x
 
     e_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
@@ -35,9 +36,11 @@ def test_1d_homogeneous(setup_1d_homogeneous, n_domains):
     # n = np.random.rand(256, 1, 1)
     source = np.zeros_like(n, dtype='complex_')
     source[0] = 1.
-    anysim_1d_h = AnySim(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
-    print_details(anysim_1d_h)
-    anysim_1d_h.setup_operators_n_initialize()
+    base_1d_h = AnySim_base(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
+    print_details(base_1d_h)
+    base_1d_h.setup_operators_n_initialize()
+
+    anysim_1d_h = AnySim(base_1d_h)
     anysim_1d_h.iterate()
     rel_err_1d_h = compare(anysim_1d_h, setup_1d_homogeneous)
     lp_1d_h = LogPlot(anysim_1d_h, setup_1d_homogeneous, rel_err_1d_h)

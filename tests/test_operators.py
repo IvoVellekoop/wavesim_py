@@ -1,22 +1,22 @@
 import numpy as np
-from anysim_main import AnySim
+from anysim_base import AnySim_base
 
-def test_Contraction():
+def test_contraction():
     n = np.ones((256,1,1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim1D_FS = AnySim(n=n, source=source)
+    anysim1D_FS = AnySim_base(n=n, source=source)
     anysim1D_FS.setup_operators_n_initialize()
     # vc = np.max(np.abs(anysim1D_FS.v))
     vc = np.linalg.norm(np.diag(np.squeeze(anysim1D_FS.v)), 2)
     print(vc)
     assert vc < 1, f'||V|| not < 1, but {vc}'
 
-def test_Accretive():
+def test_accretive():
     n = np.ones((256,1,1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim1D_FS = AnySim(n=n, source=source)
+    anysim1D_FS = AnySim_base(n=n, source=source)
     anysim1D_FS.setup_operators_n_initialize()
 
     L_plus_1_inv = anysim1D_FS.propagator(np.eye(anysim1D_FS.n_fast_conv[0]))

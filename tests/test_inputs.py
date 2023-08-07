@@ -1,11 +1,11 @@
 import pytest 
 import numpy as np
-from anysim_main import AnySim
+from anysim_base import AnySim_base
 
 @pytest.fixture
 def setup_inputs():
     n = np.ones((256, 256, 1))
-    anysim = AnySim(n=n)
+    anysim = AnySim_base(n=n)
     yield anysim
 
 def test_N(setup_inputs):
@@ -18,5 +18,5 @@ def test_N_domains(setup_inputs):
 @pytest.mark.parametrize('boundary_widths', [10, (10), [10], np.array([10]), (10,10), [10,10], np.array([10,10]) ])
 def test_input_boundary_widths(boundary_widths):
     n = np.ones((256, 256, 1))
-    anysim_bw = AnySim(n=n, boundary_widths=boundary_widths)
+    anysim_bw = AnySim_base(n=n, boundary_widths=boundary_widths)
     assert np.array_equal( anysim_bw.boundary_widths, np.array([10,10,0]))

@@ -1,11 +1,26 @@
 import time
 import numpy as np
-from utilities import check_input_dims, boundary_, overlap_decay
-from anysim_base import AnySim_base
+from anysim_base import AnySimBase
+
+
+def overlap_decay(x):
+    return np.interp(np.arange(x), [0, x - 1], [0, 1])
+
 
 class AnySim:
-    def __init__(self, base: AnySim_base):
+    def __init__(self, base: AnySimBase):
         self.base = base
+
+        self.residual_i = [None for _ in self.base.range_total_domains]
+        self.residual = [[] for _ in self.base.range_total_domains]
+        self.u_iter = []
+        self.breaker = False
+        self.full_residual = []
+        self.u_list = []
+        self.b_list = []
+        self.restrict = []
+        self.pou = []
+        self.full_norm_gb = None
 
     # AnySim update
     def iterate(self):
@@ -15,12 +30,6 @@ class AnySim:
         self.residual_initial()
 
         tj = [None for _ in self.base.range_total_domains]
-        self.residual_i = [None for _ in self.base.range_total_domains]
-        self.residual = [[] for _ in self.base.range_total_domains]
-        self.u_iter = []
-        self.breaker = False
-
-        self.full_residual = []
 
         for i in range(self.base.max_iterations):
             for j in self.base.range_total_domains:
@@ -33,15 +42,16 @@ class AnySim:
                 tj[j] = self.base.propagator(tj[j])
                 tj[j] = self.base.medium_operators[j](self.u_list[j] - tj[j])  # subdomain residual
 
-                self.residual_subdomain(i, j, tj) # Residual collection (Normalize subdomain residual wrt preconditioned source)
+                self.residual_subdomain(tj, j)  # Collect subdomain residual (Normalize wrt preconditioned source)
 
                 self.u_list[j] = self.base.alpha * tj[j]
+                # instead of this, simply update on overlapping regions?
                 if self.base.total_domains == 1:
-                    self.base.u = self.base.u - self.u_list[j]  # instead of this, simply update on overlapping regions?
+                    self.base.u = self.base.u - self.u_list[j]
                 else:
-                    self.base.u = self.base.u - self.restrict[j].T @ self.pou[j] @ self.u_list[j]  # instead, update on overlapping regions?
+                    self.base.u = self.base.u - self.restrict[j].T @ self.pou[j] @ self.u_list[j]
             
-            self.residual_full_domain(i, tj)
+            self.residual_full_domain(tj, i)
             self.u_iter.append(self.base.u)
 
             if self.breaker:
@@ -52,10 +62,6 @@ class AnySim:
 
     def restrict_n_partition(self):
         # Construct restriction operators (self.restrict) and partition of unity operators (self.pou)
-        self.u_list = []
-        self.b_list = []
-        self.restrict = []
-        self.pou = []
         if self.base.total_domains == 1:
             self.u_list.append(self.base.u)
             self.b_list.append(self.base.b)
@@ -88,11 +94,11 @@ class AnySim:
             self.full_norm_gb = np.linalg.norm(self.base.medium_operators[0](self.base.propagator(self.b_list[0])))
         else:
             self.full_norm_gb = np.linalg.norm(np.sum(np.array(
-                [(self.restrict[j].T @ self.pou[j] @ self.base.medium_operators[j](self.base.propagator(self.b_list[j]))) for j in
-                 self.base.range_total_domains]), axis=0))
+                [(self.restrict[j].T@self.pou[j]@self.base.medium_operators[j](self.base.propagator(self.b_list[j])))
+                 for j in self.base.range_total_domains]), axis=0))
 
     # Residual collection and checking
-    def residual_subdomain(self, i, j, tj):
+    def residual_subdomain(self, tj, j):
         # To Normalize subdomain residual wrt preconditioned source
         if self.base.total_domains == 1:
             nr = np.linalg.norm(tj[j])
@@ -102,17 +108,18 @@ class AnySim:
         self.residual_i[j] = nr / self.full_norm_gb
         self.residual[j].append(self.residual_i[j])
 
-    def residual_full_domain(self, i, tj):
+    def residual_full_domain(self, tj, i):
         if self.base.total_domains == 1:
             full_nr = np.linalg.norm(tj[0])
         else:
             full_nr = np.linalg.norm(
-                np.sum(np.array([(self.restrict[j].T @ self.pou[j] @ tj[j]) for j in self.base.range_total_domains]), axis=0))
+                np.sum(np.array([(self.restrict[j].T @ self.pou[j] @ tj[j])
+                                 for j in self.base.range_total_domains]), axis=0))
         self.full_residual.append(full_nr / self.full_norm_gb)
         if self.full_residual[i] < self.base.threshold_residual:
             self.base.iterations = i
             print(f'Stopping. Iter {self.base.iterations + 1} '
-                    f'residual {self.full_residual[i]:.2e}<={self.base.threshold_residual}')
+                  f'residual {self.full_residual[i]:.2e}<={self.base.threshold_residual}')
             self.breaker = True
         self.base.residual_i = self.full_residual[i]
 
@@ -125,10 +132,10 @@ class AnySim:
             self.base.residual = self.base.residual.T
         self.base.full_residual = np.array(self.full_residual)
 
-        self.base.u = self.base.u[self.base.crop_to_roi] # Truncate u to ROI
+        self.base.u = self.base.u[self.base.crop_to_roi]  # Truncate u to ROI
 
     def collect_u(self):
-        if self.base.n_dims > 1 and self.max_iterations > 500:
+        if self.base.n_dims > 1 and self.base.max_iterations > 500:
             self.u_iter = self.u_iter[::10]
-        self.base.u_iter = self.base.Tr.flatten() * np.array(self.u_iter)		## getting killed here for 2D examples with >500 iterations (memory)
+        self.base.u_iter = self.base.Tr.flatten() * np.array(self.u_iter)
         self.base.u_iter = self.base.u_iter[tuple((slice(None),))+self.base.crop_to_roi]

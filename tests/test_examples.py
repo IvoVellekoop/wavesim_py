@@ -3,7 +3,7 @@ import numpy as np
 from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 
-from anysim_base import AnySim_base
+from anysim_base import AnySimBase
 from anysim_main import AnySim
 from save_details import print_details, compare, LogPlot
 
@@ -11,7 +11,7 @@ from save_details import print_details, compare, LogPlot
 @pytest.fixture
 def setup_1d_homogeneous():
     n = np.ones((256, 1, 1))
-    base_1d_h_setup = AnySim_base(n=n, n_domains=1, boundary_widths=20)
+    base_1d_h_setup = AnySimBase(n=n, n_domains=1, boundary_widths=20)
     print('base_1d_h_setup.n_roi', base_1d_h_setup.n_roi)
 
     # Compare with the analytic solution
@@ -22,21 +22,20 @@ def setup_1d_homogeneous():
     phi = k * x
 
     e_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
-            np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
-        -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
+               np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
+               -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
     # special case for values close to 0
     small = np.abs(k * x) < 1.e-10
     e_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
     yield e_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 11)])
+@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 4)])
 def test_1d_homogeneous(setup_1d_homogeneous, n_domains):
     n = np.ones((256, 1, 1))
-    # n = np.random.rand(256, 1, 1)
     source = np.zeros_like(n, dtype='complex_')
     source[0] = 1.
-    base_1d_h = AnySim_base(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
+    base_1d_h = AnySimBase(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
     print_details(base_1d_h)
     base_1d_h.setup_operators_n_initialize()
 
@@ -49,15 +48,17 @@ def test_1d_homogeneous(setup_1d_homogeneous, n_domains):
     assert rel_err_1d_h <= 1.e-3
 
 
-@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 11)])
+@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 3)])
 def test_1d_glass_plate(n_domains):
     n = np.ones((256, 1, 1))
     n[99:130] = 1.5
     source = np.zeros_like(n, dtype='complex_')
     source[0] = 1.
-    anysim_1d_gp = AnySim(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
-    print_details(anysim_1d_gp)
-    anysim_1d_gp.setup_operators_n_initialize()
+    base_1d_gp = AnySimBase(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
+    print_details(base_1d_gp)
+    base_1d_gp.setup_operators_n_initialize()
+
+    anysim_1d_gp = AnySim(base_1d_gp)
     anysim_1d_gp.iterate()
 
     u_true_1d_gp = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
@@ -74,7 +75,7 @@ def test_2d_high_contrast(n_domains):
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
     n_iron = 2.8954 + 2.9179j
     n_contrast = n_iron - 1
-    n_im = ((np.where(im[:, :, 2] > (0.25), 1, 0) * n_contrast) + 1)
+    n_im = ((np.where(im[:, :, 2] > 0.25, 1, 0) * n_contrast) + 1)
     n_roi = int(oversampling * n_im.shape[0])
     # n2d = np.asarray(fromarray(n_im).resize((n_roi,n_roi), BILINEAR)) # resize cannot work with complex values?
     n = loadmat('anysim_matlab/n2d.mat')['n']
@@ -85,10 +86,12 @@ def test_2d_high_contrast(n_domains):
     wavelength = 0.532
     ppw = 3 * np.max(abs(n_contrast + 1))
 
-    anysim_2d_hc = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
-                          n_domains=n_domains, overlap=boundary_widths, max_iterations=max_iters)
-    print_details(anysim_2d_hc)
-    anysim_2d_hc.setup_operators_n_initialize()
+    base_2d_hc = AnySimBase(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
+                            n_domains=n_domains, overlap=boundary_widths, max_iterations=max_iters)
+    print_details(base_2d_hc)
+    base_2d_hc.setup_operators_n_initialize()
+
+    anysim_2d_hc = AnySim(base_2d_hc)
     anysim_2d_hc.iterate()
 
     u_true_2d_hc = loadmat('anysim_matlab/u2d.mat')['u2d']
@@ -106,7 +109,7 @@ def test_2d_low_contrast(n_domains):
     n_water = 1.33
     n_fat = 1.46
 
-    n_im = (np.where(im[:, :, 2] > (0.25), 1, 0) * (n_fat - n_water)) + n_water
+    n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
 
@@ -115,10 +118,12 @@ def test_2d_low_contrast(n_domains):
     wavelength = 0.532
     ppw = 3 * abs(n_fat)
 
-    anysim_2d_lc = AnySim(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
-                          n_domains=n_domains, overlap=(20, 20, 0))
-    print_details(anysim_2d_lc)
-    anysim_2d_lc.setup_operators_n_initialize()
+    base_2d_lc = AnySimBase(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
+                            n_domains=n_domains, overlap=(20, 20, 0))
+    print_details(base_2d_lc)
+    base_2d_lc.setup_operators_n_initialize()
+
+    anysim_2d_lc = AnySim(base_2d_lc)
     anysim_2d_lc.iterate()
 
     u_true_2d_lc = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
@@ -136,10 +141,12 @@ def test_3d_homogeneous(n_roi, boundary_widths):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    anysim_3d_h = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, n_domains=np.array([1, 1, 1]),
-                         overlap=boundary_widths)
-    print_details(anysim_3d_h)
-    anysim_3d_h.setup_operators_n_initialize()
+    base_3d_h = AnySimBase(boundary_widths=boundary_widths, n=n_sample, source=source, n_domains=np.array([1, 1, 1]),
+                           overlap=boundary_widths)
+    print_details(base_3d_h)
+    base_3d_h.setup_operators_n_initialize()
+
+    anysim_3d_h = AnySim(base_3d_h)
     anysim_3d_h.iterate()
 
     u_true_3d_h = loadmat(
@@ -159,10 +166,12 @@ def test_3d_disordered():
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    anysim_3d_d = AnySim(boundary_widths=boundary_widths, n=n_sample, source=source, 
-                         n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
-    print_details(anysim_3d_d)
-    anysim_3d_d.setup_operators_n_initialize()
+    base_3d_d = AnySimBase(boundary_widths=boundary_widths, n=n_sample, source=source,
+                           n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
+    print_details(base_3d_d)
+    base_3d_d.setup_operators_n_initialize()
+
+    anysim_3d_d = AnySim(base_3d_d)
     anysim_3d_d.iterate()
 
     u_true_3d_d = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']

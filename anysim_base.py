@@ -1,4 +1,3 @@
-import time
 import numpy as np
 
 
@@ -12,11 +11,7 @@ def boundary_(x):
     return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
 
 
-def overlap_decay(x):
-    return np.interp(np.arange(x), [0, x - 1], [0, 1])
-
-
-class AnySim_base:
+class AnySimBase:
     def __init__(self,
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)
@@ -159,8 +154,7 @@ class AnySim_base:
             else:
                 n_roi = self.n_subdomain - self.bw_pre - self.bw_post
             b = np.squeeze(self.pad_func(m=b, n_roi=n_roi, which_end=which_end).astype('complex_'))
-        medium = lambda x: b * x
-        return medium
+        return lambda x: b * x  # medium(x) = b * x
 
     def make_propagator(self):  # (L+1)^(-1)
         if self.wrap_correction == 'L_omega':

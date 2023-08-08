@@ -1,4 +1,4 @@
-from anysim_base import AnySim_base
+from anysim_base import AnySimBase
 from anysim_main import AnySim
 
 import os
@@ -14,7 +14,7 @@ rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
 
 
-def print_details(base: AnySim_base):
+def print_details(base: AnySimBase):
     print(f'\n{base.n_dims} dimensional problem')
     if base.wrap_correction:
         print('Wrap correction: \t', base.wrap_correction)

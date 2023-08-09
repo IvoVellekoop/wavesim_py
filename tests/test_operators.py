@@ -1,12 +1,12 @@
 import numpy as np
-from anysim_base import AnySimBase
+from helmholtz_base import Helmholtz_Base
 
 
 def test_contraction():
     n = np.ones((256, 1, 1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim_1d_fs = AnySimBase(n=n, source=source)
+    anysim_1d_fs = Helmholtz_Base(n=n, source=source)
     anysim_1d_fs.setup_operators_n_initialize()
     # vc = np.max(np.abs(anysim_1d_fs.v))
     vc = np.linalg.norm(np.diag(np.squeeze(anysim_1d_fs.v)), 2)
@@ -18,7 +18,7 @@ def test_accretive():
     n = np.ones((256, 1, 1))
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim_1d_fs = AnySimBase(n=n, source=source)
+    anysim_1d_fs = Helmholtz_Base(n=n, source=source)
     anysim_1d_fs.setup_operators_n_initialize()
 
     l_plus_1_inv = anysim_1d_fs.propagator(np.eye(anysim_1d_fs.n_fast_conv[0]))

@@ -11,7 +11,7 @@ def boundary_(x):
     return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
 
 
-class AnySimBase:
+class Helmholtz_Base:
     def __init__(self,
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)
@@ -61,7 +61,6 @@ class AnySimBase:
         self.domain_size = self.domain_size.astype(int)
 
         self.total_domains = np.prod(self.n_domains)
-        self.range_total_domains = range(self.total_domains)
 
         self.medium_operators = []
         self.n_subdomain = None
@@ -113,7 +112,6 @@ class AnySimBase:
         self.b = self.Tl * np.squeeze(
             np.pad(self.b, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])),
                    mode='constant'))  # source term y
-        self.u = (np.zeros_like(self.b, dtype='complex_'))  # field u, initialize with 0
 
     def make_medium(self, v_raw, which_end=None):  # Medium B = 1 - V
         self.n_subdomain = v_raw.shape

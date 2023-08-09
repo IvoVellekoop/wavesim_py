@@ -1,14 +1,15 @@
 import numpy as np
 from numpy.linalg import norm
-from helmholtz_base import Helmholtz_Base
+from helmholtzbase import HelmholtzBase
 from state import State
+
 
 def overlap_decay(x):
     return np.interp(np.arange(x), [0, x - 1], [0, 1])
 
 
 class AnySim:
-    def __init__(self, base: Helmholtz_Base):
+    def __init__(self, base: HelmholtzBase):
         self.base = base
 
         self.u = (np.zeros_like(self.base.b, dtype='complex_'))  # field u, initialize with 0
@@ -20,7 +21,10 @@ class AnySim:
         self.partition_of_unity = []
         self.restrict_n_partition()
         self.state = State(self.base)
-        self.state.residual_initial(preconditioned_source = [(np.dot(self.extension[j], np.dot(self.partition_of_unity[j], self.base.medium_operators[j](self.base.propagator(self.b_list[j]))))) for j in range(self.base.total_domains)])
+        self.state.init_norm = norm(np.sum(np.array([(np.dot(self.extension[j],
+                                    np.dot(self.partition_of_unity[j], self.base.medium_operators[j]
+                                    (self.base.propagator(self.b_list[j])))))
+                                    for j in range(self.base.total_domains)]), axis=0))
 
     def iterate(self):
         """ AnySim update """
@@ -33,23 +37,26 @@ class AnySim:
                 tj[j] = self.base.propagator(tj[j])
                 tj[j] = self.base.medium_operators[j](self.u_list[j] - tj[j])  # subdomain residual
 
-                self.state.log_subdomain_residual(j, residual_s = np.dot(self.partition_of_unity[j], tj[j]))
+                self.state.log_subdomain_residual(j, residual_s=norm(np.dot(self.partition_of_unity[j], tj[j])))
 
                 self.u_list[j] = self.base.alpha * tj[j]
                 # instead of this, simply update on overlapping regions?
                 self.u = self.u - np.dot(self.extension[j], np.dot(self.partition_of_unity[j], self.u_list[j]))
 
-            self.state.log_full_residual(residual_f = [( np.dot(self.extension[j], np.dot(self.partition_of_unity[j], tj[j])) ) for j in range(self.base.total_domains)])
+            self.state.log_full_residual(
+                residual_f=norm(np.sum(np.array([(np.dot(self.extension[j],
+                                np.dot(self.partition_of_unity[j], tj[j])))
+                            for j in range(self.base.total_domains)]), axis=0)))
 
-            self.state.next(i, self.u)
+            self.state.log_u_iter(i, self.u)
+            self.state.next(i)
             if self.state.should_terminate:
                 break
 
-        print('Simulation done (Time {} s)'.format(np.round(self.state.sim_time, 2)))
         return self.state.finalize(self.u), self.state
 
     def restrict_n_partition(self):
-        """Construct restriction operators (self.restriction) and partition of unity operators (self.partition_of_unity)"""
+        """Construct restriction, extension, and partition of unity operators"""
         if self.base.total_domains == 1:
             self.u_list.append(self.u)
             self.b_list.append(self.base.b)

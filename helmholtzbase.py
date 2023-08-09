@@ -11,7 +11,7 @@ def boundary_(x):
     return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
 
 
-class Helmholtz_Base:
+class HelmholtzBase:
     def __init__(self,
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)

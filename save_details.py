@@ -1,4 +1,4 @@
-from helmholtz_base import Helmholtz_Base
+from helmholtzbase import HelmholtzBase
 from state import State
 
 import os
@@ -14,7 +14,7 @@ rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
 
 
-def print_details(base: Helmholtz_Base):
+def print_details(base: HelmholtzBase):
     print(f'\n{base.n_dims} dimensional problem')
     if base.wrap_correction:
         print('Wrap correction: \t', base.wrap_correction)
@@ -29,23 +29,14 @@ def relative_error(e, e_true):
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
 
 
-def compare(base: Helmholtz_Base, u_computed, u_reference):
-    """ Compute and print relative error between u and some analytic/"ideal"/"expected" u_reference """
-    if u_reference.shape[0] != base.n_roi[0]:
-        u_computed = u_computed[tuple([slice(0, base.n_roi[i]) for i in range(base.n_dims)])]
-    rel_err = relative_error(u_computed, u_reference)
-    print('Relative error: {:.2e}'.format(rel_err))
-    return rel_err
-
-
 class LogPlot:
-    def __init__(self, base: Helmholtz_Base, state: State, u_computed: np.array([]), u_reference: np.array([]), rel_err: None):
-        """ Loggin and Plotting Class """
+    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference: np.array([])):
+        """ Logging and Plotting Class """
         self.base = base
         self.state = state
         self.u_computed = u_computed
         self.u_reference = u_reference
-        self.rel_err = rel_err
+        self.rel_err = None
         self.plotting_done = None
         self.x = None
 
@@ -76,6 +67,14 @@ class LogPlot:
 
         if 'u_reference' in locals():
             self.label = 'Reference solution'
+
+    def compare(self):
+        """ Compute and print relative error between u and some analytic/"ideal"/"expected" u_reference """
+        if self.u_reference.shape[0] != self.base.n_roi[0]:
+            self.u_computed = self.u_computed[tuple([slice(0, self.base.n_roi[i]) for i in range(self.base.n_dims)])]
+        self.rel_err = relative_error(self.u_computed, self.u_reference)
+        print('Relative error: {:.2e}'.format(self.rel_err))
+        return self.rel_err
 
     def log_and_plot(self):
         """ Call logging and plotting functions """
@@ -115,11 +114,11 @@ class LogPlot:
         """ Plot things common to all """
         if self.base.total_domains > 1:
             plt_common.axvline(
-                x=(self.base.domain_size[0] - self.base.boundary_widths[0] - self.base.overlap[0]) * self.base.pixel_size,
+                x=(self.base.domain_size[0]-self.base.boundary_widths[0]-self.base.overlap[0])*self.base.pixel_size,
                 c='b', ls='dashdot', lw=1.5)
-            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size, c='b',
-                               ls='dashdot',
-                               lw=1.5, label='Subdomain boundaries')
+            plt_common.axvline(
+                x=(self.base.domain_size[0]-self.base.boundary_widths[0])*self.base.pixel_size,
+                c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.base.total_domains - 1):
                 plt_common.axvline(
                     x=((i + 1) * (self.base.domain_size[0] - self.base.overlap[0]) - self.base.boundary_widths[
@@ -148,11 +147,12 @@ class LogPlot:
         plt.legend(ncols=2, framealpha=0.6)
 
         plt.subplot(2, 1, 2)
-        res_plots = plt.loglog(np.arange(1, self.state.iterations + 2, self.base.iter_step), self.state.subdomain_residuals, lw=1.5)
+        res_plots = plt.loglog(np.arange(1, self.state.iterations + 2, self.base.iter_step),
+                               self.state.subdomain_residuals, lw=1.5)
         if self.base.total_domains > 1:
             plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
                        title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
-        plt.loglog(np.arange(1, self.state.iterations + 2, self.base.iter_step), self.state.full_residuals, lw=3., c='k',
+        plt.loglog(np.arange(1, self.state.iterations+2, self.base.iter_step), self.state.full_residuals, lw=3., c='k',
                    ls='dashed', label='Full Residual')
         plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
         plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
@@ -245,7 +245,7 @@ class LogPlot:
         plt.title('AnySim')
 
         plt.subplot(2, 2, 2)
-        plt.loglog(np.arange(1, self.state.iterations + 2, self.base.iter_step), self.state.full_residuals, lw=3., c='k',
+        plt.loglog(np.arange(1, self.state.iterations+2, self.base.iter_step), self.state.full_residuals, lw=3., c='k',
                    ls='dashed')
         plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
         plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])

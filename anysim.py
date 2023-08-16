@@ -11,78 +11,78 @@ def overlap_decay(x):
 class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
-
-        self.u = (np.zeros_like(self.base.b, dtype='complex_'))  # field u, initialize with 0
-
-        self.u_list = []
-        self.b_list = []
-        self.restriction = []
-        self.extension = []
-        self.partition_of_unity = []
-        self.restrict_n_partition()
+        self.u = (np.zeros_like(self.base.s, dtype='complex_'))  # field u, initialize with 0s
+        self.restriction = [[] for _ in range(self.base.n_dims)]
+        self.extension = [[] for _ in range(self.base.n_dims)]
+        self.partition_of_unity = 1.
+        self.domain_decomp_operators()  # Construct restriction, extension, and partition of unity operators
         self.state = State(self.base)
-        self.state.init_norm = norm(np.sum(np.array([(np.dot(self.extension[j],
-                                    np.dot(self.partition_of_unity[j], self.base.medium_operators[j]
-                                    (self.base.propagator(self.b_list[j])))))
-                                    for j in range(self.base.total_domains)]), axis=0))
+        # norm of the preconditioned source, i.e., B(L+1)^(-1)s, for normalizing the subdomain and full-domain residuals
+        self.state.init_norm = norm(np.sum(np.array([(self.extend(self.base.medium_operators[j]
+                                    (self.base.propagator(self.restrict(self.base.s, j))), j))
+                                    for j in self.base.domains_iterator]), axis=0))
 
     def iterate(self):
         """ AnySim update """
-        tj = [None] * self.base.total_domains
         for i in range(self.base.max_iterations):
-            for j in range(self.base.total_domains):
-                print('Iteration {}, sub-domain {}.'.format(i + 1, j + 1), end='\r')
-                self.u_list[j] = np.dot(self.restriction[j], self.u)
-                tj[j] = self.base.medium_operators[j](self.u_list[j]) + self.b_list[j]
-                tj[j] = self.base.propagator(tj[j])
-                tj[j] = self.base.medium_operators[j](self.u_list[j] - tj[j])  # subdomain residual
-
-                self.state.log_subdomain_residual(j, residual_s=norm(np.dot(self.partition_of_unity[j], tj[j])))
-
-                self.u_list[j] = self.base.alpha * tj[j]
-                # instead of this, simply update on overlapping regions?
-                self.u = self.u - np.dot(self.extension[j], np.dot(self.partition_of_unity[j], self.u_list[j]))
-
-            self.state.log_full_residual(
-                residual_f=norm(np.sum(np.array([(np.dot(self.extension[j],
-                                np.dot(self.partition_of_unity[j], tj[j])))
-                            for j in range(self.base.total_domains)]), axis=0)))
-
-            self.state.log_u_iter(i, self.u)
-            self.state.next(i)
-            if self.state.should_terminate:
+            residual = 0
+            for j in self.base.domains_iterator:  # j gives the 3-element position tuple of subdomain (e.g., (0,0,0))
+                print(f'Iteration {i+1}, sub-domain {j}. ', end='\r')
+                u_temp = self.restrict(self.u, j)  # restrict full-domain field u to the j-th subdomain
+                s_temp = self.restrict(self.base.s, j)  # restrict full-domain source s to the j-th subdomain
+                tj = self.base.medium_operators[j](u_temp) + s_temp  # B(u) + s
+                tj = self.base.propagator(tj)  # (L+1)^-1 tj
+                tj = self.base.medium_operators[j](u_temp - tj)  # B(u - tj). subdomain residual
+                self.state.log_subdomain_residual(norm(np.dot(self.partition_of_unity, tj)), j)
+                tj = self.extend(tj, j)  # extend j-th subdomain tj to full-domain
+                self.u = self.u - self.base.alpha * tj  # Update full-domain u. u = u - alpha*tj. Update overlaps only?
+                self.state.log_u_iter(i, self.u[self.base.crop2roi].astype(np.csingle))  # collect u subdomain updates
+                residual += tj   # collect all subdomain residuals to update full residual
+            self.state.log_full_residual(norm(residual))
+            self.state.next(i)  # Check termination conditions
+            if self.state.should_terminate:  # Proceed to next iteration or not
                 break
+        # return u and u_iter cropped to roi, residual arrays, and state object with information on run
+        return self.state.finalize(self.u[self.base.crop2roi]), self.state
 
-        return self.state.finalize(self.u), self.state
-
-    def restrict_n_partition(self):
-        """Construct restriction, extension, and partition of unity operators"""
+    def domain_decomp_operators(self):
+        """ Construct restriction, extension, and partition of unity operators """
         if self.base.total_domains == 1:
-            self.u_list.append(self.u)
-            self.b_list.append(self.base.b)
-            self.restriction.append(1.)
-            self.extension.append(1.)
-            self.partition_of_unity.append(1.)
+            [self.restriction[i].append(1.) for i in range(self.base.n_dims)]
+            [self.extension[i].append(1.) for i in range(self.base.n_dims)]
         else:
-            ones = np.eye(self.base.domain_size[0])
-            restrict0 = np.zeros((self.base.domain_size[0], self.base.n_ext[0]))
-            for i in range(self.base.total_domains):
-                restrict_mid = restrict0.copy()
-                restrict_mid[:, i * (self.base.domain_size[0] - self.base.overlap[0]): 
-                             i * (self.base.domain_size[0] - self.base.overlap[0]) + self.base.domain_size[0]] = ones
-                self.restriction.append(restrict_mid)
-                self.extension.append(restrict_mid.T)
+            ones = np.eye(self.base.domain_size[0])            
+            restrict0_ = []
+            [restrict0_.append(np.zeros((self.base.domain_size[i], self.base.n_ext[i])))
+             for i in range(self.base.n_dims)]
+            for i in range(self.base.n_dims):
+                for j in range(self.base.n_domains[i]):
+                    restrict_mid_ = restrict0_[i].copy()
+                    restrict_mid_[:, slice(j * (self.base.domain_size[i] - self.base.overlap[i]),
+                                           j * (self.base.domain_size[i] - self.base.overlap[i])
+                                           + self.base.domain_size[i])] = ones
+                    self.restriction[i].append(restrict_mid_)
+                    self.extension[i].append(restrict_mid_.T)
 
             decay = overlap_decay(self.base.overlap[0])
-            pou1 = np.diag(np.concatenate((np.ones(self.base.domain_size[0] - self.base.overlap[0]), np.flip(decay))))
-            self.partition_of_unity.append(pou1)
-            pou_mid = np.diag(
-                np.concatenate((decay, np.ones(self.base.domain_size[0] - 2 * self.base.overlap[0]), np.flip(decay))))
-            for _ in range(1, self.base.total_domains - 1):
-                self.partition_of_unity.append(pou_mid)
-            pou_end = np.diag(np.concatenate((decay, np.ones(self.base.domain_size[0] - self.base.overlap[0]))))
-            self.partition_of_unity.append(pou_end)
+            self.partition_of_unity = np.diag(np.concatenate((decay, np.ones(self.base.domain_size[0] - 2 *
+                                                                             self.base.overlap[0]), np.flip(decay))))
 
-            for j in range(self.base.total_domains):
-                self.u_list.append(self.restriction[j] @ self.u)
-                self.b_list.append(self.restriction[j] @ self.base.b)
+    def restrict(self, a, j):
+        """ Restrict full-domain 'a' to the j-th subdomain """
+        a_ = a.copy()
+        for i in range(self.base.n_dims):  # For applying in every dimension
+            a_ = np.moveaxis(a_, i, 0)  # Transpose
+            a_ = np.dot(self.restriction[i][j[i]], a_)  # Apply (appropriate) restriction operator
+            a_ = np.moveaxis(a_, 0, i)  # Transpose back
+        return a_
+
+    def extend(self, a, j):
+        """ Extend j-th subdomain 'a' to full-domain """
+        a_ = a.copy()
+        for i in range(self.base.n_dims):  # For applying in every dimension
+            a_ = np.moveaxis(a_, i, 0)  # Transpose
+            a_ = np.dot(self.partition_of_unity, a_)  # Apply partition of unity to avoid redundancy
+            a_ = np.dot(self.extension[i][j[i]], a_)  # Apply (appropriate) extension operator
+            a_ = np.moveaxis(a_, 0, i)  # Transpose back
+        return a_

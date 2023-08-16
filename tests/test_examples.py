@@ -5,71 +5,72 @@ from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 
 from helmholtzbase import HelmholtzBase
 from anysim import AnySim
-from save_details import print_details, LogPlot
+from save_details import LogPlot
 
 
-@pytest.fixture
+def relative_error(e, e_true):
+    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
+    return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+
+
+def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
+    """ Compute, Print, and Assert relative error between computed and reference field """
+    if u_reference.shape[0] != base.n_roi[0]:
+        u_computed = u_computed[tuple([slice(0, base.n_roi[i]) for i in range(base.n_dims)])]
+    rel_err = relative_error(u_computed, u_reference)
+    print('Relative error: {:.2e}'.format(rel_err))
+    assert rel_err <= threshold
+
+
 def u_ref_1d_h():
+    """ Compute analytic solution for 1D case """
     n = np.ones((256, 1, 1))
-    base_1d_h_setup = HelmholtzBase(n=n, n_domains=1, boundary_widths=20)
-    print('base_1d_h_setup.n_roi', base_1d_h_setup.n_roi)
+    base_ = HelmholtzBase(n=n, n_domains=1, boundary_widths=20)
 
-    # Compare with the analytic solution
-    x = np.arange(0, base_1d_h_setup.n_roi[0] * base_1d_h_setup.pixel_size, base_1d_h_setup.pixel_size)
+    x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size)
     x = np.pad(x, (64, 64), mode='constant')
-    h = base_1d_h_setup.pixel_size
-    k = base_1d_h_setup.k0
+    h = base_.pixel_size
+    k = base_.k0
     phi = k * x
-
     u_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
                np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
                 -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
-    # special case for values close to 0
-    small = np.abs(k * x) < 1.e-10
+    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
-    yield u_theory[64:-64]
+    return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 4)])
-def test_1d_homogeneous(u_ref_1d_h, n_domains):
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 4)])
+def test_1d_homogeneous(n_domains):
+    """ Test for 1D free-space propagation. Compare with analytic solution """
+    u_ref = u_ref_1d_h()
     n = np.ones((256, 1, 1))
-    source = np.zeros_like(n, dtype='complex_')
+    source = np.zeros_like(n)
     source[0] = 1.
-    base_1d_h = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
-    print_details(base_1d_h)
-    base_1d_h.setup_operators_n_initialize()
-
-    anysim_1d_h = AnySim(base_1d_h)
-    u_computed_1d_h, state_1d_h = anysim_1d_h.iterate()
-    lp_1d_h = LogPlot(base_1d_h, state_1d_h, u_computed_1d_h, u_ref_1d_h)
-    rel_err_1d_h = lp_1d_h.compare()
-    lp_1d_h.log_and_plot()
-
-    assert rel_err_1d_h <= 1.e-3
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source)
+    u_computed, state = AnySim(base).iterate()
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [(i, 1, 1) for i in range(1, 3)])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
 def test_1d_glass_plate(n_domains):
+    """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1))
     n[99:130] = 1.5
-    source = np.zeros_like(n, dtype='complex_')
+    source = np.zeros_like(n)
     source[0] = 1.
-    base_1d_gp = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=20, source=source, overlap=20)
-    print_details(base_1d_gp)
-    base_1d_gp.setup_operators_n_initialize()
-
-    anysim_1d_gp = AnySim(base_1d_gp)
-    u_computed_1d_gp, state_1d_gp = anysim_1d_gp.iterate()
-    u_ref_1d_gp = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
-    lp_1d_gp = LogPlot(base_1d_gp, state_1d_gp, u_computed_1d_gp, u_ref_1d_gp)
-    rel_err_1d_gp = lp_1d_gp.compare()
-    lp_1d_gp.log_and_plot()
-
-    assert rel_err_1d_gp <= 1.e-3
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source)
+    u_computed, state = AnySim(base).iterate()
+    u_ref = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [1])
-def test_2d_high_contrast(n_domains):
+# @pytest.mark.parametrize("n_domains", [1])
+def test_2d_high_contrast():  # n_domains):
+    """ Test for propagation in 2D structure made of iron, with high refractive index contrast. 
+        Compare with reference solution (matlab repo result) """
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
     n_iron = 2.8954 + 2.9179j
@@ -81,101 +82,63 @@ def test_2d_high_contrast(n_domains):
 
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     boundary_widths = (31.5, 31.5)
-    max_iterations = int(1.e+4)  # 1.e+4 iterations gives rel_error 1.65e-4 with matlab result, but takes really long
-    wavelength = 0.532
-    ppw = 3 * np.max(abs(n_contrast + 1))
 
-    base_2d_hc = HelmholtzBase(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
-                               n_domains=n_domains, overlap=boundary_widths, max_iterations=max_iterations)
-    print_details(base_2d_hc)
-    base_2d_hc.setup_operators_n_initialize()
-
-    anysim_2d_hc = AnySim(base_2d_hc)
-    u_computed_2d_hc, state_2d_hc = anysim_2d_hc.iterate()
-
-    u_ref_2d_hc = loadmat('anysim_matlab/u2d.mat')['u2d']
-    lp_2d_hc = LogPlot(base_2d_hc, state_2d_hc, u_computed_2d_hc, u_ref_2d_hc)
-    rel_err_2d_hc = lp_2d_hc.compare()
-    lp_2d_hc.log_and_plot()
-
-    assert rel_err_2d_hc <= 1.e-3
+    base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=boundary_widths,
+                         n=n, source=source, overlap=boundary_widths, max_iterations=int(1.e+4))
+    u_computed, state = AnySim(base).iterate()
+    u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [1])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
 def test_2d_low_contrast(n_domains):
+    """ Test for propagation in 2D structure with low refractive index contrast. 
+        Compare with reference solution (matlab repo result) """
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
     n_water = 1.33
     n_fat = 1.46
-
     n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
-
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
-    boundary_widths = (75, 75, 0)
-    wavelength = 0.532
-    ppw = 3 * abs(n_fat)
 
-    base_2d_lc = HelmholtzBase(wavelength=wavelength, ppw=ppw, boundary_widths=boundary_widths, n=n, source=source,
-                               n_domains=n_domains, overlap=(20, 20, 0))
-    print_details(base_2d_lc)
-    base_2d_lc.setup_operators_n_initialize()
-
-    anysim_2d_lc = AnySim(base_2d_lc)
-    u_computed_2d_lc, state_2d_lc = anysim_2d_lc.iterate()
-
-    u_ref_2d_lc = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
-    lp_2d_lc = LogPlot(base_2d_lc, state_2d_lc, u_computed_2d_lc, u_ref_2d_lc)
-    rel_err_2d_lc = lp_2d_lc.compare()
-    lp_2d_lc.log_and_plot()
-
-    assert rel_err_2d_lc <= 1.e-3
+    base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
+                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=120)
+    u_computed, state = AnySim(base).iterate()
+    u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
 @pytest.mark.parametrize("n_roi", [np.array([128, 128, 128]), np.array([128, 48, 96])])
 @pytest.mark.parametrize("boundary_widths", [np.array([24, 24, 24]), np.array([20, 24, 32])])
 def test_3d_homogeneous(n_roi, boundary_widths):
+    """ Test for propagation in a 3D homogeneous medium. Compare with reference solution (matlab repo result) """
     n_sample = np.ones(tuple(n_roi))
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base_3d_h = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source,
-                              n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
-    print_details(base_3d_h)
-    base_3d_h.setup_operators_n_initialize()
-
-    anysim_3d_h = AnySim(base_3d_h)
-    u_computed_3d_h, state_3d_h = anysim_3d_h.iterate()
-
-    u_ref_3d_h = loadmat(
+    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, overlap=boundary_widths)
+    u_computed, state = AnySim(base).iterate()
+    u_ref = loadmat(
         f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')[
         'u']
-    lp_3d_h = LogPlot(base_3d_h, state_3d_h, u_computed_3d_h, u_ref_3d_h)
-    rel_err_3d_h = lp_3d_h.compare()
-    lp_3d_h.log_and_plot()
-
-    assert rel_err_3d_h <= 1.e-3
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-def test_3d_disordered():
-    boundary_widths = np.array([20., 20., 20.])
-    n_roi = np.array([128, 128, 128])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
+def test_3d_disordered(n_domains):
+    """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
+    n_roi = (128, 128, 128)
     n_sample = loadmat(f'anysim_matlab/n3d_disordered.mat')['n_sample']
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base_3d_d = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source,
-                              n_domains=np.array([1, 1, 1]), overlap=boundary_widths)
-    print_details(base_3d_d)
-    base_3d_d.setup_operators_n_initialize()
-
-    anysim_3d_d = AnySim(base_3d_d)
-    u_computed_3d_d, state_3d_d = anysim_3d_d.iterate()
-
-    u_ref_3d_d = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
-    lp_3d_d = LogPlot(base_3d_d, state_3d_d, u_computed_3d_d, u_ref_3d_d)
-    rel_err_3d_d = lp_3d_d.compare()
-    lp_3d_d.log_and_plot()
-
-    assert rel_err_3d_d <= 1.e-3
+    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=100)
+    u_computed, state = AnySim(base).iterate()
+    u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
+    LogPlot(base, state, u_computed, u_ref).log_and_plot()
+    compare(base, u_computed, u_ref, threshold=1.e-3)

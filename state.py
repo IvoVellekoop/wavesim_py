@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from collections import defaultdict
 from helmholtzbase import HelmholtzBase
 
 
@@ -7,15 +8,15 @@ class State(object):
     def __init__(self, base: HelmholtzBase):
         self.base = base
         self.init_norm = None
-        self.subdomain_residuals = [[] for _ in range(self.base.total_domains)]
+        self.subdomain_residuals = defaultdict(list)  # Initialize empty dict of lists
         self.full_residuals = []
         self.u_iter = []
-        self.iterations = 0
-        self.s1 = time.time()
-        self.sim_time = 0
+        self.iterations = self.base.max_iterations - 1
         self.should_terminate = False
+        self.start_time = time.time()
+        self.sim_time = 0
 
-    def log_subdomain_residual(self, j, residual_s):
+    def log_subdomain_residual(self, residual_s, j):
         """ Normalize subdomain residual wrt preconditioned source """
         self.subdomain_residuals[j].append(residual_s/self.init_norm)
 
@@ -25,31 +26,31 @@ class State(object):
 
     def log_u_iter(self, i, u):
         """ Collect u_iter"""
-        if self.base.n_dims > 1 and self.base.max_iterations > 500:
+        if self.base.n_dims > 1 and self.base.max_iterations > 300:
             if i % 10 == 0:
                 self.u_iter.append(u)
         else:
             self.u_iter.append(u)
 
     def next(self, i):
-        """ Decide whether to proceed to next iteration or not """
-        self.iterations = i
-        if self.full_residuals[i] < self.base.threshold_residual:
-            print(f'Stopping. Iter {self.iterations + 1} '
-                  f'residual {self.full_residuals[i]:.2e}<={self.base.threshold_residual}')
+        """ Check termination conditions and to proceed to next iteration or not """
+        if (self.full_residuals[i] <= self.base.threshold_residual
+                or self.full_residuals[i] >= self.base.divergence_limit
+                or i >= self.base.max_iterations - 1):
+            print(f'Residual {self.full_residuals[i]:.2e}. '
+                  f'Stopping at iteration {i + 1} ')
             self.should_terminate = True
-            self.sim_time = time.time() - self.s1
+            self.iterations = i
+            self.sim_time = time.time() - self.start_time
             print('Simulation done (Time {} s)'.format(np.round(self.sim_time, 2)))
 
     def finalize(self, u):
-        """ Rescale and truncate to ROI u and u_iter, and convert residual lists to arrays """
+        """ Rescale u and u_iter, and convert residual lists to arrays """
         u = self.base.Tr * u            # rescale u
-        u = u[self.base.crop_to_roi]    # Truncate u to ROI
         self.u_iter = self.base.Tr.flatten() * np.array(self.u_iter)                # rescale u_iter
-        self.u_iter = self.u_iter[tuple((slice(None),)) + self.base.crop_to_roi]    # truncate u_iter to ROI
 
-        # convert residual lists to arrays and reshape if needed
-        self.subdomain_residuals = np.array(self.subdomain_residuals).T
+        # convert residuals to arrays and reshape if needed
+        self.subdomain_residuals = np.array(list(map(list, self.subdomain_residuals.values())))
         if self.subdomain_residuals.shape[0] < self.subdomain_residuals.shape[1]:
             self.subdomain_residuals = self.subdomain_residuals.T
         self.full_residuals = np.array(self.full_residuals)

@@ -25,9 +25,9 @@ def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
 def u_ref_1d_h():
     """ Compute analytic solution for 1D case """
     n = np.ones((256, 1, 1))
-    base_ = HelmholtzBase(n=n, n_domains=1, boundary_widths=20)
+    base_ = HelmholtzBase(n=n, n_domains=1, boundary_widths=20, setup_operators=False)
 
-    x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size)
+    x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size).astype(np.float32)
     x = np.pad(x, (64, 64), mode='constant')
     h = base_.pixel_size
     k = base_.k0
@@ -44,7 +44,7 @@ def u_ref_1d_h():
 def test_1d_homogeneous(n_domains):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
-    n = np.ones((256, 1, 1))
+    n = np.ones((256, 1, 1)).astype(np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
     base = HelmholtzBase(n=n, n_domains=n_domains, source=source)
@@ -56,7 +56,7 @@ def test_1d_homogeneous(n_domains):
 @pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
 def test_1d_glass_plate(n_domains):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
-    n = np.ones((256, 1, 1))
+    n = np.ones((256, 1, 1)).astype(np.float32)
     n[99:130] = 1.5
     source = np.zeros_like(n)
     source[0] = 1.
@@ -105,7 +105,7 @@ def test_2d_low_contrast(n_domains):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
-                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=120)
+                         n=n, source=source, n_domains=n_domains, overlap=(75, 75))
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -137,7 +137,7 @@ def test_3d_disordered(n_domains):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=100)
+    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=3)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

@@ -11,13 +11,12 @@ def overlap_decay(x):
 class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
-        self.u = (np.zeros_like(self.base.s, dtype='complex_'))  # field u, initialize with 0s
+        self.u = (np.zeros_like(self.base.s, dtype=np.csingle))  # field u, initialize with 0s
         self.restriction = [[] for _ in range(self.base.n_dims)]
         self.extension = [[] for _ in range(self.base.n_dims)]
         self.partition_of_unity = 1.
         self.domain_decomp_operators()  # Construct restriction, extension, and partition of unity operators
         self.state = State(self.base)
-        # norm of the preconditioned source, i.e., B(L+1)^(-1)s, for normalizing the subdomain and full-domain residuals
         self.state.init_norm = norm(np.sum(np.array([(self.extend(self.base.medium_operators[j]
                                     (self.base.propagator(self.restrict(self.base.s, j))), j))
                                     for j in self.base.domains_iterator]), axis=0))
@@ -36,14 +35,14 @@ class AnySim:
                 self.state.log_subdomain_residual(norm(np.dot(self.partition_of_unity, tj)), j)
                 tj = self.extend(tj, j)  # extend j-th subdomain tj to full-domain
                 self.u = self.u - self.base.alpha * tj  # Update full-domain u. u = u - alpha*tj. Update overlaps only?
-                self.state.log_u_iter(i, self.u[self.base.crop2roi].astype(np.csingle))  # collect u subdomain updates
+                self.state.log_u_iter(self.u, j)  # collect u subdomain updates
                 residual += tj   # collect all subdomain residuals to update full residual
             self.state.log_full_residual(norm(residual))
             self.state.next(i)  # Check termination conditions
             if self.state.should_terminate:  # Proceed to next iteration or not
                 break
         # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-        return self.state.finalize(self.u[self.base.crop2roi]), self.state
+        return self.state.finalize(self.u), self.state
 
     def domain_decomp_operators(self):
         """ Construct restriction, extension, and partition of unity operators """
@@ -61,28 +60,28 @@ class AnySim:
                     restrict_mid_[:, slice(j * (self.base.domain_size[i] - self.base.overlap[i]),
                                            j * (self.base.domain_size[i] - self.base.overlap[i])
                                            + self.base.domain_size[i])] = ones
-                    self.restriction[i].append(restrict_mid_)
-                    self.extension[i].append(restrict_mid_.T)
+                    self.restriction[i].append(restrict_mid_.T)
+                    self.extension[i].append(restrict_mid_)
 
             decay = overlap_decay(self.base.overlap[0])
             self.partition_of_unity = np.diag(np.concatenate((decay, np.ones(self.base.domain_size[0] - 2 *
-                                                                             self.base.overlap[0]), np.flip(decay))))
+                                                                             self.base.overlap[0]), np.flip(decay)))).T
 
     def restrict(self, a, j):
         """ Restrict full-domain 'a' to the j-th subdomain """
         a_ = a.copy()
         for i in range(self.base.n_dims):  # For applying in every dimension
-            a_ = np.moveaxis(a_, i, 0)  # Transpose
-            a_ = np.dot(self.restriction[i][j[i]], a_)  # Apply (appropriate) restriction operator
-            a_ = np.moveaxis(a_, 0, i)  # Transpose back
-        return a_
+            a_ = np.moveaxis(a_, i, -1)  # Transpose
+            a_ = np.dot(a_, self.restriction[i][j[i]])  # Apply (appropriate) restriction operator
+            a_ = np.moveaxis(a_, -1, i)  # Transpose back
+        return a_.astype(np.csingle)
 
     def extend(self, a, j):
         """ Extend j-th subdomain 'a' to full-domain """
         a_ = a.copy()
         for i in range(self.base.n_dims):  # For applying in every dimension
-            a_ = np.moveaxis(a_, i, 0)  # Transpose
-            a_ = np.dot(self.partition_of_unity, a_)  # Apply partition of unity to avoid redundancy
-            a_ = np.dot(self.extension[i][j[i]], a_)  # Apply (appropriate) extension operator
-            a_ = np.moveaxis(a_, 0, i)  # Transpose back
-        return a_
+            a_ = np.moveaxis(a_, i, -1)  # Transpose
+            a_ = np.dot(a_, self.partition_of_unity)  # Apply partition of unity to avoid redundancy
+            a_ = np.dot(a_, self.extension[i][j[i]])  # Apply (appropriate) extension operator
+            a_ = np.moveaxis(a_, -1, i)  # Transpose back
+        return a_.astype(np.csingle)

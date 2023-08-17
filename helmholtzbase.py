@@ -30,16 +30,16 @@ class HelmholtzBase:
 
         self.n = check_input_dims(n)
         self.n_dims = (np.squeeze(self.n)).ndim  # Number of dimensions in problem
-        self.n_roi = np.array(self.n.shape)  # Num of points in ROI (Region of Interest)
+        self.n_roi = np.array(self.n.shape, dtype=np.short)  # Num of points in ROI (Region of Interest)
         self.boundary_widths = self.check_input_len(boundary_widths, 0)
-        self.bw_pre = np.floor(self.boundary_widths)
-        self.bw_post = np.ceil(self.boundary_widths)
+        self.bw_pre = np.floor(self.boundary_widths).astype(np.short)
+        self.bw_post = np.ceil(self.boundary_widths).astype(np.short)
         self.wavelength = wavelength  # Wavelength in um (micron)
         self.ppw = ppw  # points per wavelength
         self.k0 = (1. * 2. * np.pi) / self.wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
         self.pixel_size = self.wavelength / self.ppw  # Grid pixel size in um (micron)
         self.n_ext = self.n_roi + self.bw_pre + self.bw_post  # n_roi + boundaries on either side(s)
-        self.s = check_input_dims(source)
+        self.s = check_input_dims(source).astype(np.float16)
         self.max_subdomain_size = 500  # max permissible size of one sub-domain
         if n_domains is None:
             self.n_domains = self.n_ext // self.max_subdomain_size
@@ -47,7 +47,7 @@ class HelmholtzBase:
             self.n_domains = self.check_input_len(n_domains,
                                                   1)  # Number of subdomains to decompose into in each dimension
 
-        self.overlap = self.check_input_len(overlap, 0)  # Overlap between subdomains in each dimension
+        self.overlap = self.check_input_len(overlap, 0).astype(np.short)  # Overlap between subdomains in each dimension
 
         if (self.n_domains == 1).all():  # If 1 domain, implies no domain decomposition
             self.domain_size = self.n_ext.copy()
@@ -57,16 +57,16 @@ class HelmholtzBase:
             self.check_domain_size_same()  # all subdomains of same size
             self.check_domain_size_int()  # subdomain size is int
 
-        self.bw_pre = self.bw_pre.astype(int)
-        self.bw_post = self.bw_post.astype(int)
-        self.n_ext = self.n_ext.astype(int)
-        self.n_domains = self.n_domains
+        self.bw_pre = self.bw_pre.astype(np.short)
+        self.bw_post = self.bw_post.astype(np.short)
+        self.n_ext = self.n_ext.astype(np.short)
+        self.n_domains = self.n_domains.astype(np.short)
         self.domains_iterator = list(product(range(self.n_domains[0]), range(self.n_domains[1]),
                                              range(self.n_domains[2])))  # to iterate through subdomains in all dims
         self.domain_size[self.n_dims:] = 0
-        self.domain_size = self.domain_size.astype(int)
+        self.domain_size = self.domain_size.astype(np.short)
 
-        self.total_domains = np.prod(self.n_domains)
+        self.total_domains = np.prod(self.n_domains).astype(np.short)
 
         self.medium_operators = []
         self.v0 = None
@@ -124,8 +124,8 @@ class HelmholtzBase:
         """ Make the medium matrix, B = 1 - V """
         vraw_shape = v_raw.shape
         # give tiny non-zero minimum value to prevent division by zero in homogeneous media
-        mu_min = (10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
-                self.boundary_widths != 0).any() else 0
+        mu_min = ((10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
+                self.boundary_widths != 0).any() else 0).astype(np.float16)
         mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(vraw_shape[:self.n_dims]) * self.pixel_size)))
         v_min = np.imag((self.k0 + 1j * np.max(mu_min)) ** 2)
         self.v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
@@ -137,8 +137,8 @@ class HelmholtzBase:
         self.Tl = 1j * self.Tr
 
         b = 1 - self.v
-        b = np.squeeze(self.pad_func(m=b, n_roi=self.n_roi).astype('complex_'))  # apply ARL to b
-        return b
+        b = np.squeeze(self.pad_func(m=b, n_roi=self.n_roi))  # apply ARL to b
+        return b.astype(np.csingle)
 
     def make_propagator(self):
         """ Make the propagator operator that does fast convolution with (L+1)^(-1)"""
@@ -149,18 +149,18 @@ class HelmholtzBase:
             self.n_fast_conv = n_subdomain
 
         # Fourier coordinates in n_dims
-        l_p = (2 * np.pi * np.fft.fftfreq(self.n_fast_conv[0], self.pixel_size)) ** 2
+        l_p = ((2 * np.pi * np.fft.fftfreq(self.n_fast_conv[0], self.pixel_size)) ** 2).astype(np.csingle)
         for d in range(1, self.n_dims):
-            l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
-                (2 * np.pi * np.fft.fftfreq(self.n_fast_conv[d], self.pixel_size)) ** 2, axis=0)
+            l_p = np.expand_dims(l_p, axis=-1).astype(np.csingle) + np.expand_dims(
+                (2 * np.pi * np.fft.fftfreq(self.n_fast_conv[d], self.pixel_size)) ** 2, axis=0).astype(np.csingle)
         l_p = 1j * self.scaling * (l_p - self.v0)
         l_p_inv = np.squeeze(1 / (l_p + 1))
         # propagator: operator for fast convolution with (L+1)^-1
         if self.wrap_correction == 'L_omega':
-            self.propagator = lambda x: (np.fft.ifftn(
-                l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv - n_subdomain)))))[:n_subdomain]
+            self.propagator = lambda x: ((np.fft.ifftn(
+                l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv - n_subdomain)))))[:n_subdomain]).astype(np.csingle)
         else:
-            self.propagator = lambda x: (np.fft.ifftn(l_p_inv * np.fft.fftn(x)))
+            self.propagator = lambda x: (np.fft.ifftn(l_p_inv * np.fft.fftn(x))).astype(np.csingle)
 
     def check_input_len(self, a, x):
         """ Convert 'a' to a 3-element numpy array, appropriately, i.e., either repeat, or add 0 or 1. """
@@ -172,7 +172,7 @@ class HelmholtzBase:
             a += (3 - len(a)) * (x,)
         if isinstance(a, np.ndarray):
             a = np.concatenate((a, np.zeros(3 - len(a))))
-        return np.array(a).astype(int)
+        return np.array(a, dtype=np.short)
 
     def check_domain_size_same(self):
         """ Increase bw_post in dimension(s) until all subdomains are of the same size """

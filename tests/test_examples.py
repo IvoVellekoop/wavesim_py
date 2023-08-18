@@ -105,7 +105,7 @@ def test_2d_low_contrast(n_domains):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
-                         n=n, source=source, n_domains=n_domains, overlap=(75, 75))
+                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -122,9 +122,8 @@ def test_3d_homogeneous(n_roi, boundary_widths):
 
     base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, overlap=boundary_widths)
     u_computed, state = AnySim(base).iterate()
-    u_ref = loadmat(
-        f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')[
-        'u']
+    u_ref = loadmat(f'''anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}
+                        _bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat''')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -137,7 +136,7 @@ def test_3d_disordered(n_domains):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=3)
+    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=80)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

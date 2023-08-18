@@ -20,7 +20,8 @@ def relative_error(e, e_true):
 
 
 class LogPlot:
-    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference: np.array([]), animate_iters=True):
+    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference: np.array([]),
+                 animate_iters=True):
         """ Logging and Plotting Class """
         self.base = base
         self.state = state
@@ -62,12 +63,12 @@ class LogPlot:
 
         if self.animate_iters:
             self.u_iter = self.state.u_iter.copy()
-            self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/500))
-            if self.base.n_dims > 1 and self.state.iterations*self.base.total_domains > 500:
+            if self.base.n_dims > 1 and self.state.iterations*self.base.total_domains > 100:
+                self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/100))
                 self.truncate_iterations = True
                 for i in self.base.domains_iterator:
                     self.u_iter[i] = self.u_iter[i][::self.plot_iter_step]
-            self.u_iter = np.array(list(map(list, self.u_iter.values())))   # convert list of lists to array
+            self.u_iter = np.array(list(map(list, self.u_iter.values())))   # convert dict of lists to array
 
     def compare(self):
         """ Compute relative error between computed and reference field """
@@ -81,12 +82,14 @@ class LogPlot:
         self.plot_details()
 
     def log_details(self):
-        """ Save some parameters and stats """
+        """ Save parameters and stats """
         print('Saving stats...')
-        save_string = f'n_dims {self.base.n_dims}; boundaries width {self.base.boundary_widths}; n_domains {self.base.n_domains}; overlap {self.base.overlap}'
+        save_string = (f'n_dims {self.base.n_dims}; boundaries width {self.base.boundary_widths}; '
+                       + f'n_domains {self.base.n_domains}; overlap {self.base.overlap}')
         if self.base.wrap_correction:
             save_string += f'; wrap correction {self.base.wrap_correction}; corner points {self.base.cp}'
-        save_string += f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}'
+        save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
+                        + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
         if hasattr(self, 'rel_err'):
             save_string += f'; relative error {self.rel_err:>2.2e}'
         save_string += f' \n'
@@ -100,17 +103,17 @@ class LogPlot:
         if self.base.n_dims == 1:
             self.x = np.arange(self.base.n_roi[0]) * self.base.pixel_size
             self.plot_field_n_residual()    # png
-            # if self.animate_iters:
-            #     self.plot_field_iters()         # movie/animation/GIF
+            if self.animate_iters:
+                self.anim_field_iters()         # movie/animation/GIF
         elif self.base.n_dims == 2:
             self.image_field_n_residual()   # png
             if self.animate_iters:
-                self.image_field_iters()        # movie/animation/GIF
+                self.anim_field_n_residual()        # movie/animation/GIF
         elif self.base.n_dims == 3:
-            for z_slice in [0, int(self.u_computed.shape[2] / 2), int(self.u_computed.shape[2] - 1)]:
+            for idx, z_slice in enumerate([0, int(self.u_computed.shape[2] / 2), int(self.u_computed.shape[2] - 1)]):
                 self.image_field_n_residual(z_slice)    # png
                 if self.animate_iters:
-                    self.image_field_iters(z_slice)         # movie/animation/GIF
+                    self.anim_field_n_residual(idx, z_slice)         # movie/animation/GIF
         plt.close('all')
         print('Plotting done.')
 
@@ -182,9 +185,10 @@ class LogPlot:
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
 
-    def plot_field_iters(self):  # movie/animation/GIF
+    def anim_field_iters(self):  # movie/animation/GIF
         """ Plot an animation of the field wrt iterations and save as mp4 """
         u_iter = np.real(self.u_iter)
+        u_iter = np.reshape(u_iter, [-1, u_iter.shape[2]], 'F')
 
         fig = plt.figure(figsize=(14.32, 8))
         self.plot_common_things(plt)
@@ -194,26 +198,25 @@ class LogPlot:
         title = plt.title('')
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
-        if self.state.iterations > 100:
+        if self.state.iterations*self.base.total_domains > 100:
             plot_iters = 100
-            iters_trunc = np.repeat(np.linspace(0, self.state.iterations-2, plot_iters).astype(int),
-                                    self.base.total_domains)
+            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(int)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]
         else:
-            plot_iters = self.state.iterations-1 * self.base.total_domains
-            iters_trunc = np.repeat(np.arange(self.state.iterations-1), self.base.total_domains)
-            domains_trunc = self.base.domains_iterator * self.state.iterations-1
+            plot_iters = self.state.iterations * self.base.total_domains
+            iters_trunc = np.arange(self.state.iterations).astype(np.short)
+            domains_trunc = self.base.domains_iterator * self.state.iterations
             u_iter_trunc = u_iter
 
         def animate(i):
             plot_data.set_ydata(u_iter_trunc[i])  # update the data.
-            title_text = f'Iteration {iters_trunc[i] + 1}, Subdomain {domains_trunc[i]}. '
+            title_text = f'Iteration {iters_trunc[i//self.base.total_domains] + 1}, Subdomain {domains_trunc[i]}. '
             title.set_text(title_text)
             return plot_data, title,
 
         ani = animation.FuncAnimation(
-            fig, animate, interval=100, blit=True, frames=plot_iters*self.base.total_domains)
+            fig, animate, interval=100, blit=True, frames=plot_iters)
         writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
         if self.base.wrap_correction == 'L_corr':
@@ -249,6 +252,11 @@ class LogPlot:
         plt.title('AnySim')
 
         plt.subplot(2, 2, 2)
+        res_plots = plt.loglog(np.arange(1, self.state.iterations+1),
+                               self.state.subdomain_residuals, lw=1.5)
+        if self.base.total_domains > 1:
+            plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
+                       title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
         plt.loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
                    ls='dashed')
         plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
@@ -288,11 +296,13 @@ class LogPlot:
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
 
-    def image_field_iters(self, z_slice=0):  # movie/animation/GIF
+    def anim_field_n_residual(self, idx=0, z_slice=0):  # movie/animation/GIF
         """ Plot an animation of the (2D/3D) field image wrt iterations and save as mp4 """
         if self.base.n_dims == 3:
-            self.u_iter = self.u_iter[..., z_slice]
-        self.u_iter = np.reshape(self.u_iter, [-1,self.u_iter.shape[2],self.u_iter.shape[3]], 'F')
+            u_iter = self.u_iter[..., idx]
+        else:
+            u_iter = self.u_iter.copy()
+        u_iter = np.reshape(u_iter, [-1, u_iter.shape[2], u_iter.shape[3]], 'F')
 
         if hasattr(self, 'u_reference'):
             if self.base.n_dims == 3:
@@ -303,7 +313,7 @@ class LogPlot:
             v_lim = np.maximum(np.max(u_reference), np.max(u_reference))
         else:
             n_rows = 1
-            v_lim = np.maximum(np.max(self.u_iter), np.max(self.u_iter))
+            v_lim = np.maximum(np.max(u_iter), np.max(u_iter))
 
         fig, ax = plt.subplots(figsize=figsize, ncols=2, nrows=n_rows)
         ax = ax.flatten()
@@ -311,30 +321,34 @@ class LogPlot:
         shrink = 0.7
 
         if self.truncate_iterations:
-            plot_iters = len(self.u_iter)
-            iters_trunc = np.arange(0,self.state.iterations,self.plot_iter_step).astype(np.short)
+            plot_iters = len(u_iter)
+            iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step).astype(np.short)
             residuals = self.state.full_residuals[::self.plot_iter_step]
-            subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step,:]
+            subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step, :]
         else:
-            plot_iters = (self.state.iterations) * self.base.total_domains
+            plot_iters = self.state.iterations * self.base.total_domains
             iters_trunc = np.arange(self.state.iterations).astype(np.short)
             residuals = self.state.full_residuals.copy()
             subdomain_residuals = self.state.subdomain_residuals.copy()
-        domains_trunc = self.base.domains_iterator * (self.state.iterations)
+        domains_trunc = self.base.domains_iterator * self.state.iterations
 
         frames = []
         for i in range(plot_iters):
-            im0 = ax[0].imshow(self.u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
-            text0 = ax[0].text(0.1, 1.01, f'Iteration {iters_trunc[i//self.base.total_domains] + 1}, Subdomain {domains_trunc[i]}. ', ha="left", va="bottom", transform=ax[0].transAxes)
+            im0 = ax[0].imshow(u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
+            text0 = ax[0].text(0.1, 1.01,
+                               f'Iteration {iters_trunc[i//self.base.total_domains]+1}, Subdomain {domains_trunc[i]}.',
+                               ha="left", va="bottom", transform=ax[0].transAxes)
 
-            line1, = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1, residuals[:i//self.base.total_domains+1], lw=2., c='k', label='Full Residual')
+            line1, = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
+                                  residuals[:i//self.base.total_domains+1], lw=2., c='k', label='Full Residual')
             if self.base.total_domains > 1:
-                lines2 = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1, subdomain_residuals[:i//self.base.total_domains+1,:], lw=1.5)
+                lines2 = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
+                                      subdomain_residuals[:i//self.base.total_domains+1, :], lw=1.5)
             else:
                 lines2 = []
 
             if hasattr(self, 'u_reference'):
-                im3 = ax[3].imshow(u_reference - self.u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
+                im3 = ax[3].imshow(u_reference - u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
                 frames.append([im0, text0, line1, im3] + lines2)
             else:
                 frames.append([im0, text0, line1] + lines2)
@@ -342,7 +356,7 @@ class LogPlot:
         plt.colorbar(mappable=im0, ax=ax[0], shrink=shrink, pad=pad)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                    title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))

@@ -25,13 +25,14 @@ class State(object):
         self.full_residuals.append(residual_f / self.init_norm)
 
     def log_u_iter(self, u, j):
-        """ Collect u_iter"""
+        """ Collect u_iter after rescaling and cropping to ROI"""
+        u = self.base.Tr.flatten() * u[self.base.crop2roi]
         if self.base.n_dims == 1:
-            self.u_iter[j].append(self.base.Tr.flatten() * u[self.base.crop2roi])
+            self.u_iter[j].append(u)
         elif self.base.n_dims == 2:
-            self.u_iter[j].append(self.base.Tr.flatten() * np.abs(u[self.base.crop2roi]))
+            self.u_iter[j].append(np.abs(u))
         elif self.base.n_dims == 3:
-            self.u_iter[j].append(self.base.Tr.flatten() * np.abs(u[self.base.crop2roi]))
+            self.u_iter[j].append(np.abs(u[..., np.array([0, u.shape[-1]//2, -1])]))
 
     def next(self, i):
         """ Check termination conditions and to proceed to next iteration or not """

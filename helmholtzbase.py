@@ -25,7 +25,7 @@ class HelmholtzBase:
                  overlap=20,  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None, 'L_Omega' or 'L_corr'
                  cp=20,  # Corner points to include in case of 'L_corr' wrap-around correction
-                 max_iterations=int(2.e+3),  # Maximum number iterations
+                 max_iterations=int(1.2e+3),  # Maximum number iterations
                  setup_operators=True):  # Set up medium and propagator operators
 
         self.n = check_input_dims(n)
@@ -158,7 +158,7 @@ class HelmholtzBase:
         # propagator: operator for fast convolution with (L+1)^-1
         if self.wrap_correction == 'L_omega':
             self.propagator = lambda x: ((np.fft.ifftn(
-                l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv - n_subdomain)))))[:n_subdomain]).astype(np.csingle)
+                l_p_inv * np.fft.fftn(np.pad(x, (0, self.n_fast_conv-n_subdomain)))))[:n_subdomain]).astype(np.csingle)
         else:
             self.propagator = lambda x: (np.fft.ifftn(l_p_inv * np.fft.fftn(x))).astype(np.csingle)
 

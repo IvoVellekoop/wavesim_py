@@ -8,10 +8,10 @@ def test_accretive():
     n = np.ones((256, 1, 1)).astype(np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim = HelmholtzBase(n=n, source=source)
-    l_plus_1_inv = anysim.propagator(np.eye(anysim.n_fast_conv[0], dtype=np.single))
+    base = HelmholtzBase(n=n, source=source)
+    l_plus_1_inv = base.propagator(np.eye(base.n_fft[0], dtype=np.single))
     l_plus_1 = np.linalg.inv(l_plus_1_inv)
-    b = anysim.medium_operators[(0, 0, 0)](np.eye(anysim.n_fast_conv[0], dtype=np.single))
+    b = base.medium_operators[(0, 0, 0)](np.eye(base.n_fft[0], dtype=np.single))
     a = l_plus_1 - b
 
     acc = np.min(np.real(np.linalg.eigvals(a + np.asarray(np.conj(a).T))))
@@ -24,8 +24,6 @@ def test_contraction():
     n = np.ones((256, 1, 1)).astype(np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    anysim = HelmholtzBase(n=n, source=source)
-    # vc = np.max(np.abs(anysim.v))
-    vc = np.linalg.norm(np.diag(np.squeeze(anysim.v)), 2)
-    print(vc)
+    base = HelmholtzBase(n=n, source=source)
+    vc = np.max(np.abs(base.v))
     assert vc < 1, f'||V|| not < 1, but {vc}'

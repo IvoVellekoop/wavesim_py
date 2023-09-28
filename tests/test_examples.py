@@ -40,7 +40,7 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 4)])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 5)])
 def test_1d_homogeneous(n_domains):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
@@ -105,7 +105,7 @@ def test_2d_low_contrast(n_domains):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
-                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=800)
+                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

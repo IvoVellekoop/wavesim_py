@@ -26,7 +26,8 @@ class State(object):
 
     def log_u_iter(self, u, j):
         """ Collect u_iter after rescaling and cropping to ROI"""
-        u = self.base.Tr.flatten() * u[self.base.crop2roi]
+        u = self.base.Tr * u[self.base.crop2roi]
+
         if self.base.n_dims == 1:
             self.u_iter[j].append(u)
         elif self.base.n_dims == 2:
@@ -48,7 +49,7 @@ class State(object):
 
     def finalize(self, u):
         """ Crop u to ROI and rescale, and convert residual lists to arrays """
-        u = self.base.Tr * u[self.base.crop2roi]                        # rescale u
+        u = self.base.Tr * u[self.base.crop2roi]                        # rescale u cropped to ROI
 
         # convert residuals to arrays and reshape if needed
         self.subdomain_residuals = np.array(list(map(list, self.subdomain_residuals.values())))

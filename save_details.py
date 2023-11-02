@@ -20,17 +20,19 @@ def relative_error(e, e_true):
 
 
 class LogPlot:
-    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference: np.array([]),
-                 animate_iters=True):
+    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,#: np.array([]),
+                 animate_iters=False):
         """ Logging and Plotting Class """
         self.base = base
         self.state = state
         self.u_computed = u_computed
-        self.u_reference = u_reference
+        if u_reference is not None:
+            self.u_reference = u_reference
         self.animate_iters = animate_iters
         self.truncate_iterations = False
         self.rel_err = None
-        self.compare()  # relative error between u and u_true
+        if hasattr(self, 'u_reference'):
+            self.compare()  # relative error between u and u_true
         self.x = None
 
         # Create log folder / Check for existing log folder
@@ -58,17 +60,23 @@ class LogPlot:
 
         self.stats_file_name = self.run_loc + '_stats.txt'
 
-        if 'u_reference' in locals():
+        if hasattr(self, 'u_reference'):
             self.label = 'Reference solution'
 
         if self.animate_iters:
             self.u_iter = self.state.u_iter.copy()
+            self.plot_iter_step = 1
             if self.base.n_dims > 1 and self.state.iterations*self.base.total_domains > 100:
                 self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/100))
                 self.truncate_iterations = True
                 for i in self.base.domains_iterator:
                     self.u_iter[i] = self.u_iter[i][::self.plot_iter_step]
             self.u_iter = np.array(list(map(list, self.u_iter.values())))   # convert dict of lists to array
+            # # u_iter_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_uiter'
+            # u_iter_name = f'/mnt/c/Users/MacheS/Desktop/{self.run_id}_{self.state.iterations}iters_uiter'
+            # if self.base.wrap_correction == 'L_corr':
+            #     u_iter_name += f'_cp{self.base.cp}'
+            # np.savez_compressed(u_iter_name, u_iter=self.u_iter)
 
     def compare(self):
         """ Compute relative error between computed and reference field """
@@ -90,7 +98,8 @@ class LogPlot:
             save_string += f'; wrap correction {self.base.wrap_correction}; corner points {self.base.cp}'
         save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
                         + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
-        if hasattr(self, 'rel_err'):
+        # if hasattr(self, 'rel_err'):
+        if self.rel_err:
             save_string += f'; relative error {self.rel_err:>2.2e}'
         save_string += f' \n'
         with open(self.stats_file_name, 'a') as fileopen:
@@ -199,7 +208,7 @@ class LogPlot:
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
         if self.state.iterations*self.base.total_domains > 100:
-            plot_iters = 100
+            plot_iters = (self.state.iterations*self.base.total_domains/10).astype(int)
             iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(int)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]

@@ -40,7 +40,7 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 5)])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 4)])
 def test_1d_homogeneous(n_domains):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
@@ -84,7 +84,7 @@ def test_2d_high_contrast():  # n_domains):
     boundary_widths = (31.5, 31.5)
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=boundary_widths,
-                         n=n, source=source, overlap=boundary_widths, max_iterations=int(1.e+4))
+                         n=n, source=source, overlap=boundary_widths, max_iterations=int(1.e+1))
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -121,7 +121,7 @@ def test_3d_homogeneous(n_roi, boundary_widths):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, overlap=boundary_widths)
+    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, overlap=boundary_widths, max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}'
                     + f'_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']

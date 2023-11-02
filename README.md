@@ -52,7 +52,7 @@ Assuming Linux for the step ahead. Instructions also available at https://conda.
 
 2. In the directory where the installer was downloaded, in the terminal window, run:
 
-        bash setting_up/Miniconda3-latest-Linux-x86_64.sh
+        bash Miniconda3-latest-Linux-x86_64.sh
 
 3. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later.
 

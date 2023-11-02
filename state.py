@@ -1,8 +1,8 @@
 import time
+import csv
 import numpy as np
 from collections import defaultdict
 from helmholtzbase import HelmholtzBase
-
 
 class State(object):
     def __init__(self, base: HelmholtzBase):

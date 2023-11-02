@@ -24,7 +24,7 @@ class HelmholtzBase:
                  source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                  n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
                  overlap=20,  # Overlap between subdomains in each dimension
-                 wrap_correction='L_corr',  # Wrap-around correction. None or 'L_corr' or 'L_omega'
+                 wrap_correction=None,  # Wrap-around correction. None or 'L_corr' or 'L_omega'
                  cp=20,  # Corner points to include in case of 'L_corr' wrap-around correction
                  max_iterations=int(2.e+3),  # Maximum number iterations
                  setup_operators=True):  # Set up medium and propagator operators
@@ -69,6 +69,7 @@ class HelmholtzBase:
 
         self.total_domains = np.prod(self.n_domains).astype(np.short)
 
+        self.subdomain_Bs = []
         self.medium_operators = []
         self.v0 = None
         self.v = None
@@ -111,12 +112,14 @@ class HelmholtzBase:
         """ Make (1) Medium b = 1 - v and (2) Propagator (L+1)^(-1) operators, and (3) pad and scale source """
         v_raw = self.k0 ** 2 * self.n ** 2
         v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='edge'))
-        full_b = self.make_b(v_raw)
+        self.full_b = self.make_b(v_raw)
+        self.subdomain_Bs = {}
         self.medium_operators = {}
         for i, patch in enumerate(self.domains_iterator):
-            b_block = full_b[tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
+            b_block = self.full_b[tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
                                     patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
                                     for j in range(self.n_dims)])]
+            self.subdomain_Bs[patch] = b_block.copy()
             if self.wrap_correction == 'L_corr' or self.wrap_correction == 'L_omega':
                 self.medium_operators[patch] = lambda x, b_ = b_block: b_ * x - self.dot_ndim(x, self.L_corr)
             else:

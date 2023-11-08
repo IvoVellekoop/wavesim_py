@@ -20,7 +20,7 @@ def relative_error(e, e_true):
 
 
 class LogPlot:
-    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,#: np.array([]),
+    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
                  animate_iters=False):
         """ Logging and Plotting Class """
         self.base = base
@@ -72,11 +72,6 @@ class LogPlot:
                 for i in self.base.domains_iterator:
                     self.u_iter[i] = self.u_iter[i][::self.plot_iter_step]
             self.u_iter = np.array(list(map(list, self.u_iter.values())))   # convert dict of lists to array
-            # # u_iter_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_uiter'
-            # u_iter_name = f'/mnt/c/Users/MacheS/Desktop/{self.run_id}_{self.state.iterations}iters_uiter'
-            # if self.base.wrap_correction == 'L_corr':
-            #     u_iter_name += f'_cp{self.base.cp}'
-            # np.savez_compressed(u_iter_name, u_iter=self.u_iter)
 
     def compare(self):
         """ Compute relative error between computed and reference field """
@@ -95,7 +90,7 @@ class LogPlot:
         save_string = (f'n_dims {self.base.n_dims}; boundaries width {self.base.boundary_widths}; '
                        + f'n_domains {self.base.n_domains}; overlap {self.base.overlap}')
         if self.base.wrap_correction:
-            save_string += f'; wrap correction {self.base.wrap_correction}; corner points {self.base.cp}'
+            save_string += f'; {self.base.wrap_correction}; corner points {self.base.cp}'
         save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
                         + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
         # if hasattr(self, 'rel_err'):
@@ -157,7 +152,7 @@ class LogPlot:
         plt.plot(self.x, np.real(self.u_computed), 'r', lw=1., label='AnySim')
         title = 'Field'
         if hasattr(self, 'u_reference'):
-            plt.plot(self.x, np.real(self.u_reference - self.u_computed) * 10, 'g', lw=1., label='Error*10')
+            plt.plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
             title += f' (Relative Error = {self.rel_err:.2e})'
         plt.title(title)
         plt.legend(ncols=2, framealpha=0.6)
@@ -183,12 +178,12 @@ class LogPlot:
         title_text = ''
         title_text = f'{title_text} Absorbing boundaries ({self.base.boundary_widths}). '
         if self.base.wrap_correction:
-            title_text += f'{title_text} Wrap correction: {self.base.wrap_correction}. '
+            title_text += f'{title_text} {self.base.wrap_correction}. '
         plt.suptitle(title_text)
 
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual'
-        if self.base.wrap_correction == 'L_corr':
+        if self.base.wrap_correction == 'wrap_corr':
             fig_name += f'_cp{self.base.cp}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
@@ -228,7 +223,7 @@ class LogPlot:
             fig, animate, interval=100, blit=True, frames=plot_iters)
         writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
-        if self.base.wrap_correction == 'L_corr':
+        if self.base.wrap_correction == 'wrap_corr':
             ani_name += f'_cp{self.base.cp}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
@@ -294,12 +289,12 @@ class LogPlot:
         title_text = ''
         title_text = f'{title_text} Absorbing boundaries ({self.base.boundary_widths}). '
         if self.base.wrap_correction:
-            title_text += f'{title_text} Wrap correction: {self.base.wrap_correction}. '
+            title_text += f'{title_text} {self.base.wrap_correction}. '
         plt.suptitle(title_text)
 
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual_{z_slice}'
-        if self.base.wrap_correction == 'L_corr':
+        if self.base.wrap_correction == 'wrap_corr':
             fig_name += f'_cp{self.base.cp}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
@@ -388,7 +383,7 @@ class LogPlot:
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
         if self.base.n_dims == 3:
             ani_name += f'_zslice{z_slice}'
-        if self.base.wrap_correction == 'L_corr':
+        if self.base.wrap_correction == 'wrap_corr':
             ani_name += f'_cp{self.base.cp}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)

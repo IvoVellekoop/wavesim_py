@@ -126,3 +126,9 @@ Example of an error: "findfont: Generic family 'sans-serif' not found because no
 2. Clear matplotlib cache. An equally important step.
 
         rm ~/.cache/matplotlib -rf
+
+---
+
+## For animations, ffmpeg package needed
+
+        sudo apt-get install ffmpeg

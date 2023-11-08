@@ -1,8 +1,8 @@
 import time
-import csv
 import numpy as np
 from collections import defaultdict
 from helmholtzbase import HelmholtzBase
+
 
 class State(object):
     def __init__(self, base: HelmholtzBase):
@@ -24,16 +24,19 @@ class State(object):
         """ Normalize full domain residual wrt preconditioned source """
         self.full_residuals.append(residual_f / self.init_norm)
 
-    def log_u_iter(self, u, j):
+    def log_u_iter(self, u, patch):
         """ Collect u_iter after rescaling and cropping to ROI"""
-        u = self.base.Tr * u[self.base.crop2roi]
+        u = self.base.Tr[patch] * u[self.base.crop2roi]  # Crop u to ROI and rescale
 
+        # Collect u_iter 
+        # mainly for plotting animation, so process accordingly:
+        # 2D -- abs() for imshow; 3D -- abs() of 2D-slice in the middle for imshow
         if self.base.n_dims == 1:
-            self.u_iter[j].append(u)
+            self.u_iter[patch].append(u)
         elif self.base.n_dims == 2:
-            self.u_iter[j].append(np.abs(u))
+            self.u_iter[patch].append(np.abs(u))
         elif self.base.n_dims == 3:
-            self.u_iter[j].append(np.abs(u[..., np.array([0, u.shape[-1]//2, -1])]))
+            self.u_iter[patch].append(np.abs(u[..., np.array([0, u.shape[-1]//2, -1])]))
 
     def next(self, i):
         """ Check termination conditions and to proceed to next iteration or not """
@@ -48,13 +51,17 @@ class State(object):
             print('Simulation done (Time {} s)'.format(np.round(self.sim_time, 2)))
 
     def finalize(self, u):
-        """ Crop u to ROI and rescale, and convert residual lists to arrays """
-        u = self.base.Tr * u[self.base.crop2roi]                        # rescale u cropped to ROI
+        """ Rescale u and crop to ROI, and convert residual lists to arrays """
+        for patch in self.base.domains_iterator:  # patch gives 3-element position tuple of subdomain (e.g., (0,0,0))
+            current_patch = tuple([slice(patch[j]*(self.base.domain_size[j]-self.base.overlap[j]),
+                                   patch[j]*(self.base.domain_size[j]-self.base.overlap[j])+self.base.domain_size[j])
+                                   for j in range(self.base.n_dims)])
+            u[current_patch] = self.base.Tr[patch] * u[current_patch]  # rescale u
+        u = u[self.base.crop2roi]  # Crop u to ROI
 
         # convert residuals to arrays and reshape if needed
         self.subdomain_residuals = np.array(list(map(list, self.subdomain_residuals.values())))
         if self.subdomain_residuals.shape[0] < self.subdomain_residuals.shape[1]:
             self.subdomain_residuals = self.subdomain_residuals.T
         self.full_residuals = np.array(self.full_residuals)
-
         return u

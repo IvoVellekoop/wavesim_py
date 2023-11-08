@@ -47,7 +47,7 @@ def test_1d_homogeneous(n_domains):
     n = np.ones((256, 1, 1)).astype(np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, n_domains=n_domains, source=source)
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, max_iterations=1000)
     u_computed, state = AnySim(base).iterate()
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -84,7 +84,7 @@ def test_2d_high_contrast():  # n_domains):
     boundary_widths = (31.5, 31.5)
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=boundary_widths,
-                         n=n, source=source, overlap=boundary_widths, max_iterations=int(1.e+1))
+                         n=n, source=source)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -105,7 +105,7 @@ def test_2d_low_contrast(n_domains):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
-                         n=n, source=source, n_domains=n_domains, overlap=(75, 75), max_iterations=500)
+                         n=n, source=source, n_domains=n_domains, max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -121,7 +121,7 @@ def test_3d_homogeneous(n_roi, boundary_widths):
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, overlap=boundary_widths, max_iterations=500)
+    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}'
                     + f'_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']

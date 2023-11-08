@@ -23,9 +23,9 @@ class HelmholtzBase:
                  boundary_widths=20,  # Width of absorbing boundaries
                  source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                  n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-                 overlap=20,  # Overlap between subdomains in each dimension
-                 wrap_correction=None,  # Wrap-around correction. None or 'L_corr' or 'L_omega'
-                 cp=20,  # Corner points to include in case of 'L_corr' wrap-around correction
+                 overlap=0,  # Overlap between subdomains in each dimension
+                 wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
+                 cp=20,  # Corner points to include in case of 'wrap_corr' wrap-around correction
                  max_iterations=int(2.e+3),  # Maximum number iterations
                  setup_operators=True):  # Set up medium and propagator operators
 
@@ -73,20 +73,22 @@ class HelmholtzBase:
         self.medium_operators = []
         self.v0 = None
         self.v = None
+        self.fft_size = None
         self.scaling = None
         self.Tl = None
         self.Tr = None
         self.n_fft = None
-        self.L_corr = None
-        self.L_transfer = None
+        self.wrap_corr = None
+        self.wrap_transfer = None
+        self.full_b = None
         self.propagator = None
-        # self.transfer_info = None
+        self.transfer_info = None
 
         self.crop2roi = tuple([slice(self.bw_pre[i], -self.bw_post[i])
                                for i in range(self.n_dims)])  # crop array from n_ext to n_roi
 
-        self.wrap_correction = wrap_correction  # None OR 'L_corr'
-        self.cp = cp  # number of corner points (c.p.) in the upper and lower triangular corners of the L_corr matrix
+        self.wrap_correction = wrap_correction  # None OR 'wrap_corr'
+        self.cp = cp  # number of corner points (c.p.) in the upper and lower triangular corners of the wrap_corr matrix
 
         self.max_iterations = max_iterations
         self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
@@ -115,23 +117,21 @@ class HelmholtzBase:
         self.full_b = self.make_b(v_raw)
         self.subdomain_Bs = {}
         self.medium_operators = {}
-        for i, patch in enumerate(self.domains_iterator):
+        for patch in self.domains_iterator:
             b_block = self.full_b[tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
-                                    patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
-                                    for j in range(self.n_dims)])]
+                                  patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
+                                  for j in range(self.n_dims)])]
             self.subdomain_Bs[patch] = b_block.copy()
-            if self.wrap_correction == 'L_corr' or self.wrap_correction == 'L_omega':
-                self.medium_operators[patch] = lambda x, b_ = b_block: b_ * x - self.dot_ndim(x, self.L_corr)
+            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+                self.medium_operators[patch] = lambda x, b_ = b_block, subdomain_scaling = self.scaling[patch]: (
+                        b_ * x - self.dot_ndim(x, subdomain_scaling * self.wrap_corr))
             else:
                 self.medium_operators[patch] = lambda x, b_ = b_block: b_ * x
 
-        self.propagator = self.make_propagator(tuple(self.domain_size[:self.n_dims]))
-        # if self.wrap_correction == 'L_corr' or self.wrap_correction == 'L_omega':
-        #     self.transfer_info = lambda x: self.dot_ndim(x, self.L_transfer)
+        self.s = np.squeeze(np.pad(self.s, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), 
+                                   mode='constant'))  # Pad the source term (scale later)
 
-        self.s = (self.Tl * np.squeeze(
-            np.pad(self.s, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])),
-                   mode='constant')))  # Scale the source term and pad
+        self.propagator = self.make_propagator(tuple(self.domain_size[:self.n_dims]))
 
     def make_b(self, v_raw):
         """ Make the medium matrix, B = 1 - V """
@@ -143,58 +143,84 @@ class HelmholtzBase:
         self.v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
         self.v0 = self.v0 + 1j * v_min
         self.v = -1j * (v_raw - self.v0)
-        self.scaling = 0.95 / np.max(np.abs(self.v))
 
-        if self.wrap_correction == 'L_corr' or self.wrap_correction == 'L_omega':
-            n_fft = self.domain_size[0]
-            f = np.array(dft(n_fft))
-            finv = np.conj(f).T/n_fft
-            lw_p = ((2 * np.pi * np.fft.fftfreq(n_fft, self.pixel_size)) ** 2).astype(np.csingle)
-            lw = finv @ np.diag(lw_p.ravel()) @ f
+        if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+            self.fft_size = self.domain_size[0]
+            lw = self.l_fft_operator()
 
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
-            truncate = np.zeros((n_fft, n_fft*10))
-            truncate[:, :n_fft] = np.eye(n_fft)
-            f_omega = np.array(dft(n_fft*10))
-            finv_omega = np.conj(f_omega).T/(n_fft*10)
-            l_omega = ((2 * np.pi * np.fft.fftfreq(n_fft*10, self.pixel_size)) ** 2).astype(np.csingle)
-            lo = truncate @ finv_omega @ np.diag(l_omega.ravel()) @ f_omega @ truncate.T
-            self.L_corr = 1j*(lo-lw).astype(np.csingle)
-
-            # Option 2. APPROXIMATE. Replacing (Lo-lw) with -lw
-            # self.L_corr = -1j*lw.astype(np.csingle)  #-np.real(lw)
+            lo = self.l_fft_operator(truncate=True)
+            self.wrap_corr = (1j * (lo-lw))
+            # Option 2. APPROXIMATE. Replacing (Lo-lw) with -lw, or even -np.real(lw) (because real(lw)>>imag(lw))
+            # self.wrap_corr = -1j * lw  # np.real(lw)
 
             # Truncate the wrap-around correction to square blocks of side cp in the upper and lower triangular corners
-            self.L_corr[:-self.cp, :-self.cp] = 0
-            self.L_corr[self.cp:, self.cp:] = 0
-            self.scaling = 0.95 / max(np.max(np.abs(self.v)), np.linalg.norm(self.L_corr, 2))
-            self.L_corr = self.scaling * self.L_corr
-            # self.L_transfer = 1j * self.scaling * lo[:int(n_fft/2), -int(n_fft/2):].astype(np.csingle)
+            self.wrap_corr[:-self.cp, :-self.cp] = 0
+            self.wrap_corr[self.cp:, self.cp:] = 0
+            # Transfer the one-sided wrap-around artefacts from one subdomain to another
+            # apply subdomain_scaling => self.scaling[patch] later
+            self.wrap_transfer = 1j * self.l_fft_operator(truncate=True, n=2)[:self.fft_size,
+                                                                              self.fft_size:2*self.fft_size]
 
-        self.v = self.scaling * self.v
-        self.Tr = np.sqrt(self.scaling)
-        self.Tl = 1j * self.Tr
+            # change the scaling based on both v and wrap_corr
+            wrap_corr_norm = np.linalg.norm(self.wrap_corr, 2)
+        else:
+            wrap_corr_norm = 0
+
+        # # Option 1: Uniform scaling across the full domain
+        scaling = 0.95 / max(np.max(np.abs(self.v)), wrap_corr_norm)
+        self.scaling = {}
+        self.Tr = {}
+        self.Tl = {}
+        for patch in self.domains_iterator:
+            current_patch = tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
+                                  patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
+                                  for j in range(self.n_dims)])
+            v_temp = self.v[current_patch]
+    
+            # Option 1: Uniform scaling across the full domain
+            self.scaling[patch] = scaling
+            # # Option 2: Different scaling for different subdomains
+            # self.scaling[patch] = (0.95 / max(np.max(np.abs(v_temp)), wrap_corr_norm))
+    
+            self.Tr[patch] = np.sqrt(self.scaling[patch])
+            self.Tl[patch] = 1j * self.Tr[patch]
+            self.v[current_patch] = self.scaling[patch] * v_temp
 
         b = 1 - self.v
         b = self.pad_func(m=b, n_roi=self.n_roi)
         return b
 
     def make_propagator(self, n):
-        """ Make the propagator operator that does fast convolution with (L+1)^(-1)"""
+        """ Make the propagator operator that does fast convolution with (l_p+1)^(-1) """
         if self.wrap_correction == 'L_omega':
             self.n_fft = n * 10
         else:
             self.n_fft = n
 
-        L = self.coordinates_f()  # Fourier coordinates in n_dims
-        L = 1j * self.scaling * (L - self.v0)  # Shift, scale, and multiply with 1j, L
-        L_inv = np.squeeze(1 / (L + 1))  # Invert (L + 1)
+        l_p = self.coordinates_f()  # Fourier coordinates in n_dims
 
-        # propagator: operator for fast convolution with (L+1)^-1
+        # propagator: operator for fast convolution with (l_p+1)^-1
+
+        # # Option 1: Uniform scaling across the full domain
+        # l_p = 1j * self.scaling * (l_p - self.v0)  # Shift, scale, and multiply with 1j, l_p
+        # l_inv = np.squeeze(1 / (l_p + 1))  # Invert (l_p + 1)
+
+        # if self.wrap_correction == 'L_omega':
+        #     propagator = lambda x: (np.fft.ifftn(l_inv * np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[:n]
+        # else:
+        #     propagator = lambda x: np.fft.ifftn(l_inv * np.fft.fftn(x))
+
+        # Option 2: Different scaling for different subdomains
+        # Shift, and multiply with 1j, l_p (don't scale just yet. Scaling incorporated as an argument inside the
+        # propagator operator definition)
+        l_p = 1j * (l_p - self.v0)
         if self.wrap_correction == 'L_omega':
-            propagator = lambda x: (np.fft.ifftn(L_inv * np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[:n]
+            propagator = lambda x, subdomain_scaling: (np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
+                                                       np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[:n]
         else:
-            propagator = lambda x: np.fft.ifftn(L_inv * np.fft.fftn(x))
+            propagator = lambda x, subdomain_scaling: np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
+                                                                   np.fft.fftn(x))
         return propagator
 
     def check_input_len(self, a, x):
@@ -231,6 +257,29 @@ class HelmholtzBase:
             self.n_ext = self.n_roi + self.bw_pre + self.bw_post
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
+    def l_fft_operator(self, truncate=False, omega=1, n=1):
+        """ Make the operator that does fast convolution with L
+        :param truncate: True if you want to do the fast convolution over a much larger domain and then truncate.
+                         Default: False.
+        :param omega: Do the fast convolution over a domain size (omega) times (fft_size).
+                      Default: omega=1, i.e., gives wrap-around artefacts.
+        :param n: To truncate to (n) times (fft_size). Only ued when truncate=True.
+                  Default n=1, i.e., truncate to original domain size
+        :return:
+        """
+        if truncate:
+            omega = 10  # to do the fast convolution over a much larger domain (omega times fft_size)
+        f = np.array(dft(self.fft_size*omega))
+        finv = np.conj(f).T/(self.fft_size*omega)
+        l_p = ((2 * np.pi * np.fft.fftfreq(self.fft_size*omega, self.pixel_size)) ** 2)
+        if truncate:
+            trunc = np.zeros((n*self.fft_size, self.fft_size*omega))
+            trunc[:, :n*self.fft_size] = np.eye(n*self.fft_size)
+            l_fft = trunc @ finv @ np.diag(l_p.ravel()) @ f @ trunc.T
+        else:   
+            l_fft = finv @ np.diag(l_p.ravel()) @ f
+        return l_fft.astype(np.csingle)
+
     def pad_func(self, m, n_roi):
         """ Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
         for i in range(self.n_dims):
@@ -257,3 +306,9 @@ class HelmholtzBase:
             a = np.dot(a, b)
             a = np.moveaxis(a, -1, i)  # Transpose back
         return a.astype(np.csingle)
+
+    def transfer(self, x, subdomain_scaling, patch_shift):
+        if patch_shift == -1:
+            return self.dot_ndim(x, subdomain_scaling * self.wrap_transfer)
+        elif patch_shift == +1:
+            return self.dot_ndim(x, subdomain_scaling * np.flip(self.wrap_transfer))

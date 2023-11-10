@@ -146,21 +146,24 @@ class HelmholtzBase:
 
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             self.fft_size = self.domain_size[0]
-            lw = self.l_fft_operator()
+            lw = self.l_fft_operator(omega=1, truncate_to=1)
 
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
-            lo = self.l_fft_operator(truncate=True)
+            lo = self.l_fft_operator(omega=20, truncate_to=1)
             self.wrap_corr = (1j * (lo-lw))
             # Option 2. APPROXIMATE. Replacing (Lo-lw) with -lw, or even -np.real(lw) (because real(lw)>>imag(lw))
             # self.wrap_corr = -1j * lw  # np.real(lw)
 
             # Truncate the wrap-around correction to square blocks of side cp in the upper and lower triangular corners
-            self.wrap_corr[:-self.cp, :-self.cp] = 0
-            self.wrap_corr[self.cp:, self.cp:] = 0
+            # self.wrap_corr[:-self.cp, :-self.cp] = 0
+            # self.wrap_corr[self.cp:, self.cp:] = 0
+
             # Transfer the one-sided wrap-around artefacts from one subdomain to another
             # apply subdomain_scaling => self.scaling[patch] later
-            self.wrap_transfer = 1j * self.l_fft_operator(truncate=True, n=2)[:self.fft_size,
-                                                                              self.fft_size:2*self.fft_size]
+            self.wrap_transfer = 1j * self.l_fft_operator(omega=20,
+                                                          truncate_to=2)[:self.fft_size,
+                                                                         self.fft_size:2*self.fft_size]
+            # self.wrap_transfer = self.wrap_corr.copy()
 
             # change the scaling based on both v and wrap_corr
             wrap_corr_norm = np.linalg.norm(self.wrap_corr, 2)
@@ -257,26 +260,24 @@ class HelmholtzBase:
             self.n_ext = self.n_roi + self.bw_pre + self.bw_post
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
-    def l_fft_operator(self, truncate=False, omega=1, n=1):
+    def l_fft_operator(self, omega=1, truncate_to=1):
         """ Make the operator that does fast convolution with L
-        :param truncate: True if you want to do the fast convolution over a much larger domain and then truncate.
-                         Default: False.
         :param omega: Do the fast convolution over a domain size (omega) times (fft_size).
                       Default: omega=1, i.e., gives wrap-around artefacts.
-        :param n: To truncate to (n) times (fft_size). Only ued when truncate=True.
-                  Default n=1, i.e., truncate to original domain size
+        :param truncate_to: To truncate to (truncate_to) times (fft_size). Must be <= omega.
+                  Default truncate_to=1, i.e., truncate to original domain size
         :return:
         """
-        if truncate:
-            omega = 10  # to do the fast convolution over a much larger domain (omega times fft_size)
-        f = np.array(dft(self.fft_size*omega))
-        finv = np.conj(f).T/(self.fft_size*omega)
-        l_p = ((2 * np.pi * np.fft.fftfreq(self.fft_size*omega, self.pixel_size)) ** 2)
-        if truncate:
-            trunc = np.zeros((n*self.fft_size, self.fft_size*omega))
-            trunc[:, :n*self.fft_size] = np.eye(n*self.fft_size)
+        n = omega * self.fft_size
+        f = np.array(dft(n))
+        finv = np.conj(f).T/n
+        l_p = ((2 * np.pi * np.fft.fftfreq(n, self.pixel_size)) ** 2)
+        if omega > 1:
+            m = truncate_to * self.fft_size
+            trunc = np.zeros((m, n))
+            trunc[:, :m] = np.eye(m)
             l_fft = trunc @ finv @ np.diag(l_p.ravel()) @ f @ trunc.T
-        else:   
+        else:
             l_fft = finv @ np.diag(l_p.ravel()) @ f
         return l_fft.astype(np.csingle)
 
@@ -298,14 +299,14 @@ class HelmholtzBase:
                 (2 * np.pi * np.fft.fftfreq(self.n_fft[d], self.pixel_size)) ** 2, axis=0).astype(np.csingle)
         return l_p
 
-    def dot_ndim(self, a, b):
-        """ np.dot(a, b) over all axes of a.
-        Here b is a 2-D array for fast-convolution or related operations that need to be applied to every axis of a """
+    def dot_ndim(self, x, y):
+        """ np.dot(x, y) over all axes of x.
+        Here y is a 2-D array for fast-convolution or related operations that need to be applied to every axis of x """
         for i in range(self.n_dims):
-            a = np.moveaxis(a, i, -1)  # Transpose
-            a = np.dot(a, b)
-            a = np.moveaxis(a, -1, i)  # Transpose back
-        return a.astype(np.csingle)
+            x = np.moveaxis(x, i, -1)  # Transpose
+            x = np.dot(x, y)
+            x = np.moveaxis(x, -1, i)  # Transpose back
+        return x.astype(np.csingle)
 
     def transfer(self, x, subdomain_scaling, patch_shift):
         if patch_shift == -1:

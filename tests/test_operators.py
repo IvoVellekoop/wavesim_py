@@ -18,6 +18,7 @@ def test_accretive(wrap_correction):
     a = l_plus_1 - b
 
     acc = np.min(np.real(np.linalg.eigvals(a + np.asarray(np.conj(a).T))))
+    print(f'{acc:.2e}')
     assert np.round(acc, 5) >= 0, f'a is not accretive. {acc}'
 
 
@@ -49,7 +50,7 @@ def test_subdomain_op_reconstruction():
     # Get the subdomain operators and transfer corrections (2 subdomains) and reconstruct A
     base2 = HelmholtzBase(n=n, source=source, n_domains=2, wrap_correction='wrap_corr', cp=296)
     sub_n = base2.n_fft[0]
-    x = np.eye(sub_n, dtype=np.single)
+    x = np.eye(sub_n, dtype=np.csingle)
 
     # (L+1) and B for subdomain 1
     l_plus_1_inv_1 = base2.propagator(x, base2.scaling[base2.domains_iterator[0]])
@@ -72,4 +73,5 @@ def test_subdomain_op_reconstruction():
     a_reconstructed[:sub_n, sub_n:] = b1_corr  # Transfer correction
     a_reconstructed[sub_n:, :sub_n] = b2_corr  # Transfer correction
     rel_err = relative_error(a_reconstructed, a)
-    assert rel_err <= 1.e-6, f'operator A not reconstructed properly. relative error high {rel_err}'
+    print(f'{rel_err:.2e}')
+    assert rel_err < 1.e-9, f'operator A not reconstructed properly. relative error high {rel_err:.2e}'

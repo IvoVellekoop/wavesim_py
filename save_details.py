@@ -203,8 +203,8 @@ class LogPlot:
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
         if self.state.iterations*self.base.total_domains > 100:
-            plot_iters = (self.state.iterations*self.base.total_domains/10).astype(int)
-            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(int)
+            plot_iters = (self.state.iterations*self.base.total_domains/10).astype(np.short)
+            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(np.short)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]
         else:

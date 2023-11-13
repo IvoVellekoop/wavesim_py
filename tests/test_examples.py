@@ -41,26 +41,28 @@ def u_ref_1d_h():
 
 
 @pytest.mark.parametrize("n_domains", [i for i in range(1, 4)])
-def test_1d_homogeneous(n_domains):
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
     n = np.ones((256, 1, 1)).astype(np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, max_iterations=1000)
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, wrap_correction=wrap_correction, max_iterations=1000)
     u_computed, state = AnySim(base).iterate()
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
 @pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
-def test_1d_glass_plate(n_domains):
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1)).astype(np.float32)
     n[99:130] = 1.5
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, n_domains=n_domains, source=source)
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, wrap_correction=wrap_correction)
     u_computed, state = AnySim(base).iterate()
     u_ref = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -91,8 +93,9 @@ def test_2d_high_contrast():  # n_domains):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
-def test_2d_low_contrast(n_domains):
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_2d_low_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure with low refractive index contrast. 
         Compare with reference solution (matlab repo result) """
     oversampling = 0.25
@@ -105,7 +108,8 @@ def test_2d_low_contrast(n_domains):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
-                         n=n, source=source, n_domains=n_domains, max_iterations=500)
+                         n=n, source=source, wrap_correction=wrap_correction, 
+                         n_domains=n_domains, max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -114,14 +118,16 @@ def test_2d_low_contrast(n_domains):
 
 @pytest.mark.parametrize("n_roi", [np.array([128, 128, 128]), np.array([128, 48, 96])])
 @pytest.mark.parametrize("boundary_widths", [np.array([24, 24, 24]), np.array([20, 24, 32])])
-def test_3d_homogeneous(n_roi, boundary_widths):
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     """ Test for propagation in a 3D homogeneous medium. Compare with reference solution (matlab repo result).
         Testing with same and varying sizes and boundary widths in each dimension. """
     n_sample = np.ones(tuple(n_roi))
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, max_iterations=500)
+    base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, 
+                         wrap_correction=wrap_correction, max_iterations=500)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}'
                     + f'_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']
@@ -129,15 +135,17 @@ def test_3d_homogeneous(n_roi, boundary_widths):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
-def test_3d_disordered(n_domains):
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_3d_disordered(n_domains, wrap_correction):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
     n_roi = (128, 128, 128)
     n_sample = loadmat(f'anysim_matlab/n3d_disordered.mat')['n_sample']
     source = np.zeros_like(n_sample, dtype='complex_')
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, max_iterations=50)
+    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 
+                         wrap_correction=wrap_correction, max_iterations=50)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

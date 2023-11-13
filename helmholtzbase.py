@@ -131,7 +131,7 @@ class HelmholtzBase:
         self.s = np.squeeze(np.pad(self.s, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), 
                                    mode='constant'))  # Pad the source term (scale later)
 
-        self.propagator = self.make_propagator(tuple(self.domain_size[:self.n_dims]))
+        self.propagator = self.make_propagator(self.domain_size[:self.n_dims])
 
     def make_b(self, v_raw):
         """ Make the medium matrix, B = 1 - V """
@@ -172,6 +172,7 @@ class HelmholtzBase:
 
         # # Option 1: Uniform scaling across the full domain
         scaling = 0.95 / max(np.max(np.abs(self.v)), wrap_corr_norm)
+        # scaling = 0.027
         self.scaling = {}
         self.Tr = {}
         self.Tl = {}
@@ -220,7 +221,7 @@ class HelmholtzBase:
         l_p = 1j * (l_p - self.v0)
         if self.wrap_correction == 'L_omega':
             propagator = lambda x, subdomain_scaling: (np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
-                                                       np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[:n]
+                                                       np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[tuple([slice(0, n[i]) for i in range(self.n_dims)])]#[:n[0]]
         else:
             propagator = lambda x, subdomain_scaling: np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
                                                                    np.fft.fftn(x))

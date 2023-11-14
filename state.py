@@ -18,7 +18,7 @@ class State(object):
 
     def log_subdomain_residual(self, residual_s, j):
         """ Normalize subdomain residual wrt preconditioned source """
-        self.subdomain_residuals[j].append((residual_s/self.init_norm).astype(np.single))
+        self.subdomain_residuals[j].append((residual_s/self.init_norm).astype(np.float32))
 
     def log_full_residual(self, residual_f):
         """ Normalize full domain residual wrt preconditioned source """

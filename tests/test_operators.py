@@ -12,9 +12,9 @@ def test_accretive(wrap_correction):
     source = np.zeros_like(n)
     source[0] = 1.
     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction=wrap_correction)
-    l_plus_1_inv = base.propagator(np.eye(base.domain_size[0], dtype=np.single), base.scaling[base.domains_iterator[0]])[:base.domain_size[0],:base.domain_size[0]]
+    l_plus_1_inv = base.propagator(np.eye(base.domain_size[0], dtype=np.float32), base.scaling[base.domains_iterator[0]])[:base.domain_size[0],:base.domain_size[0]]
     l_plus_1 = np.linalg.inv(l_plus_1_inv)
-    b = base.medium_operators[(0, 0, 0)](np.eye(base.domain_size[0], dtype=np.single))
+    b = base.medium_operators[(0, 0, 0)](np.eye(base.domain_size[0], dtype=np.float32))
     a = l_plus_1 - b
 
     acc = np.min(np.real(np.linalg.eigvals(a + np.asarray(np.conj(a).T))))
@@ -42,32 +42,33 @@ def test_subdomain_op_reconstruction():
 
     # Get the operator A = (L+1)-B = (L+1)-(1-V) = L+V for the full-domain problem (baseline to compare against)
     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction='wrap_corr', cp=296)
-    l_plus_1_inv = base.propagator(np.eye(base.domain_size[0], dtype=np.single), base.scaling[base.domains_iterator[0]])
+    x = np.eye(base.domain_size[0], dtype=np.float32)
+    l_plus_1_inv = base.propagator(x, base.scaling[base.domains_iterator[0]])
     l_plus_1 = np.linalg.inv(l_plus_1_inv)
-    b = base.medium_operators[base.domains_iterator[0]](np.eye(base.domain_size[0], dtype=np.single))
+    b = base.medium_operators[base.domains_iterator[0]](x)
     a = l_plus_1 - b
 
     # Get the subdomain operators and transfer corrections (2 subdomains) and reconstruct A
     base2 = HelmholtzBase(n=n, source=source, n_domains=2, wrap_correction='wrap_corr', cp=296)
     sub_n = base2.domain_size[0]
-    x = np.eye(sub_n, dtype=np.csingle)
+    x_ = np.eye(sub_n, dtype=np.float32)
 
     # (L+1) and B for subdomain 1
-    l_plus_1_inv_1 = base2.propagator(x, base2.scaling[base2.domains_iterator[0]])
+    l_plus_1_inv_1 = base2.propagator(x_, base2.scaling[base2.domains_iterator[0]])
     l_plus_1_1 = np.linalg.inv(l_plus_1_inv_1)
-    b1 = base2.medium_operators[base2.domains_iterator[0]](x)
+    b1 = base2.medium_operators[base2.domains_iterator[0]](x_)
 
     # (L+1) and B for subdomain 2
-    l_plus_1_inv_2 = base2.propagator(x, base2.scaling[base2.domains_iterator[1]])
+    l_plus_1_inv_2 = base2.propagator(x_, base2.scaling[base2.domains_iterator[1]])
     l_plus_1_2 = np.linalg.inv(l_plus_1_inv_2)
-    b2 = base2.medium_operators[base2.domains_iterator[1]](x)
+    b2 = base2.medium_operators[base2.domains_iterator[1]](x_)
 
     # Transfer corrections
-    b1_corr = base2.transfer(x, base2.scaling[base2.domains_iterator[0]], +1)
-    b2_corr = base2.transfer(x, base2.scaling[base2.domains_iterator[1]], -1)
+    b1_corr = base2.transfer(x_, base2.scaling[base2.domains_iterator[0]], +1)
+    b2_corr = base2.transfer(x_, base2.scaling[base2.domains_iterator[1]], -1)
 
     # Reconstruct A using above subdomain operators and transfer corrections
-    a_reconstructed = np.zeros_like(a, dtype=np.csingle)
+    a_reconstructed = np.zeros_like(a, dtype=np.complex64)
     a_reconstructed[:sub_n, :sub_n] = l_plus_1_1 - b1  # Subdomain 1
     a_reconstructed[sub_n:, sub_n:] = l_plus_1_2 - b2  # Subdomain 2
     a_reconstructed[:sub_n, sub_n:] = b1_corr  # Transfer correction

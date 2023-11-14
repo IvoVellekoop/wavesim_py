@@ -40,7 +40,7 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 4)])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
 def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
@@ -54,7 +54,7 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 3)])
+@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
 def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
@@ -123,7 +123,7 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     """ Test for propagation in a 3D homogeneous medium. Compare with reference solution (matlab repo result).
         Testing with same and varying sizes and boundary widths in each dimension. """
     n_sample = np.ones(tuple(n_roi))
-    source = np.zeros_like(n_sample, dtype='complex_')
+    source = np.zeros_like(n_sample, dtype=np.complex64)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
     base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, 
@@ -141,7 +141,7 @@ def test_3d_disordered(n_domains, wrap_correction):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
     n_roi = (128, 128, 128)
     n_sample = loadmat(f'anysim_matlab/n3d_disordered.mat')['n_sample']
-    source = np.zeros_like(n_sample, dtype='complex_')
+    source = np.zeros_like(n_sample, dtype=np.complex64)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
     base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 

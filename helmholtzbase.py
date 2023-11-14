@@ -31,16 +31,16 @@ class HelmholtzBase:
 
         self.n = check_input_dims(n)
         self.n_dims = (np.squeeze(self.n)).ndim  # Number of dimensions in problem
-        self.n_roi = np.array(self.n.shape, dtype=np.short)  # Num of points in ROI (Region of Interest)
+        self.n_roi = np.array(self.n.shape, dtype=np.int16)  # Num of points in ROI (Region of Interest)
         self.boundary_widths = self.check_input_len(boundary_widths, 0)
-        self.bw_pre = np.floor(self.boundary_widths).astype(np.short)
-        self.bw_post = np.ceil(self.boundary_widths).astype(np.float16)
+        self.bw_pre = np.floor(self.boundary_widths).astype(np.int16)
+        self.bw_post = np.ceil(self.boundary_widths).astype(np.float32)
         self.wavelength = wavelength  # Wavelength in um (micron)
         self.ppw = ppw  # points per wavelength
         self.k0 = (1. * 2. * np.pi) / self.wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
         self.pixel_size = self.wavelength / self.ppw  # Grid pixel size in um (micron)
         self.n_ext = self.n_roi + self.bw_pre + self.bw_post  # n_roi + boundaries on either side(s)
-        self.s = check_input_dims(source).astype(np.float16)
+        self.s = check_input_dims(source).astype(np.float32)
         self.max_subdomain_size = 500  # max permissible size of one sub-domain
         if n_domains is None:
             self.n_domains = self.n_ext // self.max_subdomain_size
@@ -48,7 +48,7 @@ class HelmholtzBase:
             self.n_domains = self.check_input_len(n_domains,
                                                   1)  # Number of subdomains to decompose into in each dimension
 
-        self.overlap = self.check_input_len(overlap, 0).astype(np.short)  # Overlap between subdomains in each dimension
+        self.overlap = self.check_input_len(overlap, 0).astype(np.int16)  # Overlap between subdomains in each dimension
 
         if (self.n_domains == 1).all():  # If 1 domain, implies no domain decomposition
             self.domain_size = self.n_ext.copy()
@@ -58,16 +58,16 @@ class HelmholtzBase:
             self.check_domain_size_same()  # all subdomains of same size
             self.check_domain_size_int()  # subdomain size is int
 
-        self.bw_pre = self.bw_pre.astype(np.short)
-        self.bw_post = self.bw_post.astype(np.short)
-        self.n_ext = self.n_ext.astype(np.short)
-        self.n_domains = self.n_domains.astype(np.short)
+        self.bw_pre = self.bw_pre.astype(np.int16)
+        self.bw_post = self.bw_post.astype(np.int16)
+        self.n_ext = self.n_ext.astype(np.int16)
+        self.n_domains = self.n_domains.astype(np.int16)
         self.domains_iterator = list(product(range(self.n_domains[0]), range(self.n_domains[1]),
                                              range(self.n_domains[2])))  # to iterate through subdomains in all dims
         self.domain_size[self.n_dims:] = 0
-        self.domain_size = self.domain_size.astype(np.short)
+        self.domain_size = self.domain_size.astype(np.int16)
 
-        self.total_domains = np.prod(self.n_domains).astype(np.short)
+        self.total_domains = np.prod(self.n_domains).astype(np.int16)
 
         self.subdomain_Bs = []
         self.medium_operators = []
@@ -137,7 +137,7 @@ class HelmholtzBase:
         """ Make the medium matrix, B = 1 - V """
         # give tiny non-zero minimum value to prevent division by zero in homogeneous media
         mu_min = ((10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
-                self.boundary_widths != 0).any() else self.check_input_len(0, 0)).astype(np.float16)
+                self.boundary_widths != 0).any() else self.check_input_len(0, 0)).astype(np.float32)
         mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:self.n_dims]) * self.pixel_size)))
         v_min = np.imag((self.k0 + 1j * np.max(mu_min)) ** 2)
         self.v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
@@ -237,7 +237,7 @@ class HelmholtzBase:
             a += (3 - len(a)) * (x,)
         if isinstance(a, np.ndarray):
             a = np.concatenate((a, np.zeros(3 - len(a))))
-        return np.array(a, dtype=np.short)
+        return np.array(a, dtype=np.int16)
 
     def check_domain_size_same(self):
         """ Increase bw_post in dimension(s) until all subdomains are of the same size """
@@ -280,7 +280,7 @@ class HelmholtzBase:
             l_fft = trunc @ finv @ np.diag(l_p.ravel()) @ f @ trunc.T
         else:
             l_fft = finv @ np.diag(l_p.ravel()) @ f
-        return l_fft.astype(np.csingle)
+        return l_fft.astype(np.complex64)
 
     def pad_func(self, m, n_roi):
         """ Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
@@ -290,14 +290,14 @@ class HelmholtzBase:
             full_filter = np.concatenate((left_boundary, np.ones(n_roi[i]), right_boundary))
             m = np.moveaxis(m, i, -1) * full_filter
             m = np.moveaxis(m, -1, i)
-        return m.astype(np.csingle)
+        return m.astype(np.complex64)
 
     def coordinates_f(self):
         """ Fourier space coordinates for given size, spacing, and dimensions """
-        l_p = ((2 * np.pi * np.fft.fftfreq(self.n_fft[0], self.pixel_size)) ** 2).astype(np.csingle)
+        l_p = ((2 * np.pi * np.fft.fftfreq(self.n_fft[0], self.pixel_size)) ** 2).astype(np.complex64)
         for d in range(1, self.n_dims):
             l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
-                (2 * np.pi * np.fft.fftfreq(self.n_fft[d], self.pixel_size)) ** 2, axis=0).astype(np.csingle)
+                (2 * np.pi * np.fft.fftfreq(self.n_fft[d], self.pixel_size)) ** 2, axis=0).astype(np.complex64)
         return l_p
 
     def dot_ndim(self, x, y):
@@ -307,7 +307,7 @@ class HelmholtzBase:
             x = np.moveaxis(x, i, -1)  # Transpose
             x = np.dot(x, y)
             x = np.moveaxis(x, -1, i)  # Transpose back
-        return x.astype(np.csingle)
+        return x.astype(np.complex64)
 
     def transfer(self, x, subdomain_scaling, patch_shift):
         if patch_shift == -1:

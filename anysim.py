@@ -12,7 +12,7 @@ def overlap_decay(x):
 class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
-        self.u = np.zeros_like(self.base.s, dtype=np.csingle)  # field u, initialize with 0s
+        self.u = np.zeros_like(self.base.s, dtype=np.complex64)  # field u, initialize with 0s
         self.u_dict = defaultdict(list)  # Empty dict of lists to store u's in each patch
         self.restriction = [[] for _ in range(self.base.n_dims)]
         self.extension = [[] for _ in range(self.base.n_dims)]
@@ -87,7 +87,7 @@ class AnySim:
             x = np.moveaxis(x, i, -1)  # Transpose
             x = np.dot(x, self.restriction[i][patch[i]])  # Apply (appropriate) restriction operator
             x = np.moveaxis(x, -1, i)  # Transpose back
-        return x.astype(np.csingle)
+        return x.astype(np.complex64)
 
     def extend(self, x, patch):
         """ Extend patch subdomain 'x' to full-domain """
@@ -95,10 +95,10 @@ class AnySim:
             x = np.moveaxis(x, i, -1)  # Transpose
             x = np.dot(x, self.extension[i][patch[i]])  # Apply (appropriate) extension operator
             x = np.moveaxis(x, -1, i)  # Transpose back
-        return x.astype(np.csingle)
+        return x.astype(np.complex64)
 
     def transfer_correction(self, current_patch, idx):
-        u_transfer = np.zeros_like(self.u_dict[current_patch], dtype=np.csingle)
+        u_transfer = np.zeros_like(self.u_dict[current_patch], dtype=np.complex64)
         for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain
             if 0 <= idx + idx_shift < len(self.base.domains_iterator):
                 neighbour_patch = self.base.domains_iterator[idx + idx_shift]  # get the neighbouring subdomain location

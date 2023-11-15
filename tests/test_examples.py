@@ -1,3 +1,7 @@
+import os
+if os.path.basename(os.getcwd()) == 'tests':
+    os.chdir('..')
+
 import pytest
 import numpy as np
 from scipy.io import loadmat

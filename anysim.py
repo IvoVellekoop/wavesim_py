@@ -13,7 +13,6 @@ class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
         self.u = np.zeros_like(self.base.s, dtype=np.complex64)  # field u, initialize with 0s
-        self.u_dict = defaultdict(list)  # Empty dict of lists to store u's in each patch
         self.restriction = [[] for _ in range(self.base.n_dims)]
         self.extension = [[] for _ in range(self.base.n_dims)]
         self.domain_decomp_operators()  # Construct restriction and extension operators
@@ -26,11 +25,12 @@ class AnySim:
     def iterate(self):
         """ AnySim update """
         s_dict = defaultdict(list)  # Empty dict of lists to store source term s in each patch
+        u_dict = defaultdict(list)  # Empty dict of lists to store u's in each patch
         for patch in self.base.domains_iterator:
             # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
             s_dict[patch] = self.base.Tl[patch] * self.restrict(self.base.s, patch)
             # restrict full-domain field u to the patch subdomain
-            self.u_dict[patch] = self.restrict(self.u, patch)
+            u_dict[patch] = self.restrict(self.u, patch)
 
         for i in range(self.base.max_iterations):
             residual = 0
@@ -38,20 +38,22 @@ class AnySim:
                 # idx gives the index in the list of domains_iterator
                 # patch gives the 3-element position tuple of subdomain (e.g., (0,0,0))
                 print(f'Iteration {i + 1}, sub-domain {patch}. ', end='\r')
-                t1 = self.base.medium_operators[patch](self.u_dict[patch]) + s_dict[patch]  # B(u) + s
+                t1 = self.base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
+                # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
+                t1 = t1 - self.transfer_correction(patch, idx, u_dict)
                 t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
-                t1 = self.base.medium_operators[patch](self.u_dict[patch] - t1)  # B(u - t1). subdomain residual
+                t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
+                # # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
+                # t1 = t1 + self.transfer_correction(patch, idx, u_dict)
                 self.state.log_subdomain_residual(norm(t1), patch)  # log residual for this subdomain
 
-                # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
-                t1 = t1 + self.transfer_correction(patch, idx)
-                self.u_dict[patch] = self.u_dict[patch] - (self.base.alpha * t1)  # update subdomain u
+                u_dict[patch] = u_dict[patch] - (self.base.alpha * t1)  # update subdomain u
 
                 # find the slice of full domain u to update
                 patch_slice = tuple([slice(patch[j]*(self.base.domain_size[j]-self.base.overlap[j]),
                                     patch[j]*(self.base.domain_size[j]-self.base.overlap[j])+self.base.domain_size[j])
                                     for j in range(self.base.n_dims)])
-                self.u[patch_slice] = self.u_dict[patch]
+                self.u[patch_slice] = u_dict[patch]
 
                 self.state.log_u_iter(self.u, patch)  # collect u updates (store separately subdomain-wise)
                 residual += self.extend(t1, patch)  # collect all subdomain residuals to update full residual
@@ -97,12 +99,12 @@ class AnySim:
             x = np.moveaxis(x, -1, i)  # Transpose back
         return x.astype(np.complex64)
 
-    def transfer_correction(self, current_patch, idx):
-        u_transfer = np.zeros_like(self.u_dict[current_patch], dtype=np.complex64)
+    def transfer_correction(self, current_patch, idx, x):
+        x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
         for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain
             if 0 <= idx + idx_shift < len(self.base.domains_iterator):
                 neighbour_patch = self.base.domains_iterator[idx + idx_shift]  # get the neighbouring subdomain location
-                u_tr_temp = self.u_dict[neighbour_patch].copy()  # get the neighbouring subdomain field
+                x_neighbour = x[neighbour_patch].copy()  # get the neighbouring subdomain field
                 # get the field(s) to transfer
-                u_transfer = u_transfer + self.base.transfer(u_tr_temp, self.base.scaling[current_patch], idx_shift)
-        return u_transfer
+                x_transfer = x_transfer + self.base.transfer(x_neighbour, self.base.scaling[current_patch], idx_shift)
+        return x_transfer

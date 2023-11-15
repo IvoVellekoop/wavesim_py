@@ -12,9 +12,11 @@ def test_accretive(wrap_correction):
     source = np.zeros_like(n)
     source[0] = 1.
     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction=wrap_correction)
-    l_plus_1_inv = base.propagator(np.eye(base.domain_size[0], dtype=np.float32), base.scaling[base.domains_iterator[0]])[:base.domain_size[0],:base.domain_size[0]]
+    x = np.eye(base.domain_size[0], dtype=np.float32)
+    l_plus_1_inv = base.propagator(x, base.scaling[base.domains_iterator[0]])[:base.domain_size[0],
+                                                                              :base.domain_size[0]]
     l_plus_1 = np.linalg.inv(l_plus_1_inv)
-    b = base.medium_operators[(0, 0, 0)](np.eye(base.domain_size[0], dtype=np.float32))
+    b = base.medium_operators[(0, 0, 0)](x)
     a = l_plus_1 - b
 
     acc = np.min(np.real(np.linalg.eigvals(a + np.asarray(np.conj(a).T))))

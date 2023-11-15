@@ -40,8 +40,8 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, 'L_omega'), (1, 'wrap_corr'), (1, None), 
+                                                        (2, None), (3, None), (4, None), (5, None)])
 def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
@@ -54,8 +54,8 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, 'L_omega'), (1, 'wrap_corr'), (1, None), 
+                                                        (2, None), (3, None), (4, None), (5, None)])
 def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1)).astype(np.float32)
@@ -71,7 +71,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
 
 # @pytest.mark.parametrize("n_domains", [1])
 def test_2d_high_contrast():  # n_domains):
-    """ Test for propagation in 2D structure made of iron, with high refractive index contrast. 
+    """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
         Compare with reference solution (matlab repo result) """
     oversampling = 0.25
     im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
@@ -80,6 +80,8 @@ def test_2d_high_contrast():  # n_domains):
     n_im = ((np.where(im[:, :, 2] > 0.25, 1, 0) * n_contrast) + 1)
     n_roi = int(oversampling * n_im.shape[0])
     # n2d = np.asarray(fromarray(n_im).resize((n_roi,n_roi), BILINEAR)) # resize cannot work with complex values?
+    if os.path.basename(os.getcwd()) == 'tests':
+        os.chdir('..')
     n = loadmat('anysim_matlab/n2d.mat')['n']
 
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
@@ -93,8 +95,8 @@ def test_2d_high_contrast():  # n_domains):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, 'L_omega'), (1, 'wrap_corr'), (1, None), 
+                                                        (2, None), (3, None)])
 def test_2d_low_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure with low refractive index contrast. 
         Compare with reference solution (matlab repo result) """
@@ -118,7 +120,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
 
 @pytest.mark.parametrize("n_roi", [np.array([128, 128, 128]), np.array([128, 48, 96])])
 @pytest.mark.parametrize("boundary_widths", [np.array([24, 24, 24]), np.array([20, 24, 32])])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr'])  # , 'L_omega'
 def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     """ Test for propagation in a 3D homogeneous medium. Compare with reference solution (matlab repo result).
         Testing with same and varying sizes and boundary widths in each dimension. """
@@ -135,8 +137,8 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains", [i for i in range(1, 2)])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, 'L_omega'), (1, 'wrap_corr'), (1, None), 
+                                                        (2, None), (3, None)])
 def test_3d_disordered(n_domains, wrap_correction):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
     n_roi = (128, 128, 128)

@@ -21,7 +21,7 @@ def relative_error(e, e_true):
 
 class LogPlot:
     def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
-                 animate_iters=False):
+                 animate_iters=True):
         """ Logging and Plotting Class """
         self.base = base
         self.state = state

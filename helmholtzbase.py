@@ -221,7 +221,8 @@ class HelmholtzBase:
         l_p = 1j * (l_p - self.v0)
         if self.wrap_correction == 'L_omega':
             propagator = lambda x, subdomain_scaling: (np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
-                                                       np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[tuple([slice(0, n[i]) for i in range(self.n_dims)])]#[:n[0]]
+                                                       np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[
+                                                       tuple([slice(0, n[i]) for i in range(self.n_dims)])]
         else:
             propagator = lambda x, subdomain_scaling: np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
                                                                    np.fft.fftn(x))

@@ -167,13 +167,14 @@ class HelmholtzBase:
             # self.wrap_transfer = wrap_corr.copy()
 
             # change the scaling based on both v and wrap_corr
-            # wrap_corr_norm = np.linalg.norm(wrap_corr, 2)
-        # else:
-            # wrap_corr_norm = 0
+            wrap_corr_norm = np.linalg.norm(wrap_corr, 2)
+        else:
+            wrap_corr_norm = 0
 
         # # Option 1: Uniform scaling across the full domain
-        # scaling = 0.95 / max(np.max(np.abs(self.v)), wrap_corr_norm)
-        scaling = 0.95 / np.max(np.abs(self.v))
+        # scaling = 0.95 / min(np.max(np.abs(self.v)), wrap_corr_norm)
+        # scaling = 0.95 / np.max(np.abs(self.v))
+        scaling = 0.95 / wrap_corr_norm
         # scaling = 0.027
         self.scaling = {}
         self.Tr = {}

@@ -28,8 +28,7 @@ def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
 
 def u_ref_1d_h():
     """ Compute analytic solution for 1D case """
-    n = np.ones((256, 1, 1), dtype=np.float32)
-    base_ = HelmholtzBase(n=n, n_domains=1, boundary_widths=20, setup_operators=False)
+    base_ = HelmholtzBase(n=np.ones((256, 1, 1), dtype=np.float32), n_domains=1, boundary_widths=20, setup_operators=False)
 
     x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size, dtype=np.float32)
     x = np.pad(x, (64, 64), mode='constant')
@@ -52,7 +51,7 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     n = np.ones((256, 1, 1), dtype=np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, wrap_correction=wrap_correction, max_iterations=1000)
+    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, wrap_correction=wrap_correction)
     u_computed, state = AnySim(base).iterate()
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -113,7 +112,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
 
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
                          n=n, source=source, wrap_correction=wrap_correction, 
-                         n_domains=n_domains, max_iterations=500)
+                         n_domains=n_domains)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

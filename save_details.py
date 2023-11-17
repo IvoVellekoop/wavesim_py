@@ -21,7 +21,7 @@ def relative_error(e, e_true):
 
 class LogPlot:
     def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
-                 animate_iters=True):
+                 animate_iters=False):
         """ Logging and Plotting Class """
         self.base = base
         self.state = state
@@ -203,13 +203,13 @@ class LogPlot:
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
         if self.state.iterations*self.base.total_domains > 100:
-            plot_iters = (self.state.iterations*self.base.total_domains/10).astype(np.int16)
-            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(np.int16)
+            plot_iters = (self.state.iterations*self.base.total_domains/10)
+            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]
         else:
             plot_iters = self.state.iterations * self.base.total_domains
-            iters_trunc = np.arange(self.state.iterations).astype(np.int16)
+            iters_trunc = np.arange(self.state.iterations)
             domains_trunc = self.base.domains_iterator * self.state.iterations
             u_iter_trunc = u_iter
 
@@ -326,12 +326,12 @@ class LogPlot:
 
         if self.truncate_iterations:
             plot_iters = len(u_iter)
-            iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step).astype(np.int16)
+            iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step)
             residuals = self.state.full_residuals[::self.plot_iter_step]
             subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step, :]
         else:
             plot_iters = self.state.iterations * self.base.total_domains
-            iters_trunc = np.arange(self.state.iterations).astype(np.int16)
+            iters_trunc = np.arange(self.state.iterations)
             residuals = self.state.full_residuals.copy()
             subdomain_residuals = self.state.subdomain_residuals.copy()
         domains_trunc = self.base.domains_iterator * self.state.iterations

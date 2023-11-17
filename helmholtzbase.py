@@ -31,15 +31,15 @@ class HelmholtzBase:
 
         self.n = check_input_dims(n)
         self.n_dims = (np.squeeze(self.n)).ndim  # Number of dimensions in problem
-        self.n_roi = np.array(self.n.shape, dtype=np.int16)  # Num of points in ROI (Region of Interest)
+        self.n_roi = np.array(self.n.shape)  # Num of points in ROI (Region of Interest)
         self.boundary_widths = self.check_input_len(boundary_widths, 0)
-        self.bw_pre = np.floor(self.boundary_widths).astype(np.int16)
-        self.bw_post = np.ceil(self.boundary_widths).astype(np.float32)
+        self.boundary_pre = np.floor(self.boundary_widths).astype(int)
+        self.boundary_post = np.ceil(self.boundary_widths).astype(np.float32)
         self.wavelength = wavelength  # Wavelength in um (micron)
         self.ppw = ppw  # points per wavelength
         self.k0 = (1. * 2. * np.pi) / self.wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
         self.pixel_size = self.wavelength / self.ppw  # Grid pixel size in um (micron)
-        self.n_ext = self.n_roi + self.bw_pre + self.bw_post  # n_roi + boundaries on either side(s)
+        self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post  # n_roi + boundaries on either side(s)
         self.s = check_input_dims(source).astype(np.float32)
         self.max_subdomain_size = 500  # max permissible size of one sub-domain
         if n_domains is None:
@@ -48,7 +48,7 @@ class HelmholtzBase:
             self.n_domains = self.check_input_len(n_domains,
                                                   1)  # Number of subdomains to decompose into in each dimension
 
-        self.overlap = self.check_input_len(overlap, 0).astype(np.int16)  # Overlap between subdomains in each dimension
+        self.overlap = self.check_input_len(overlap, 0).astype(int)  # Overlap between subdomains in each dimension
 
         if (self.n_domains == 1).all():  # If 1 domain, implies no domain decomposition
             self.domain_size = self.n_ext.copy()
@@ -58,16 +58,15 @@ class HelmholtzBase:
             self.check_domain_size_same()  # all subdomains of same size
             self.check_domain_size_int()  # subdomain size is int
 
-        self.bw_pre = self.bw_pre.astype(np.int16)
-        self.bw_post = self.bw_post.astype(np.int16)
-        self.n_ext = self.n_ext.astype(np.int16)
-        self.n_domains = self.n_domains.astype(np.int16)
+        self.boundary_post = self.boundary_post.astype(int)
+        self.n_ext = self.n_ext.astype(int)
+        self.n_domains = self.n_domains.astype(int)
         self.domains_iterator = list(product(range(self.n_domains[0]), range(self.n_domains[1]),
                                              range(self.n_domains[2])))  # to iterate through subdomains in all dims
         self.domain_size[self.n_dims:] = 0
-        self.domain_size = self.domain_size.astype(np.int16)
+        self.domain_size = self.domain_size.astype(int)
 
-        self.total_domains = np.prod(self.n_domains).astype(np.int16)
+        self.total_domains = np.prod(self.n_domains).astype(int)
 
         self.subdomain_Bs = []
         self.medium_operators = []
@@ -84,7 +83,7 @@ class HelmholtzBase:
         self.propagator = None
         self.transfer_info = None
 
-        self.crop2roi = tuple([slice(self.bw_pre[i], -self.bw_post[i])
+        self.crop2roi = tuple([slice(self.boundary_pre[i], -self.boundary_post[i])
                                for i in range(self.n_dims)])  # crop array from n_ext to n_roi
 
         self.wrap_correction = wrap_correction  # None OR 'wrap_corr'
@@ -104,8 +103,8 @@ class HelmholtzBase:
         print(f'\n{self.n_dims} dimensional problem')
         if self.wrap_correction:
             print('Wrap correction: \t', self.wrap_correction)
-        print('Boundaries widths (Pre): \t', self.bw_pre)
-        print('\t\t (Post): \t', self.bw_post)
+        print('Boundaries widths (Pre): \t', self.boundary_pre)
+        print('\t\t (Post): \t', self.boundary_post)
         if self.total_domains > 1:
             print(
                 f'Decomposing into {self.n_domains} domains of size {self.domain_size}, overlap {self.overlap}')
@@ -113,7 +112,7 @@ class HelmholtzBase:
     def setup_operators_n_initialize(self):
         """ Make (1) Medium b = 1 - v and (2) Propagator (L+1)^(-1) operators, and (3) pad and scale source """
         v_raw = self.k0 ** 2 * self.n ** 2
-        v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), mode='edge'))
+        v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])), mode='edge'))
         self.full_b = self.make_b(v_raw)
         self.subdomain_Bs = {}
         self.medium_operators = {}
@@ -123,12 +122,13 @@ class HelmholtzBase:
                                   for j in range(self.n_dims)])]
             self.subdomain_Bs[patch] = b_block.copy()
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                self.medium_operators[patch] = lambda x, b_ = b_block, subdomain_scaling = self.scaling[patch]: (
-                        b_ * x - self.dot_ndim(x, subdomain_scaling * self.wrap_corr))
+                # self.medium_operators[patch] = lambda x, b_ = b_block, subdomain_scaling = self.scaling[patch]: (
+                #         b_ * x - self.dot_ndim(x, subdomain_scaling * self.wrap_corr))
+                self.medium_operators[patch] = lambda x, b_ = b_block: (b_ * x - self.dot_ndim(x, self.wrap_corr))
             else:
                 self.medium_operators[patch] = lambda x, b_ = b_block: b_ * x
 
-        self.s = np.squeeze(np.pad(self.s, (tuple([[self.bw_pre[i], self.bw_post[i]] for i in range(3)])), 
+        self.s = np.squeeze(np.pad(self.s, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])), 
                                    mode='constant'))  # Pad the source term (scale later)
 
         self.propagator = self.make_propagator(self.domain_size[:self.n_dims])
@@ -149,29 +149,31 @@ class HelmholtzBase:
             lw = self.l_fft_operator(omega=1, truncate_to=1)
 
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
-            lo = self.l_fft_operator(omega=20, truncate_to=1)
-            self.wrap_corr = (1j * (lo-lw))
+            lo = self.l_fft_operator(omega=10, truncate_to=1)
+            wrap_corr = (1j * (lo-lw))
             # Option 2. APPROXIMATE. Replacing (Lo-lw) with -lw, or even -np.real(lw) (because real(lw)>>imag(lw))
-            # self.wrap_corr = -1j * lw  # np.real(lw)
+            # wrap_corr = -1j * lw  # np.real(lw)
 
             # Truncate the wrap-around correction to square blocks of side cp in the upper and lower triangular corners
-            # self.wrap_corr[:-self.cp, :-self.cp] = 0
-            # self.wrap_corr[self.cp:, self.cp:] = 0
+            # wrap_corr[:-self.cp, :-self.cp] = 0
+            # wrap_corr[self.cp:, self.cp:] = 0
 
             # Transfer the one-sided wrap-around artefacts from one subdomain to another
             # apply subdomain_scaling => self.scaling[patch] later
-            self.wrap_transfer = 1j * self.l_fft_operator(omega=20,
-                                                          truncate_to=2)[:self.fft_size,
-                                                                         self.fft_size:2*self.fft_size]
-            # self.wrap_transfer = self.wrap_corr.copy()
+            if self.total_domains > 1:
+                self.wrap_transfer = 1j * self.l_fft_operator(omega=20,
+                                                            truncate_to=2)[:self.fft_size,
+                                                                            self.fft_size:2*self.fft_size]
+            # self.wrap_transfer = wrap_corr.copy()
 
             # change the scaling based on both v and wrap_corr
-            wrap_corr_norm = np.linalg.norm(self.wrap_corr, 2)
-        else:
-            wrap_corr_norm = 0
+            # wrap_corr_norm = np.linalg.norm(wrap_corr, 2)
+        # else:
+            # wrap_corr_norm = 0
 
         # # Option 1: Uniform scaling across the full domain
-        scaling = 0.95 / max(np.max(np.abs(self.v)), wrap_corr_norm)
+        # scaling = 0.95 / max(np.max(np.abs(self.v)), wrap_corr_norm)
+        scaling = 0.95 / np.max(np.abs(self.v))
         # scaling = 0.027
         self.scaling = {}
         self.Tr = {}
@@ -192,7 +194,9 @@ class HelmholtzBase:
             self.v[current_patch] = self.scaling[patch] * v_temp
 
         b = 1 - self.v
-        b = self.pad_func(m=b, n_roi=self.n_roi)
+        b = self.pad_func(m=b, n_dims=self.n_dims)
+        if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+            self.wrap_corr = self.pad_func(m=(scaling*wrap_corr), n_dims=2)
         return b
 
     def make_propagator(self, n):
@@ -218,13 +222,13 @@ class HelmholtzBase:
         # Option 2: Different scaling for different subdomains
         # Shift, and multiply with 1j, l_p (don't scale just yet. Scaling incorporated as an argument inside the
         # propagator operator definition)
-        l_p = 1j * (l_p - self.v0)
+        self.l_p = 1j * (l_p - self.v0)
         if self.wrap_correction == 'L_omega':
-            propagator = lambda x, subdomain_scaling: (np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
+            propagator = lambda x, subdomain_scaling: (np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
                                                        np.fft.fftn(np.pad(x, (0, self.n_fft[0] - n[0])))))[
                                                        tuple([slice(0, n[i]) for i in range(self.n_dims)])]
         else:
-            propagator = lambda x, subdomain_scaling: np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * l_p + 1)) *
+            propagator = lambda x, subdomain_scaling: np.fft.ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
                                                                    np.fft.fftn(x))
         return propagator
 
@@ -238,14 +242,14 @@ class HelmholtzBase:
             a += (3 - len(a)) * (x,)
         if isinstance(a, np.ndarray):
             a = np.concatenate((a, np.zeros(3 - len(a))))
-        return np.array(a, dtype=np.int16)
+        return np.array(a)
 
     def check_domain_size_same(self):
-        """ Increase bw_post in dimension(s) until all subdomains are of the same size """
+        """ Increase boundary_post in dimension(s) until all subdomains are of the same size """
         while (self.domain_size[:self.n_dims] != np.max(self.domain_size[:self.n_dims])).any():
-            self.bw_post[:self.n_dims] = self.bw_post[:self.n_dims] + self.n_domains[:self.n_dims] * (
+            self.boundary_post[:self.n_dims] = self.boundary_post[:self.n_dims] + self.n_domains[:self.n_dims] * (
                     np.max(self.domain_size[:self.n_dims]) - self.domain_size[:self.n_dims])
-            self.n_ext = self.n_roi + self.bw_pre + self.bw_post
+            self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
             self.domain_size[:self.n_dims] = (self.n_ext + (
                     (self.n_domains - 1) * self.overlap)) / self.n_domains
 
@@ -256,10 +260,10 @@ class HelmholtzBase:
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
     def check_domain_size_int(self):
-        """ Increase bw_post in dimension(s) until the subdomain size is int """
-        while (self.domain_size % 1 != 0).any() or (self.bw_post % 1 != 0).any():
-            self.bw_post += np.round(self.n_domains * (np.ceil(self.domain_size) - self.domain_size), 2)
-            self.n_ext = self.n_roi + self.bw_pre + self.bw_post
+        """ Increase boundary_post in dimension(s) until the subdomain size is int """
+        while (self.domain_size % 1 != 0).any() or (self.boundary_post % 1 != 0).any():
+            self.boundary_post += np.round(self.n_domains * (np.ceil(self.domain_size) - self.domain_size), 2)
+            self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
     def l_fft_operator(self, omega=1, truncate_to=1):
@@ -283,12 +287,12 @@ class HelmholtzBase:
             l_fft = finv @ np.diag(l_p.ravel()) @ f
         return l_fft.astype(np.complex64)
 
-    def pad_func(self, m, n_roi):
+    def pad_func(self, m, n_dims):
         """ Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
-        for i in range(self.n_dims):
-            left_boundary = boundary_(self.bw_pre[i])
-            right_boundary = np.flip(boundary_(self.bw_post[i]))
-            full_filter = np.concatenate((left_boundary, np.ones(n_roi[i]), right_boundary))
+        for i in range(n_dims):
+            left_boundary = boundary_(self.boundary_pre[i])
+            right_boundary = np.flip(boundary_(self.boundary_post[i]))
+            full_filter = np.concatenate((left_boundary, np.ones(self.n_roi[i]), right_boundary))
             m = np.moveaxis(m, i, -1) * full_filter
             m = np.moveaxis(m, -1, i)
         return m.astype(np.complex64)

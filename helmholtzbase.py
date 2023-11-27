@@ -1,6 +1,5 @@
 from itertools import product
 import numpy as np
-# from numpy.fft import fftn, ifftn, fftfreq
 from scipy.fft import fftn, ifftn, fftfreq
 from scipy.sparse import diags as spdiags
 from scipy.sparse.linalg import norm as spnorm
@@ -60,17 +59,13 @@ class HelmholtzBase:
 
         self.total_domains = np.prod(self.n_domains).astype(int)
 
-        self.medium_operators = []
-        self.v0 = None
         self.v = None
         self.fft_size = None
         self.omega = None
         self.scaling = None
         self.wrap_corr = None
-        self.wrap_transfer = None
         self.l_p = None
         self.propagator = None
-        self.transfer_info = None
 
         self.crop2roi = tuple([slice(self.boundary_pre[i], -self.boundary_post[i])
                                for i in range(self.n_dims)])  # crop array from n_ext to n_roi
@@ -85,7 +80,7 @@ class HelmholtzBase:
 
         self.print_details()
         if setup_operators:
-            self.setup_operators()
+            self.initialize()
 
     def print_details(self):
         """ Print main information about the problem """
@@ -98,60 +93,31 @@ class HelmholtzBase:
             print(
                 f'Decomposing into {self.n_domains} domains of size {self.domain_size}, overlap {self.overlap}')
 
-    def setup_operators(self):
-        """ Make (1) Medium b = 1 - v and (2) Propagator (L+1)^(-1) operators, and (3) pad and scale source """
+    def initialize(self):
+        """ Get (1) Medium b = 1 - v and (2) Propagator (L+1)^(-1) operators, and (3) pad and scale source """
         v_raw = self.k0 ** 2 * self.n ** 2
         v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])),
                                   mode='edge'))
-        self.v = self.make_v(v_raw)
-        self.scaling, self.propagator = self.make_propagator()
-
-        for patch in self.domains_iterator:
-            current_patch = tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
-                                   patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
-                                   for j in range(self.n_dims)])
-            self.v[current_patch] = self.scaling[patch] * self.v[current_patch]
-        b = 1 - self.v
-        b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, n_dims=self.n_dims)
-        self.medium_operators = {}
-        for patch in self.domains_iterator:
-            subdomain_patch = tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
-                                     patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j])
-                                     for j in range(self.n_dims)])
-            b_block = b[subdomain_patch]
-            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                self.medium_operators[patch] = lambda x, b_ = b_block: (b_ * x - self.scaling[(0, 0, 0)]**2 * self.wrap_corr(x))
-            else:
-                self.medium_operators[patch] = lambda x, b_ = b_block: b_ * x
-
+        self.medium_operators, self.propagator, self.scaling = self.make_operators(v_raw)
         self.s = np.squeeze(np.pad(self.s, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])), 
                                    mode='constant'))  # Pad the source term (scale later)
 
-    def make_v(self, v_raw):
-        """ Make the medium matrix, B = 1 - V """
-        # give tiny non-zero minimum value to prevent division by zero in homogeneous media
-        mu_min = ((10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
-                self.boundary_widths != 0).any() else self.check_input_len(0, 0)).astype(np.float32)
-        mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:self.n_dims]) * self.pixel_size)))
-        v_min = np.imag((self.k0 + 1j * np.max(mu_min)) ** 2)
-        self.v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
-        self.v0 = self.v0 + 1j * v_min
-        v = -1j * (v_raw - self.v0)
+    def make_operators(self, v_raw):
+        """ Make the medium (, wrapping correction,) and propagator operators """
+        # Make v
+        v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
+        v0 = v0 + 1j * self.v_min(v_raw)
+        self.v = -1j * (v_raw - v0)
 
-        return v
-
-    def make_propagator(self):
-        """ Make the propagator operator that does fast convolution with (l_p+1)^(-1) """
+        # Make the wrap_corr operator (If wrap_correction=True)
         d = self.domain_size[:self.n_dims]
-        self.omega = 2
+        self.omega = 2  # compute the fft over omega times the domain size
         if self.wrap_correction == 'L_omega':
             n_fft = d * self.omega
         else:
             n_fft = d
-
+        
         l_p = self.coordinates_f(n_fft)  # Fourier coordinates in n_dims
-
-        v = spdiags(self.v.ravel())
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             l_p_omega = self.coordinates_f(d*self.omega)
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
@@ -159,50 +125,53 @@ class HelmholtzBase:
                                               tuple([slice(0, d[i]) for i in range(self.n_dims)])]
                                               - ifftn(l_p * fftn(x)))
 
-            # Option 2. APPROXIMATE. Replacing (Lo-lw) with -lw, or even -np.real(lw) (because real(lw)>>imag(lw))
-            # wrap_corr = -1j * lw  # np.real(lw)
-
-            # Truncate the wrap-around correction to square blocks of side cp in the upper and lower triangular corners
-            # wrap_corr[:-self.cp, :-self.cp] = 0
-            # wrap_corr[self.cp:, self.cp:] = 0
-
-            v = v + full_matrix(self.wrap_corr, self.domain_size[:self.n_dims])
-
-        # Option 1: Uniform scaling across the full domain
-        # c = 0.95 / np.max(np.abs(self.v))
-        c = 0.95/spnorm(v, 2)
-        # print(f'scaling {c:.2e}')
+        # Compute (and apply to v) the scaling. Scaling computation includes wrap_corr if wrap_correction=True
         scaling = {}
         for patch in self.domains_iterator:
-            # Option 1: Uniform scaling across the full domain
-            scaling[patch] = c
-            # # Option 2: Different scaling for different subdomains
-            # scaling[patch] = (0.95 / max(np.max(np.abs(v_temp)), wrap_corr_norm))
+            patch_slice = self.patch_slice(patch)
 
-        # propagator: operator for fast convolution with (l_p+1)^-1
+            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+                v_corr = spdiags(self.v[patch_slice].ravel()) + full_matrix(self.wrap_corr, self.domain_size[:self.n_dims])
+            else:
+                v_corr = spdiags(self.v[patch_slice].ravel())
+            scaling[patch] = 0.95/spnorm(v_corr, 2)
 
-        # Option 1: Uniform scaling across the full domain
-        self.l_p = 1j * scaling[(0, 0, 0)] * (l_p - self.v0)  # Shift, scale, and multiply with 1j, l_p
-        l_inv = np.squeeze(1 / (self.l_p + 1))  # Invert (self.l_p + 1)
+            self.v[patch_slice] = scaling[patch] * self.v[patch_slice]
 
+        # Make medium operator(s)
+        b = 1 - self.v
+        b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, n_dims=self.n_dims)
+        medium_operators = {}
+        for patch in self.domains_iterator:
+            patch_slice = self.patch_slice(patch)
+            b_block = b[patch_slice]
+            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x - scaling[patch]**self.n_dims * self.wrap_corr(x))
+            else:
+                medium_operators[patch] = lambda x, b_ = b_block: b_ * x
+
+        # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
+        self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
         if self.wrap_correction == 'L_omega':
-            propagator = lambda x: (ifftn(l_inv * fftn(np.pad(x, (0, n_fft[0] - d[0])))))[
-                                    tuple([slice(0, d[i]) for i in range(self.n_dims)])]
+            propagator = lambda x, subdomain_scaling: (ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
+                                                       fftn(np.pad(x, (0, n_fft[0] - d[0])))))[
+                                                       tuple([slice(0, d[i]) for i in range(self.n_dims)])]
         else:
-            propagator = lambda x: ifftn(l_inv * fftn(x))
+            propagator = lambda x, subdomain_scaling: ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
+                                                                   fftn(x))
 
-        # # Option 2: Different scaling for different subdomains
-        # # Shift, and multiply with 1j, l_p (don't scale just yet. Scaling incorporated as an argument inside the
-        # # propagator operator definition)
-        # self.l_p = 1j * (l_p - self.v0)
-        # if self.wrap_correction == 'L_omega':
-        #     propagator = lambda x, subdomain_scaling: (ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
-        #                                                fftn(np.pad(x, (0, n_fft[0] - d[0])))))[
-        #                                                tuple([slice(0, d[i]) for i in range(self.n_dims)])]
-        # else:
-        #     propagator = lambda x, subdomain_scaling: ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
-        #                                                            fftn(x))
-        return scaling, propagator
+        return medium_operators, propagator, scaling
+
+    def v_min(self, v_raw):
+        # give tiny non-zero minimum value to prevent division by zero in homogeneous media
+        mu_min = ((10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
+                self.boundary_widths != 0).any() else self.check_input_len(0, 0)).astype(np.float32)
+        mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:self.n_dims]) * self.pixel_size)))
+        return np.imag((self.k0 + 1j * np.max(mu_min)) ** 2)
+    
+    def patch_slice(self, patch):
+        return tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
+                            patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j]) for j in range(self.n_dims)])
 
     def check_input_len(self, a, x):
         """ Convert 'a' to a 3-element numpy array, appropriately, i.e., either repeat, or add 0 or 1. """

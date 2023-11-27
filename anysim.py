@@ -15,7 +15,7 @@ class AnySim:
         self.state = State(self.base)
         self.state.init_norm = norm(np.sum(np.array([(self.extend(self.base.medium_operators[patch]
                                                                   (self.base.propagator(self.restrict(self.base.s,
-                                                                   patch))), patch))
+                                                                   patch), self.base.scaling[patch])), patch))
                                                      for patch in self.base.domains_iterator]), axis=0))
 
     def iterate(self):
@@ -37,7 +37,7 @@ class AnySim:
                 t1 = self.base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
                 # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
                 t1 = t1 - self.transfer_correction(patch, idx, u_dict)
-                t1 = self.base.propagator(t1)  # (L+1)^-1 t1
+                t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
                 t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
                 # # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
                 # t1 = t1 + self.transfer_correction(patch, idx, u_dict)
@@ -45,10 +45,8 @@ class AnySim:
 
                 u_dict[patch] = u_dict[patch] - (self.base.alpha * t1)  # update subdomain u
 
-                # find the slice of full domain u to update
-                patch_slice = tuple([slice(patch[j]*(self.base.domain_size[j]-self.base.overlap[j]),
-                                    patch[j]*(self.base.domain_size[j]-self.base.overlap[j])+self.base.domain_size[j])
-                                    for j in range(self.base.n_dims)])
+                # find the slice of full domain u and update
+                patch_slice = self.base.patch_slice(patch)
                 self.u[patch_slice] = u_dict[patch]
 
                 self.state.log_u_iter(self.u, patch)  # collect u updates (store separately subdomain-wise)

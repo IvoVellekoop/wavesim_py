@@ -1,5 +1,8 @@
 import pytest
 import numpy as np
+from scipy.sparse.linalg import norm as spnorm
+from scipy.sparse import diags as spdiags
+
 from helmholtzbase import HelmholtzBase
 from preprocess import full_matrix, relative_error
 
@@ -17,11 +20,11 @@ def test_accretive(n, boundary_widths, wrap_correction):
     d = base.domain_size[:base.n_dims]
     patch = (0, 0, 0)
     if wrap_correction == 'L_omega':
-        l_plus_1_operator = lambda x: (np.fft.ifftn((base.l_p + 1) *
+        l_plus_1_operator = lambda x: (np.fft.ifftn((base.scaling[patch] * base.l_p + 1) *
                                        np.fft.fftn(np.pad(x, (0, (d*base.omega)[0] - d[0])))))[
                                        tuple([slice(0, d[i]) for i in range(base.n_dims)])]
     else:
-        l_plus_1_operator = lambda x: np.fft.ifftn((base.l_p + 1) * np.fft.fftn(x))
+        l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
     l_plus_1 = full_matrix(l_plus_1_operator, d)
     b = full_matrix(base.medium_operators[patch], d)
     a = (l_plus_1 - b).todense()
@@ -31,19 +34,26 @@ def test_accretive(n, boundary_widths, wrap_correction):
     assert np.round(acc, 5) >= 0, f'a is not accretive. {acc}'
 
 
+@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
+                                                (np.ones((20, 20)), 0), (np.ones((10, 10)), 5),
+                                                (np.ones((5, 5, 5)), 0), (np.ones((5, 5, 5)), 1)])
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
-def test_contraction(wrap_correction):
+def test_contraction(n, boundary_widths, wrap_correction):
     """ Check that potential V is a contraction,
         i.e., the operator norm ||V|| < 1 """
-    n = np.ones((256, 1, 1), dtype=np.float32)
+    # n = np.ones((256, 1, 1))
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, source=source, wrap_correction=wrap_correction)
+    base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction=wrap_correction)
+    patch = (0, 0, 0)
     if wrap_correction == 'wrap_corr':
         wrap_operator = lambda x: base.scaling[(0, 0, 0)] * base.wrap_corr(x)
-        vc = np.linalg.norm(np.diag(base.v) + full_matrix(wrap_operator, base.domain_size[:base.n_dims]), 2)
+        vc = spnorm(spdiags(base.v.ravel()) + full_matrix(wrap_operator, base.domain_size[:base.n_dims]), 2)
     else:
-        vc = np.max(np.abs(base.v))
+        # vc = np.max(np.abs(base.v))
+        v_mat = (full_matrix(base.medium_operators[patch], base.domain_size[:base.n_dims]) 
+                - spdiags(np.ones(np.prod(base.domain_size[:base.n_dims]))))
+        vc = spnorm(v_mat, 2)
     print(f'vc {vc:.2e}')
     assert vc < 1, f'||V|| not < 1, but {vc}'
 
@@ -59,7 +69,7 @@ def test_compare_A(n, boundary_widths):
     base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='wrap_corr')
     d = base_w.domain_size[:base_w.n_dims]
     patch = (0, 0, 0)
-    l_w_operator = lambda x: np.fft.ifftn((base_w.l_p) * np.fft.fftn(x))
+    l_w_operator = lambda x: np.fft.ifftn((base_w.scaling[patch] * base_w.l_p) * np.fft.fftn(x))
     l_w = full_matrix(l_w_operator, d)
     # b_w = full_matrix(base_w.medium_operators[patch], d)
     wrap_operator = lambda x: base_w.scaling[patch] * base_w.wrap_corr(x)
@@ -68,7 +78,7 @@ def test_compare_A(n, boundary_widths):
 
     base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')    
     n_ = (base_o.domain_size[:base_o.n_dims]).astype(int)
-    l_o_operator = lambda x: (np.fft.ifftn((base_o.l_p) *
+    l_o_operator = lambda x: (np.fft.ifftn((base_o.scaling[patch] * base_o.l_p) *
                                      np.fft.fftn(np.pad(x, (0, (n_*base_o.omega)[0] - n_[0])))))[
                                      tuple([slice(0, n_[i]) for i in range(base_o.n_dims)])]
     l_o = full_matrix(l_o_operator, d)
@@ -77,7 +87,7 @@ def test_compare_A(n, boundary_widths):
     a_o = (l_o + v_o)/base_o.scaling[patch]
 
     # base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction=None)
-    # l_plus_1_operator = lambda x: np.fft.ifftn((base.l_p + 1) * np.fft.fftn(x))
+    # l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
     # l_plus_1 = full_matrix(l_plus_1_operator, d)
     # b = full_matrix(base.medium_operators[patch], d)
     # a = (l_plus_1 - b)/base.scaling[patch]

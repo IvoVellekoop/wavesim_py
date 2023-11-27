@@ -1,5 +1,6 @@
 from helmholtzbase import HelmholtzBase
 from state import State
+from preprocess import relative_error
 
 import os
 import numpy as np
@@ -12,11 +13,6 @@ font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial',
         'size': 12}  # 8-10 pt
 rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
-
-
-def relative_error(e, e_true):
-    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
-    return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
 
 
 class LogPlot:

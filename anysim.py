@@ -5,10 +5,6 @@ from helmholtzbase import HelmholtzBase
 from state import State
 
 
-def overlap_decay(x):
-    return np.interp(np.arange(x), [0, x - 1], [0, 1])
-
-
 class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
@@ -19,7 +15,7 @@ class AnySim:
         self.state = State(self.base)
         self.state.init_norm = norm(np.sum(np.array([(self.extend(self.base.medium_operators[patch]
                                                                   (self.base.propagator(self.restrict(self.base.s,
-                                                                   patch), self.base.scaling[patch])), patch))
+                                                                   patch))), patch))
                                                      for patch in self.base.domains_iterator]), axis=0))
 
     def iterate(self):
@@ -28,7 +24,7 @@ class AnySim:
         u_dict = defaultdict(list)  # Empty dict of lists to store u's in each patch
         for patch in self.base.domains_iterator:
             # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
-            s_dict[patch] = self.base.Tl[patch] * self.restrict(self.base.s, patch)
+            s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.restrict(self.base.s, patch)
             # restrict full-domain field u to the patch subdomain
             u_dict[patch] = self.restrict(self.u, patch)
 
@@ -41,7 +37,7 @@ class AnySim:
                 t1 = self.base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
                 # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
                 t1 = t1 - self.transfer_correction(patch, idx, u_dict)
-                t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
+                t1 = self.base.propagator(t1)  # (L+1)^-1 t1
                 t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
                 # # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
                 # t1 = t1 + self.transfer_correction(patch, idx, u_dict)

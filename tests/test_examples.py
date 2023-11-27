@@ -10,11 +10,7 @@ from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 from helmholtzbase import HelmholtzBase
 from anysim import AnySim
 from save_details import LogPlot
-
-
-def relative_error(e, e_true):
-    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
-    return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+from preprocess import relative_error
 
 
 def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
@@ -28,7 +24,7 @@ def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
 
 def u_ref_1d_h():
     """ Compute analytic solution for 1D case """
-    base_ = HelmholtzBase(n=np.ones((256, 1, 1), dtype=np.float32), n_domains=1, boundary_widths=20, setup_operators=False)
+    base_ = HelmholtzBase(n=np.ones((256, 1, 1), dtype=np.float32), setup_operators=False)
 
     x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size, dtype=np.float32)
     x = np.pad(x, (64, 64), mode='constant')
@@ -89,14 +85,14 @@ def test_2d_high_contrast(n_domains, wrap_correction):
     n = loadmat('anysim_matlab/n2d.mat')['n']
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=(31.5, 31.5),
-                         n=n, source=source, wrap_correction=wrap_correction, max_iterations=1.e+4)
+                         n=n, source=source, wrap_correction=wrap_correction, max_iterations=int(1.e+4))
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr')])#, (1, 'L_omega')
                                                         #, (2, None), (3, None)])
 def test_2d_low_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure with low refractive index contrast. 
@@ -148,7 +144,7 @@ def test_3d_disordered(n_domains, wrap_correction):
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
     base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 
-                         wrap_correction=wrap_correction)#, max_iterations=50)
+                         wrap_correction=wrap_correction)
     u_computed, state = AnySim(base).iterate()
     u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

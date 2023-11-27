@@ -26,7 +26,7 @@ class State(object):
 
     def log_u_iter(self, u, patch):
         """ Collect u_iter after rescaling and cropping to ROI"""
-        u = self.base.Tr[patch] * u[self.base.crop2roi]  # Crop u to ROI and rescale
+        u = np.sqrt(self.base.scaling[patch]) * u[self.base.crop2roi]  # Crop u to ROI and rescale
 
         # Collect u_iter 
         # mainly for plotting animation, so process accordingly:
@@ -56,7 +56,7 @@ class State(object):
             current_patch = tuple([slice(patch[j]*(self.base.domain_size[j]-self.base.overlap[j]),
                                    patch[j]*(self.base.domain_size[j]-self.base.overlap[j])+self.base.domain_size[j])
                                    for j in range(self.base.n_dims)])
-            u[current_patch] = self.base.Tr[patch] * u[current_patch]  # rescale u
+            u[current_patch] = np.sqrt(self.base.scaling[patch]) * u[current_patch]  # rescale u
         u = u[self.base.crop2roi]  # Crop u to ROI
 
         # convert residuals to arrays and reshape if needed

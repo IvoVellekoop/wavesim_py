@@ -3,7 +3,7 @@ import numpy as np
 from scipy.fft import fftn, ifftn, fftfreq
 from scipy.sparse import diags as spdiags
 from scipy.sparse.linalg import norm as spnorm
-from preprocess import *
+from utilities import *
 
 
 class HelmholtzBase:
@@ -150,6 +150,12 @@ class HelmholtzBase:
             else:
                 medium_operators[patch] = lambda x, b_ = b_block: b_ * x
 
+        # # Transfer the one-sided wrap-around artefacts from one subdomain to another
+        # # apply subdomain_scaling => scaling[patch] later
+        # if self.total_domains > 1:
+        #     wrap_transfer = 1j * self.l_fft_operator(omega=20, truncate_to=2)[:self.fft_size,
+        #                                                                       self.fft_size:2*self.fft_size]
+
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
         if self.wrap_correction == 'L_omega':
@@ -214,3 +220,49 @@ class HelmholtzBase:
             l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
                 (2 * np.pi * fftfreq(n_fft[d], self.pixel_size)) ** 2, axis=0).astype(np.complex64)
         return l_p
+
+    def l_fft_operator(self, omega=1, truncate_to=1):
+        """ Make the operator that does fast convolution with L
+        :param omega: Do the fast convolution over a domain size (omega) times (fft_size).
+                      Default: omega=1, i.e., gives wrap-around artefacts.
+        :param truncate_to: To truncate to (truncate_to) times (fft_size). Must be <= omega.
+                  Default truncate_to=1, i.e., truncate to original domain size
+        :return:
+        """
+        fft_size = self.domain_size[0]
+        n = omega * fft_size
+        f = np.array(dft(n))
+        finv = np.conj(f).T/n
+        l_p = ((2 * np.pi * fftfreq(n, self.pixel_size)) ** 2)
+        if omega > 1:
+            m = truncate_to * fft_size
+            trunc = np.zeros((m, n))
+            trunc[:, :m] = np.eye(m)
+            l_fft = trunc @ finv @ np.diag(l_p.ravel()) @ f @ trunc.T
+        else:
+            l_fft = finv @ np.diag(l_p.ravel()) @ f
+        return l_fft.astype(np.complex64)
+
+    def dot_ndim(self, x, y):  # np.einsum useful for this? https://stackoverflow.com/a/48290839/14384909
+        """ np.dot(x, y) over all axes of x.
+        y is a 2-D array for fast-convolution or related operations that need to be applied to every axis of x """
+        for i in range(self.n_dims):
+            x = np.moveaxis(x, i, -1)  # Transpose
+            x = np.dot(x, y)
+            x = np.moveaxis(x, -1, i)  # Transpose back
+        return x.astype(np.complex64)
+
+    def transfer(self, x, subdomain_scaling, patch_shift):
+        if patch_shift == -1:
+            return self.dot_ndim(x, subdomain_scaling * self.wrap_transfer)
+            # return self.dot_ndim(x, self.wrap_transfer)
+        elif patch_shift == +1:
+            return self.dot_ndim(x, subdomain_scaling * np.flip(self.wrap_transfer))
+            # return self.dot_ndim(x, np.flip(self.wrap_transfer))
+
+
+# n = np.ones((90, 90, 1), dtype=np.float32)
+# source = np.zeros_like(n)
+# source[0] = 1.
+# base = HelmholtzBase(n=n, source=source, boundary_widths=5, wrap_correction='wrap_corr')
+# print('Done.')

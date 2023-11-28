@@ -1,6 +1,6 @@
 from helmholtzbase import HelmholtzBase
 from state import State
-from preprocess import relative_error
+from utilities import relative_error
 
 import os
 import numpy as np

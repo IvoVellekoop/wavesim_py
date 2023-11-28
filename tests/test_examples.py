@@ -10,7 +10,7 @@ from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 from helmholtzbase import HelmholtzBase
 from anysim import AnySim
 from save_details import LogPlot
-from preprocess import relative_error
+from utilities import relative_error
 
 
 def compare(base: HelmholtzBase, u_computed, u_reference, threshold):

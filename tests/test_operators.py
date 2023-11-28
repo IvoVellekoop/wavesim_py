@@ -4,7 +4,7 @@ from scipy.sparse.linalg import norm as spnorm
 from scipy.sparse import diags as spdiags
 
 from helmholtzbase import HelmholtzBase
-from preprocess import full_matrix, relative_error
+from utilities import full_matrix, relative_error
 
 
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 

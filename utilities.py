@@ -36,6 +36,7 @@ def full_matrix(operator, d):
 
 
 def overlap_decay(x):
+    """ Linear decay from 0 to 1 of size x """
     return np.interp(np.arange(x), [0, x - 1], [0, 1])
 
 

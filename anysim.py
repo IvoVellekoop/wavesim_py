@@ -94,6 +94,7 @@ class AnySim:
         return x.astype(np.complex64)
 
     def transfer_correction(self, current_patch, idx, x):
+        """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain """
         x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
         for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain
             if 0 <= idx + idx_shift < len(self.base.domains_iterator):

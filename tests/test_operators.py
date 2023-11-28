@@ -52,7 +52,7 @@ def test_contraction(n, boundary_widths, wrap_correction):
     else:
         # vc = np.max(np.abs(base.v))
         v_mat = (full_matrix(base.medium_operators[patch], base.domain_size[:base.n_dims]) 
-                - spdiags(np.ones(np.prod(base.domain_size[:base.n_dims]))))
+                 - spdiags(np.ones(np.prod(base.domain_size[:base.n_dims]))))
         vc = spnorm(v_mat, 2)
     print(f'vc {vc:.2e}')
     assert vc < 1, f'||V|| not < 1, but {vc}'
@@ -79,8 +79,8 @@ def test_compare_A(n, boundary_widths):
     base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')    
     n_ = (base_o.domain_size[:base_o.n_dims]).astype(int)
     l_o_operator = lambda x: (np.fft.ifftn((base_o.scaling[patch] * base_o.l_p) *
-                                     np.fft.fftn(np.pad(x, (0, (n_*base_o.omega)[0] - n_[0])))))[
-                                     tuple([slice(0, n_[i]) for i in range(base_o.n_dims)])]
+                                           np.fft.fftn(np.pad(x, (0, (n_*base_o.omega)[0] - n_[0])))))[
+                                           tuple([slice(0, n_[i]) for i in range(base_o.n_dims)])]
     l_o = full_matrix(l_o_operator, d)
     # b_o = full_matrix(base_o.medium_operators[patch], d)
     v_o = np.diag(base_o.v.ravel())

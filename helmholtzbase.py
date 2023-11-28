@@ -1,5 +1,6 @@
 from itertools import product
 import numpy as np
+from scipy.linalg import dft
 from scipy.fft import fftn, ifftn, fftfreq
 from scipy.sparse import diags as spdiags
 from scipy.sparse.linalg import norm as spnorm
@@ -62,10 +63,11 @@ class HelmholtzBase:
         self.v = None
         self.fft_size = None
         self.omega = None
+        self.medium_operators = None
+        self.propagator = None
         self.scaling = None
         self.wrap_corr = None
         self.l_p = None
-        self.propagator = None
 
         self.crop2roi = tuple([slice(self.boundary_pre[i], -self.boundary_post[i])
                                for i in range(self.n_dims)])  # crop array from n_ext to n_roi
@@ -94,7 +96,7 @@ class HelmholtzBase:
                 f'Decomposing into {self.n_domains} domains of size {self.domain_size}, overlap {self.overlap}')
 
     def initialize(self):
-        """ Get (1) Medium b = 1 - v and (2) Propagator (L+1)^(-1) operators, and (3) pad and scale source """
+        """ Get (1) Medium b = 1 - v - corrections and (2) Propagator (L+1)^(-1) operators, and (3) pad source """
         v_raw = self.k0 ** 2 * self.n ** 2
         v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])),
                                   mode='edge'))
@@ -103,7 +105,7 @@ class HelmholtzBase:
                                    mode='constant'))  # Pad the source term (scale later)
 
     def make_operators(self, v_raw):
-        """ Make the medium (, wrapping correction,) and propagator operators """
+        """ Make the medium (, wrapping correction) and propagator operators """
         # Make v
         v0 = (np.max(np.real(v_raw)) + np.min(np.real(v_raw))) / 2
         v0 = v0 + 1j * self.v_min(v_raw)
@@ -121,9 +123,9 @@ class HelmholtzBase:
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             l_p_omega = self.coordinates_f(d*self.omega)
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
-            self.wrap_corr = lambda x: 1j * ((ifftn(l_p_omega * fftn(np.pad(x, (0, (d*self.omega)[0] - d[0])))))[
-                                              tuple([slice(0, d[i]) for i in range(self.n_dims)])]
-                                              - ifftn(l_p * fftn(x)))
+            self.wrap_corr = lambda x: 1j * ((ifftn(l_p_omega * fftn(np.pad(x, (0, (self.omega-1)*d[0])))))[
+                                             tuple([slice(0, d[i]) for i in range(self.n_dims)])]
+                                             - ifftn(l_p * fftn(x)))
 
         # Compute (and apply to v) the scaling. Scaling computation includes wrap_corr if wrap_correction=True
         scaling = {}
@@ -131,7 +133,8 @@ class HelmholtzBase:
             patch_slice = self.patch_slice(patch)
 
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                v_corr = spdiags(self.v[patch_slice].ravel()) + full_matrix(self.wrap_corr, self.domain_size[:self.n_dims])
+                v_corr = spdiags(self.v[patch_slice].ravel()) + full_matrix(self.wrap_corr,
+                                                                            self.domain_size[:self.n_dims])
             else:
                 v_corr = spdiags(self.v[patch_slice].ravel())
             scaling[patch] = 0.95/spnorm(v_corr, 2)
@@ -146,7 +149,8 @@ class HelmholtzBase:
             patch_slice = self.patch_slice(patch)
             b_block = b[patch_slice]
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x - scaling[patch]**self.n_dims * self.wrap_corr(x))
+                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x
+                                                                   - scaling[patch]**self.n_dims * self.wrap_corr(x))
             else:
                 medium_operators[patch] = lambda x, b_ = b_block: b_ * x
 
@@ -164,20 +168,22 @@ class HelmholtzBase:
                                                        tuple([slice(0, d[i]) for i in range(self.n_dims)])]
         else:
             propagator = lambda x, subdomain_scaling: ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
-                                                                   fftn(x))
+                                                            fftn(x))
 
         return medium_operators, propagator, scaling
 
     def v_min(self, v_raw):
-        # give tiny non-zero minimum value to prevent division by zero in homogeneous media
+        """ give tiny non-zero minimum value to prevent division by zero in homogeneous media """
         mu_min = ((10.0 / (self.boundary_widths[:self.n_dims] * self.pixel_size)) if (
                 self.boundary_widths != 0).any() else self.check_input_len(0, 0)).astype(np.float32)
         mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:self.n_dims]) * self.pixel_size)))
         return np.imag((self.k0 + 1j * np.max(mu_min)) ** 2)
     
     def patch_slice(self, patch):
+        """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
         return tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
-                            patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j]) for j in range(self.n_dims)])
+                            patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j]) for
+                      j in range(self.n_dims)])
 
     def check_input_len(self, a, x):
         """ Convert 'a' to a 3-element numpy array, appropriately, i.e., either repeat, or add 0 or 1. """

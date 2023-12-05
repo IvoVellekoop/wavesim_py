@@ -16,9 +16,9 @@ class State(object):
         self.start_time = time.time()
         self.sim_time = 0
 
-    def log_subdomain_residual(self, residual_s, j):
+    def log_subdomain_residual(self, residual_s, patch):
         """ Normalize subdomain residual wrt preconditioned source """
-        self.subdomain_residuals[j].append((residual_s/self.init_norm).astype(np.float32))
+        self.subdomain_residuals[patch].append((residual_s/self.init_norm).astype(np.float32))
 
     def log_full_residual(self, residual_f):
         """ Normalize full domain residual wrt preconditioned source """

@@ -16,6 +16,13 @@ def check_input_dims(a):
     return a
 
 
+def dft_matrix(N):
+    """ Create a discrete Fourier transform matrix. Faster than scipy dft function """
+    r = np.arange(N)
+    omega = np.exp((-2 * np.pi * 1j) / N)  # remove the '-' for inverse fourier
+    return np.vander(omega ** r, increasing=True)  # faster than meshgrid
+
+
 def full_matrix(operator, d):
     """ Converts operator to an 2D square matrix of size d.
     (operator should be a function taking a single column vector as input?) """
@@ -28,7 +35,7 @@ def full_matrix(operator, d):
     b[0] = 1
     # b_[0] = 1
     for i in range(nf):
-        print(f'{i}.', end='\r')
+        # print(f'{i}.', end='\r')
         m[:, i] = np.reshape(operator(np.reshape(b, shape)), (-1,))
         b = np.roll(b, (1, 0), axis=(0, 1))
         # b_.indices = (b_.indices+1)%b.shape[0]

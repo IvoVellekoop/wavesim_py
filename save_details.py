@@ -55,6 +55,8 @@ class LogPlot:
         self.run_id += '_n_domains' + str(self.base.n_domains)
 
         self.stats_file_name = self.run_loc + '_stats.txt'
+        # u_file_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_u'
+        # np.save(u_file_name, self.u_computed)
 
         if hasattr(self, 'u_reference'):
             self.label = 'Reference solution'
@@ -127,9 +129,9 @@ class LogPlot:
                 x=(self.base.domain_size[0]-self.base.boundary_widths[0])*self.base.pixel_size,
                 c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.base.total_domains - 1):
-                plt_common.axvline(
-                    x=((i + 1) * (self.base.domain_size[0] - self.base.overlap[0]) - self.base.boundary_widths[
-                        0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
+                # plt_common.axvline(
+                #     x=((i + 1) * (self.base.domain_size[0] - self.base.overlap[0]) - self.base.boundary_widths[
+                #         0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
                 plt_common.axvline(x=(i * (self.base.domain_size[0] - self.base.overlap[0]) + self.base.domain_size[0] -
                                       self.base.boundary_widths[0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_reference'):
@@ -150,8 +152,11 @@ class LogPlot:
         if hasattr(self, 'u_reference'):
             plt.plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
             title += f' (Relative Error = {self.rel_err:.2e})'
+        # plt.axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
+        # plt.axvspan(99*self.base.pixel_size, 130*self.base.pixel_size, facecolor='lightblue', alpha=0.5, label='n=1.5')
+        # plt.axvspan(130*self.base.pixel_size, 400*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
         plt.title(title)
-        plt.legend(ncols=2, framealpha=0.6)
+        plt.legend(ncols=2, framealpha=0.8)
 
         plt.subplot(2, 1, 2)
         res_plots = plt.loglog(np.arange(1, self.state.iterations+1),

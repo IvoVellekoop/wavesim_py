@@ -39,22 +39,22 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
-                                                        # , (2, None), (3, None), (4, None), (5, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')
+                                                        , (2, None), (3, None), (4, None), (5, None)])
 def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
     n = np.ones((256, 1, 1), dtype=np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, n_domains=n_domains, source=source, wrap_correction=wrap_correction)
+    base = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=10, source=source, wrap_correction=wrap_correction)
     u_computed, state = AnySim(base).iterate()
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
-                                                        # , (2, None), (3, None), (4, None), (5, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')
+                                                        , (2, None), (3, None), (4, None), (5, None)])
 def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1), dtype=np.float32)

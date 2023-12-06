@@ -18,7 +18,7 @@ class HelmholtzBase:
                  overlap=0,  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  cp=20,  # Corner points to include in case of 'wrap_corr' wrap-around correction
-                 max_iterations=int(1.e+4),  # Maximum number iterations
+                 max_iterations=int(3.e+4),  # Maximum number iterations
                  setup_operators=True):  # Set up medium and propagator operators
 
         self.n = check_input_dims(n)
@@ -112,15 +112,15 @@ class HelmholtzBase:
 
         # Make the wrap_corr operator (If wrap_correction=True)
         d = self.domain_size[:self.n_dims]
-        self.omega = 2  # compute the fft over omega times the domain size
+        self.omega = 10  # compute the fft over omega times the domain size
         if self.wrap_correction == 'L_omega':
             n_fft = d * self.omega
         else:
             n_fft = d
         
-        l_p = self.coordinates_f(n_fft)  # Fourier coordinates in n_dims
+        l_p = self.coordinates_f(n_fft, self.n_dims, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-            l_p_omega = self.coordinates_f(d*self.omega)
+            l_p_omega = self.coordinates_f(d*self.omega, self.n_dims, self.pixel_size)
             # Option 1. EXACT. Using (Lo-lw) as the wrap-around correction
             self.wrap_corr = lambda x: 1j * ((ifftn(l_p_omega * fftn(np.pad(x, (0, (self.omega-1)*d[0])))))[
                                              tuple([slice(0, d[i]) for i in range(self.n_dims)])]
@@ -158,7 +158,8 @@ class HelmholtzBase:
         # apply subdomain_scaling => scaling[patch] later
         if self.total_domains > 1:
             fft_size = self.domain_size[0]
-            self.wrap_transfer = 1j * self.l_fft_matrix(omega=20, truncate_to=2)[:fft_size, fft_size:2*fft_size]
+            self.wrap_transfer = 1j * self.l_fft_matrix(self.domain_size, omega=20, truncate_to=2, 
+                                                        pixel_size=self.pixel_size)[:fft_size, fft_size:2*fft_size]
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
@@ -219,62 +220,65 @@ class HelmholtzBase:
             self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
-    def coordinates_f(self, n_fft):
+    @staticmethod
+    def coordinates_f(n_fft, n_dims, pixel_size=1):
         """ Fourier space coordinates for given size, spacing, and dimensions """
-        l_p = ((2 * np.pi * fftfreq(n_fft[0], self.pixel_size)) ** 2).astype(np.complex64)
-        for d in range(1, self.n_dims):
+        l_p = ((2 * np.pi * fftfreq(n_fft[0], pixel_size)) ** 2).astype(np.complex64)
+        for d in range(1, n_dims):
             l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
-                (2 * np.pi * fftfreq(n_fft[d], self.pixel_size)) ** 2, axis=0).astype(np.complex64)
+                (2 * np.pi * fftfreq(n_fft[d], pixel_size)) ** 2, axis=0).astype(np.complex64)
         return l_p
 
-    def l_fft_matrix(self, omega=1, truncate_to=1):
+    @staticmethod
+    def l_fft_matrix(domain_size, omega=1, truncate_to=1, pixel_size=1):
         """ Make the operator that does fast convolution with L
-        :param omega: Do the fast convolution over a domain size (omega) times (fft_size).
+        :param omega: Do the fast convolution over a domain size (omega) times (domain_size).
                       Default: omega=1, i.e., gives wrap-around artefacts.
-        :param truncate_to: To truncate to (truncate_to) times (fft_size). Must be <= omega.
+        :param truncate_to: To truncate to (truncate_to) times (domain_size). Must be <= omega.
                   Default truncate_to=1, i.e., truncate to original domain size
         :return:
         """
-        fft_size = self.domain_size[0]
-        n = omega * fft_size
-        l_p = ((2 * np.pi * fftfreq(n, self.pixel_size)) ** 2)
-        f = dft_matrix(n) # np.array(dft(n))
-        finv = np.conj(f).T/n
+        n = omega * domain_size
+        l_p = ((2 * np.pi * fftfreq(n[0], pixel_size)) ** 2)
+        f = dft_matrix(n[0])
+        finv = np.conj(f).T/n[0]
         if omega > 1:
-            m = truncate_to * fft_size
-            trunc = np.zeros((m, n))
+            m = truncate_to * domain_size[0]
+            trunc = np.zeros((m, n[0]))
             trunc[:, :m] = np.eye(m)
             l_fft = trunc @ finv @ np.diag(l_p.ravel()) @ f @ trunc.T
         else:
             l_fft = finv @ np.diag(l_p.ravel()) @ f
         return l_fft.astype(np.complex64)
 
+    @staticmethod
     def l_fft_operator(self, omega=1, truncate_to=1):
         """ Make the operator that does fast convolution with L
-        :param omega: Do the fast convolution over a domain size (omega) times (fft_size).
+        :param omega: Do the fast convolution over a domain size (omega) times (domain_size).
                       Default: omega=1, i.e., gives wrap-around artefacts.
-        :param truncate_to: To truncate to (truncate_to) times (fft_size). Must be <= omega.
+        :param truncate_to: To truncate to (truncate_to) times (domain_size). Must be <= omega.
                   Default truncate_to=1, i.e., truncate to original domain size
         :return:
         """
-        fft_size = self.domain_size
-        n = omega * fft_size
-        l_p = self.coordinates_f(n)
+        d = self.n_dims
+        n = omega * self.domain_size
+        l_p = self.coordinates_f(n, d, self.pixel_size)
         f = dft_matrix(n[0])
         finv = np.conj(f).T/n[0]
         if omega > 1:
-            m = truncate_to * fft_size[0]
+            m = truncate_to * self.domain_size[0]
             trunc = np.zeros((m, n[0]))
             trunc[:, :m] = np.eye(m)
-            l_fft = lambda x: self.dot_ndim(self.dot_ndim(l_p * self.dot_ndim(self.dot_ndim(x, trunc), f), finv), trunc.T)
+            l_fft = lambda x: self.dot_ndim(self.dot_ndim(l_p * self.dot_ndim(self.dot_ndim(x, trunc, d), f, d), finv, d), trunc.T, d)
         else:
-            l_fft = lambda x: self.dot_ndim(l_p * self.dot_ndim(x, f), finv)
+            l_fft = lambda x: self.dot_ndim(l_p * self.dot_ndim(x, f, d), finv, d)
         return l_fft
 
-    def dot_ndim(self, x, y):  # np.einsum useful for this? https://stackoverflow.com/a/48290839/14384909
+    @staticmethod
+    def dot_ndim(x, y, n_dims):  # np.einsum useful for this? https://stackoverflow.com/a/48290839/14384909
         """ np.dot(x, y) over all axes of x.
         y is a 2-D array for fast-convolution or related operations that need to be applied to every axis of x """
-        for i in range(self.n_dims):
+        for i in range(n_dims):
             x = np.moveaxis(x, i, -1)  # Transpose
             x = np.dot(x, y)
             x = np.moveaxis(x, -1, i)  # Transpose back
@@ -282,15 +286,15 @@ class HelmholtzBase:
 
     def transfer(self, x, subdomain_scaling, patch_shift):
         if patch_shift == -1:
-            return self.dot_ndim(x, subdomain_scaling * self.wrap_transfer)
+            return self.dot_ndim(x, subdomain_scaling * self.wrap_transfer, self.n_dims)
             # return self.dot_ndim(x, self.wrap_transfer)
         elif patch_shift == +1:
-            return self.dot_ndim(x, subdomain_scaling * np.flip(self.wrap_transfer))
+            return self.dot_ndim(x, subdomain_scaling * np.flip(self.wrap_transfer), self.n_dims)
             # return self.dot_ndim(x, np.flip(self.wrap_transfer))
 
 
-# n = np.ones((40, 1, 1), dtype=np.float32)
+# n = np.ones((40, 40, 1), dtype=np.float32)
 # source = np.zeros_like(n)
 # source[0] = 1.
-# base = HelmholtzBase(n=n, source=source, n_domains=2, boundary_widths=5, wrap_correction='wrap_corr')
+# base = HelmholtzBase(n=n, source=source, n_domains=1, boundary_widths=5, wrap_correction='wrap_corr')
 # print('Done.')

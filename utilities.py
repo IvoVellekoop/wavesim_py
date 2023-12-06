@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import dok_matrix
 import matplotlib
-matplotlib.use("TkAgg")
+# matplotlib.use("TkAgg")
 
 
 def boundary_(x):
@@ -28,17 +28,14 @@ def full_matrix(operator, d):
     (operator should be a function taking a single column vector as input?) """
     shape = list(d)
     nf = np.prod(d)
-    # m = np.zeros((nf, nf), dtype=np.complex64)
-    b = np.zeros((nf, 1), dtype=np.complex64)
     m = dok_matrix((nf, nf), dtype=np.complex64)
-    # b_ = csr_matrix(([1], ([0],[0])), shape=(nf, 1), dtype=np.complex64)
+    b = np.zeros((nf, 1), dtype=np.complex64)
+    # b = csr_matrix(([1], ([0],[0])), shape=(nf, 1), dtype=np.complex64)
     b[0] = 1
-    # b_[0] = 1
     for i in range(nf):
-        # print(f'{i}.', end='\r')
         m[:, i] = np.reshape(operator(np.reshape(b, shape)), (-1,))
         b = np.roll(b, (1, 0), axis=(0, 1))
-        # b_.indices = (b_.indices+1)%b.shape[0]
+        # b.indices = (b.indices+1)%b.shape[0]
     return m
 
 

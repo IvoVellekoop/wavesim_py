@@ -55,8 +55,6 @@ class LogPlot:
         self.run_id += '_n_domains' + str(self.base.n_domains)
 
         self.stats_file_name = self.run_loc + '_stats.txt'
-        # u_file_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_u'
-        # np.save(u_file_name, self.u_computed)
 
         if hasattr(self, 'u_reference'):
             self.label = 'Reference solution'
@@ -88,10 +86,9 @@ class LogPlot:
         save_string = (f'n_dims {self.base.n_dims}; boundaries width {self.base.boundary_widths}; '
                        + f'n_domains {self.base.n_domains}; overlap {self.base.overlap}')
         if self.base.wrap_correction:
-            save_string += f'; {self.base.wrap_correction}; corner points {self.base.cp}'
+            save_string += f'; {self.base.wrap_correction}; n_correction {self.base.n_correction}'
         save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
                         + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
-        # if hasattr(self, 'rel_err'):
         if self.rel_err:
             save_string += f'; relative error {self.rel_err:>2.2e}'
         save_string += f' \n'
@@ -129,9 +126,6 @@ class LogPlot:
                 x=(self.base.domain_size[0]-self.base.boundary_widths[0])*self.base.pixel_size,
                 c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.base.total_domains - 1):
-                # plt_common.axvline(
-                #     x=((i + 1) * (self.base.domain_size[0] - self.base.overlap[0]) - self.base.boundary_widths[
-                #         0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
                 plt_common.axvline(x=(i * (self.base.domain_size[0] - self.base.overlap[0]) + self.base.domain_size[0] -
                                       self.base.boundary_widths[0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_reference'):
@@ -153,8 +147,6 @@ class LogPlot:
             plt.plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
             title += f' (Relative Error = {self.rel_err:.2e})'
         # plt.axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
-        # plt.axvspan(99*self.base.pixel_size, 130*self.base.pixel_size, facecolor='lightblue', alpha=0.5, label='n=1.5')
-        # plt.axvspan(130*self.base.pixel_size, 400*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
         plt.title(title)
         plt.legend(ncols=2, framealpha=0.8)
 
@@ -185,7 +177,7 @@ class LogPlot:
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual'
         if self.base.wrap_correction == 'wrap_corr':
-            fig_name += f'_cp{self.base.cp}'
+            fig_name += f'{self.base.n_correction}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
@@ -225,7 +217,7 @@ class LogPlot:
         writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
         if self.base.wrap_correction == 'wrap_corr':
-            ani_name += f'_cp{self.base.cp}'
+            ani_name += f'{self.base.n_correction}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
         plt.close('all')
@@ -296,7 +288,7 @@ class LogPlot:
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual_{z_slice}'
         if self.base.wrap_correction == 'wrap_corr':
-            fig_name += f'_cp{self.base.cp}'
+            fig_name += f'{self.base.n_correction}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
@@ -385,7 +377,7 @@ class LogPlot:
         if self.base.n_dims == 3:
             ani_name += f'_zslice{z_slice}'
         if self.base.wrap_correction == 'wrap_corr':
-            ani_name += f'_cp{self.base.cp}'
+            ani_name += f'{self.base.n_correction}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
         plt.close('all')

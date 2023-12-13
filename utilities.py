@@ -1,7 +1,5 @@
 import numpy as np
 from scipy.sparse import dok_matrix
-import matplotlib
-# matplotlib.use("TkAgg")
 
 
 def boundary_(x):
@@ -16,27 +14,39 @@ def check_input_dims(a):
     return a
 
 
-def dft_matrix(N):
+def dft_matrix(n):
     """ Create a discrete Fourier transform matrix. Faster than scipy dft function """
-    r = np.arange(N)
-    omega = np.exp((-2 * np.pi * 1j) / N)  # remove the '-' for inverse fourier
-    return np.vander(omega ** r, increasing=True)  # faster than meshgrid
+    r = np.arange(n)
+    omega = np.exp((-2 * np.pi * 1j) / n)  # remove the '-' for inverse fourier
+    return np.vander(omega ** r, increasing=True).astype(np.complex64)  # faster than meshgrid
 
 
 def full_matrix(operator, d):
     """ Converts operator to an 2D square matrix of size d.
     (operator should be a function taking a single column vector as input?) """
-    shape = list(d)
     nf = np.prod(d)
     m = dok_matrix((nf, nf), dtype=np.complex64)
-    b = np.zeros((nf, 1), dtype=np.complex64)
-    # b = csr_matrix(([1], ([0],[0])), shape=(nf, 1), dtype=np.complex64)
-    b[0] = 1
+    b = np.zeros(d, dtype=np.complex64)
+    b[*(0,)*b.ndim] = 1
     for i in range(nf):
-        m[:, i] = np.reshape(operator(np.reshape(b, shape)), (-1,))
-        b = np.roll(b, (1, 0), axis=(0, 1))
-        # b.indices = (b.indices+1)%b.shape[0]
+        m[:, i] = operator(np.roll(b, i)).ravel()
     return m
+
+
+# def full_matrix(operator, d):
+#     """ Converts operator to an 2D square matrix of size d.
+#     (operator should be a function taking a single column vector as input?) """
+#     shape = list(d)
+#     nf = np.prod(d)
+#     m = dok_matrix((nf, nf), dtype=np.complex64)
+#     # b = csr_matrix(([1], ([0],[0])), shape=(nf, 1), dtype=np.complex64)
+#     b = np.zeros((nf, 1), dtype=np.complex64)
+#     b[0] = 1
+#     for i in range(nf):
+#         m[:, i] = np.reshape(operator(np.reshape(b, shape)), (-1,))
+#         # b.indices = (b.indices+1)%b.shape[0]
+#         b = np.roll(b, (1, 0), axis=(0, 1))
+#     return m
 
 
 def overlap_decay(x):

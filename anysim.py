@@ -20,8 +20,9 @@ class AnySim:
 
     def iterate(self):
         """ AnySim update """
-        s_dict = defaultdict(list)  # Empty dict of lists to store source term s in each patch
-        u_dict = defaultdict(list)  # Empty dict of lists to store u's in each patch
+        # Empty dicts of lists to store patch-wise source (s) and field (u)
+        s_dict = defaultdict(list)
+        u_dict = defaultdict(list)
         for patch in self.base.domains_iterator:
             # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
             s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.restrict(self.base.s, patch)
@@ -33,15 +34,16 @@ class AnySim:
             for idx, patch in enumerate(self.base.domains_iterator):
                 # idx gives the index in the list of domains_iterator
                 # patch gives the 3-element position tuple of subdomain (e.g., (0,0,0))
+
                 print(f'Iteration {i + 1}, sub-domain {patch}. ', end='\r')
+
                 t1 = self.base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
                 # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
                 t1 = t1 - self.transfer_correction(patch, idx, u_dict)
                 t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
                 t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
-                # # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
-                # t1 = t1 + self.transfer_correction(patch, idx, u_dict)
-                self.state.log_subdomain_residual(norm(t1), patch)  # log residual for this subdomain
+
+                self.state.log_subdomain_residual(norm(t1), patch)  # log residual for current subdomain
 
                 u_dict[patch] = u_dict[patch] - (self.base.alpha * t1)  # update subdomain u
 

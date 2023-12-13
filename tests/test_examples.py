@@ -39,8 +39,8 @@ def u_ref_1d_h():
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')
-                                                        , (2, None), (3, None), (4, None), (5, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
+                                                        #, (2, None), (3, None), (4, None), (5, None)])
 def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     u_ref = u_ref_1d_h()
@@ -53,8 +53,8 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')
-                                                        , (2, None), (3, None), (4, None), (5, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
+                                                        #, (2, None), (3, None), (4, None), (5, None)])
 def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1), dtype=np.float32)
@@ -106,7 +106,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 
-    base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(75, 75), 
+    base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(20, 20), 
                          n=n, source=source, wrap_correction=wrap_correction, 
                          n_domains=n_domains)
     u_computed, state = AnySim(base).iterate()

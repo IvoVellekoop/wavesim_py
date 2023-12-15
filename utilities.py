@@ -14,6 +14,19 @@ def check_input_dims(a):
     return a
 
 
+def check_input_len(x, e, n_dims):
+    """ Convert 'x' to a 3-element numpy array, appropriately, i.e., either repeat, or add 0 or 1. """
+    if isinstance(x, int) or isinstance(x, float):
+        x = n_dims*tuple((x,)) + (3-n_dims) * (e,)
+    elif len(x) == 1:
+        x = n_dims*tuple(x) + (3-n_dims) * (e,)
+    elif isinstance(x, list) or isinstance(x, tuple):
+        x += (3 - len(x)) * (e,)
+    if isinstance(x, np.ndarray):
+        x = np.concatenate((x, np.zeros(3 - len(x))))
+    return np.array(x)
+
+
 def dft_matrix(n):
     """ Create a discrete Fourier transform matrix. Faster than scipy dft function """
     r = np.arange(n)

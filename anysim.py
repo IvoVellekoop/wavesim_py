@@ -39,7 +39,7 @@ class AnySim:
 
                 t1 = self.base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
                 # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
-                t1 = t1 - self.transfer_correction(patch, idx, u_dict)
+                t1 = t1 - self.transfer_correction(u_dict, patch, idx)
                 t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
                 t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
 
@@ -92,13 +92,14 @@ class AnySim:
             x = np.moveaxis(x, -1, dim)  # Transpose back
         return x.astype(np.complex64)
 
-    def transfer_correction(self, current_patch, idx, x):
+    def transfer_correction(self, x, current_patch, idx):
         """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain """
         x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
         for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain
-            if 0 <= idx + idx_shift < len(self.base.domains_iterator):
+            if 0 <= idx + idx_shift < len(self.base.domains_iterator):  # check if subdomain is on the edge
                 neighbour_patch = self.base.domains_iterator[idx + idx_shift]  # get the neighbouring subdomain location
                 x_neighbour = x[neighbour_patch].copy()  # get the neighbouring subdomain field
                 # get the field(s) to transfer
-                x_transfer = x_transfer + self.base.transfer(x_neighbour, self.base.scaling[current_patch], idx_shift)
+                x_transfer += self.base.scaling[current_patch] * self.base.wrap_corr(x_neighbour, idx_shift)
+                # x_transfer += self.transfer(x_neighbour, self.base.scaling[current_patch], idx_shift)
         return x_transfer

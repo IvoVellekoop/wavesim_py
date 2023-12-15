@@ -87,6 +87,8 @@ class LogPlot:
                        + f'n_domains {self.base.n_domains}; overlap {self.base.overlap}')
         if self.base.wrap_correction:
             save_string += f'; {self.base.wrap_correction}; n_correction {self.base.n_correction}'
+        if self.base.total_domains > 1:
+            save_string += f'; n_transfer {self.base.n_correction}'
         save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
                         + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
         if self.rel_err:

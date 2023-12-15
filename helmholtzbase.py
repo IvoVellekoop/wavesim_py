@@ -17,7 +17,7 @@ class HelmholtzBase:
                  overlap=0,  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  n_correction=8,  # number of points used in the wrapping correction
-                 max_iterations=int(3.e+4),  # Maximum number iterations
+                 max_iterations=int(1.e+4),  # Maximum number iterations
                  setup_operators=True):  # Set up medium and propagator operators
 
         self.n = check_input_dims(n)
@@ -158,7 +158,7 @@ class HelmholtzBase:
             patch_slice = self.patch_slice(patch)
             b_block = b[patch_slice]
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x - scaling[patch] * self.wrap_corr(x))
+                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x + scaling[patch] * self.wrap_corr(x))
             else:
                 medium_operators[patch] = lambda x, b_ = b_block: b_ * x
 

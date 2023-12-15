@@ -51,7 +51,7 @@ class LogPlot:
 
         self.run_id += '_abs' + str(self.base.boundary_widths)
         if self.base.wrap_correction:
-            self.run_id += '_' + self.base.wrap_correction
+            self.run_id += '_' + self.base.wrap_correction + f'{self.base.n_correction}'
         self.run_id += '_n_domains' + str(self.base.n_domains)
 
         self.stats_file_name = self.run_loc + '_stats.txt'
@@ -176,8 +176,6 @@ class LogPlot:
 
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual'
-        if self.base.wrap_correction == 'wrap_corr':
-            fig_name += f'{self.base.n_correction}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
@@ -216,8 +214,6 @@ class LogPlot:
             fig, animate, interval=100, blit=True, frames=plot_iters)
         writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
-        if self.base.wrap_correction == 'wrap_corr':
-            ani_name += f'{self.base.n_correction}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
         plt.close('all')
@@ -287,8 +283,6 @@ class LogPlot:
 
         plt.tight_layout()
         fig_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_FieldNResidual_{z_slice}'
-        if self.base.wrap_correction == 'wrap_corr':
-            fig_name += f'{self.base.n_correction}'
         fig_name += f'.png'
         plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=100)
         plt.close('all')
@@ -376,8 +370,6 @@ class LogPlot:
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
         if self.base.n_dims == 3:
             ani_name += f'_zslice{z_slice}'
-        if self.base.wrap_correction == 'wrap_corr':
-            ani_name += f'{self.base.n_correction}'
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
         plt.close('all')

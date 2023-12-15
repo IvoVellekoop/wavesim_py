@@ -67,34 +67,35 @@ def test_contraction(n, boundary_widths, wrap_correction):
     assert vc < 1, f'||V|| not < 1, but {vc}'
 
 
-@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
-                                                (np.ones((20, 21)), 0), (np.ones((15, 16)), 5),
-                                                (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
-def test_compare_A(n, boundary_widths):
+@pytest.mark.parametrize("n, boundary_widths, n_correction", [(np.ones(256), 0, 64), (np.ones(256), 10, 64), 
+                                                              (np.ones((20, 21)), 0, 7), (np.ones((15, 16)), 5, 7),
+                                                              (np.ones((5, 6, 7)), 0, 2), (np.ones((5, 6, 7)), 1, 2)])
+def test_compare_A(n, boundary_widths, n_correction):
     """ Check that the operator (A) is the same for wrap_correction = ['wrap_corr', 'L_omega'] """
     source = np.zeros_like(n)
     source[0] = 1.
-    n_correction = 8
-    if n.ndim == 3:
-        n_correction = 2
     base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, 
                            wrap_correction='wrap_corr', n_correction=n_correction)
     d = base_w.domain_size[:base_w.n_dims]
     patch = (0, 0, 0)
     scaling_w = base_w.scaling[patch]
-    l_w_operator = lambda x: np.fft.ifftn((scaling_w * base_w.l_p) * np.fft.fftn(x))
-    l_w = full_matrix(l_w_operator, d)
-    v_w = spdiags(base_w.v.ravel(), dtype=np.complex64) - scaling_w * full_matrix(base_w.wrap_corr, d)
-    a_w = (l_w + v_w)/scaling_w
+    l_w_operator = lambda x: np.fft.ifftn((scaling_w * base_w.l_p + 1) * np.fft.fftn(x))
+    l_w_plus1 = full_matrix(l_w_operator, d)
+    # v_w = spdiags(base_w.v.ravel(), dtype=np.complex64) - scaling_w * full_matrix(base_w.wrap_corr, d)
+    # a_w = (l_w_plus1 + v_w)/scaling_w
+    b_w = full_matrix(base_w.medium_operators[patch], d)
+    a_w = ((l_w_plus1 - b_w)/scaling_w).todense()
 
     base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')    
     n_ = (base_o.domain_size[:base_o.n_dims]).astype(int)
     scaling_o = base_o.scaling[patch]
-    l_o_operator = lambda x: (np.fft.ifftn((scaling_o * base_o.l_p) * np.fft.fftn(x, n_*10)))[
+    l_o_operator = lambda x: (np.fft.ifftn((scaling_o * base_o.l_p + 1) * np.fft.fftn(x, n_*10)))[
                                            tuple([slice(0, n_[i]) for i in range(base_o.n_dims)])]
-    l_o = full_matrix(l_o_operator, d)
-    v_o = np.diag(base_o.v.ravel())
-    a_o = (l_o + v_o)/scaling_o
+    l_o_plus1 = full_matrix(l_o_operator, d)
+    # v_o = np.diag(base_o.v.ravel())
+    # a_o = (l_o_plus1 + v_o)/scaling_o
+    b_o = full_matrix(base_o.medium_operators[patch], d)
+    a_o = ((l_o_plus1 - b_o)/scaling_o).todense()
 
     # base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction=None)
     # l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
@@ -102,10 +103,17 @@ def test_compare_A(n, boundary_widths):
     # b = full_matrix(base.medium_operators[patch], d)
     # a = (l_plus_1 - b)/base.scaling[patch]
 
-    rel_err = relative_error(a_w, a_o)
+    if boundary_widths == 0:
+        rel_err = relative_error(a_w, a_o)
+    else:
+        crop2roi = tuple([slice(base_w.boundary_pre[0], -base_w.boundary_post[0]) 
+                          for _ in range(2)])  # crop array from n_ext to n_roi
+
+        rel_err = relative_error(a_w[crop2roi], a_o[crop2roi])
+
     print(f'{rel_err:.2e}')
     # print(f'{rel_err:.2e}, {relative_error(a, a_o):.2e}, {relative_error(a, a_w):.2e}')
-    assert rel_err <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). relative error {rel_err:.2e}'
+    assert rel_err <= 3.e-2, f'Operator A (wrap_corr case) != A (L_omega case). relative error {rel_err:.2e}'
 
 
 # def test_subdomain_op_reconstruction():

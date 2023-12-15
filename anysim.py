@@ -8,26 +8,26 @@ from state import State
 class AnySim:
     def __init__(self, base: HelmholtzBase):
         self.base = base
-        self.u = np.zeros_like(self.base.s, dtype=np.complex64)  # field u, initialize with 0s
-        self.restriction = [[] for _ in range(self.base.n_dims)]
-        self.extension = [[] for _ in range(self.base.n_dims)]
-        self.domain_decomp_operators()  # Construct restriction and extension operators
-        self.state = State(self.base)
-        self.state.init_norm = norm(np.sum(np.array([(self.extend(self.base.medium_operators[patch]
-                                                                  (self.base.propagator(self.restrict(self.base.s,
-                                                                   patch), self.base.scaling[patch])), patch))
-                                                     for patch in self.base.domains_iterator]), axis=0))
 
     def iterate(self):
         """ AnySim update """
+
+        u = np.zeros_like(self.base.s, dtype=np.complex64)  # field u, initialize with 0s
+        restrict, extend = self.domain_decomp_operators()  # Construct restriction and extension operators
+        state = State(self.base)
+        state.init_norm = norm(np.sum(np.array([(self.map_domain(
+            self.base.medium_operators[patch](self.base.propagator(self.map_domain(self.base.s, restrict, patch),
+                                                                   self.base.scaling[patch])), extend, patch))
+            for patch in self.base.domains_iterator]), axis=0))
+
         # Empty dicts of lists to store patch-wise source (s) and field (u)
         s_dict = defaultdict(list)
         u_dict = defaultdict(list)
         for patch in self.base.domains_iterator:
             # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
-            s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.restrict(self.base.s, patch)
+            s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.map_domain(self.base.s, restrict, patch)
             # restrict full-domain field u to the patch subdomain
-            u_dict[patch] = self.restrict(self.u, patch)
+            u_dict[patch] = self.map_domain(u, restrict, patch)
 
         for i in range(self.base.max_iterations):
             residual = 0
@@ -43,56 +43,53 @@ class AnySim:
                 t1 = self.base.propagator(t1, self.base.scaling[patch])  # (L+1)^-1 t1
                 t1 = self.base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
 
-                self.state.log_subdomain_residual(norm(t1), patch)  # log residual for current subdomain
+                state.log_subdomain_residual(norm(t1), patch)  # log residual for current subdomain
 
                 u_dict[patch] = u_dict[patch] - (self.base.alpha * t1)  # update subdomain u
 
                 # find the slice of full domain u and update
                 patch_slice = self.base.patch_slice(patch)
-                self.u[patch_slice] = u_dict[patch]
+                u[patch_slice] = u_dict[patch]
 
-                self.state.log_u_iter(self.u, patch)  # collect u updates (store separately subdomain-wise)
-                residual += self.extend(t1, patch)  # collect all subdomain residuals to update full residual
-            self.state.log_full_residual(norm(residual))  # log residual for entire domain
-            self.state.next(i)  # Check termination conditions
-            if self.state.should_terminate:  # Proceed to next iteration or not
+                state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
+                residual += self.map_domain(t1, extend, patch)  # collect subdomain residuals to update full residual
+            state.log_full_residual(norm(residual))  # log residual for entire domain
+            state.next(i)  # Check termination conditions
+            if state.should_terminate:  # Proceed to next iteration or not
                 break
         # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-        return self.state.finalize(self.u), self.state
+        return state.finalize(u), state
 
     def domain_decomp_operators(self):
-        """ Construct restriction, extension, and partition of unity operators """
+        """ Construct restriction and extension operators """
+        restrict = [[] for _ in range(self.base.n_dims)]
+        extend = [[] for _ in range(self.base.n_dims)]
+
         if self.base.total_domains == 1:
-            [self.restriction[i].append(1.) for i in range(self.base.n_dims)]
-            [self.extension[i].append(1.) for i in range(self.base.n_dims)]
+            [restrict[dim].append(1.) for dim in range(self.base.n_dims)]
+            [extend[dim].append(1.) for dim in range(self.base.n_dims)]
         else:
             ones = np.eye(self.base.domain_size[0])
             restrict0_ = []
-            [restrict0_.append(np.zeros((self.base.domain_size[i], self.base.n_ext[i])))
-             for i in range(self.base.n_dims)]
-            for i in range(self.base.n_dims):
-                for patch in range(self.base.n_domains[i]):
-                    restrict_mid_ = restrict0_[i].copy()
-                    restrict_mid_[:, slice(patch * (self.base.domain_size[i] - self.base.overlap[i]),
-                                           patch * (self.base.domain_size[i] - self.base.overlap[i])
-                                           + self.base.domain_size[i])] = ones
-                    self.restriction[i].append(restrict_mid_.T)
-                    self.extension[i].append(restrict_mid_)
+            [restrict0_.append(np.zeros((self.base.domain_size[dim], self.base.n_ext[dim]))) 
+             for dim in range(self.base.n_dims)]
+            for dim in range(self.base.n_dims):
+                for patch in range(self.base.n_domains[dim]):
+                    restrict_mid_ = restrict0_[dim].copy()
+                    restrict_mid_[:, slice(patch * (self.base.domain_size[dim] - self.base.overlap[dim]),
+                                           patch * (self.base.domain_size[dim] - self.base.overlap[dim])
+                                           + self.base.domain_size[dim])] = ones
+                    restrict[dim].append(restrict_mid_.T)
+                    extend[dim].append(restrict_mid_)
+        return restrict, extend
 
-    def restrict(self, x, patch):
-        """ Restrict full-domain 'x' to the patch subdomain """
-        for i in range(self.base.n_dims):  # For applying in every dimension
-            x = np.moveaxis(x, i, -1)  # Transpose
-            x = np.dot(x, self.restriction[i][patch[i]])  # Apply (appropriate) restriction operator
-            x = np.moveaxis(x, -1, i)  # Transpose back
-        return x.astype(np.complex64)
-
-    def extend(self, x, patch):
-        """ Extend patch subdomain 'x' to full-domain """
-        for i in range(self.base.n_dims):  # For applying in every dimension
-            x = np.moveaxis(x, i, -1)  # Transpose
-            x = np.dot(x, self.extension[i][patch[i]])  # Apply (appropriate) extension operator
-            x = np.moveaxis(x, -1, i)  # Transpose back
+    @staticmethod
+    def map_domain(x, mapping_operator, patch):
+        """ Map x to extended domain or restricted subdomain """
+        for dim in range(x.ndim):  # For applying in every dimension
+            x = np.moveaxis(x, dim, -1)  # Transpose
+            x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
+            x = np.moveaxis(x, -1, dim)  # Transpose back
         return x.astype(np.complex64)
 
     def transfer_correction(self, current_patch, idx, x):

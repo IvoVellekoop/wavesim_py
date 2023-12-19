@@ -2,6 +2,90 @@ import numpy as np
 from scipy.sparse import dok_matrix
 
 
+def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
+               wavelength=1.,  # Wavelength in um (micron)
+               ppw=4,  # points per wavelength
+               boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
+               source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
+               overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
+               n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
+               omega=10):  # compute the fft over omega times the domain size
+
+    n = check_input_dims(n)
+    n_dims = (np.squeeze(n)).ndim  # Number of dimensions in problem
+    n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
+
+    boundary_widths = check_input_len(boundary_widths, 0, n_dims)
+    boundary_pre = np.floor(boundary_widths)
+    boundary_post = np.ceil(boundary_widths)
+
+    n_ext = n_roi + boundary_pre + boundary_post  # n_roi + boundaries on either side(s)
+
+    max_subdomain_size = 500  # max permissible size of one sub-domain
+    # Number of subdomains to decompose into in each dimension
+    if n_domains is None:
+        n_domains = n_ext // max_subdomain_size
+    else:
+        n_domains = check_input_len(n_domains, 1, n_dims)
+
+    # Overlap between subdomains in each axis
+    overlap = check_input_len(overlap, 0, n_dims).astype(int)
+
+    # determines number of subdomains based on max size, ensures that all are of the same size (pads if necessary),
+    # modifies boundary_post and n_ext, and casts parameters to int
+
+    if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
+        domain_size = n_ext.copy()
+    else:  # Else, domain decomposition
+        domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+
+        """ Increase boundary_post in dimension(s) until all subdomains are of the same size """
+        while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
+            boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
+            n_ext = n_roi + boundary_pre + boundary_post
+            domain_size[:n_dims] = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+
+        """ Increase number of subdomains until subdomain size is less than max_subdomain_size """
+        while (domain_size > max_subdomain_size).any():
+            n_domains[np.where(domain_size > max_subdomain_size)] += 1
+            domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+
+        """ Increase boundary_post in dimension(s) until the subdomain size is int """
+        while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
+            boundary_post += np.round(n_domains * (np.ceil(domain_size) - domain_size), 2)
+            n_ext = n_roi + boundary_pre + boundary_post
+            domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+
+    boundary_pre = boundary_pre.astype(int)
+    boundary_post = boundary_post.astype(int)
+    n_ext = n_ext.astype(int)
+    n_domains = n_domains.astype(int)
+    domain_size = domain_size.astype(int)
+
+    k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
+    v_raw = k0 ** 2 * n ** 2
+
+    # pad v_raw with boundaries using edge values
+    v_raw = pad_boundaries(v_raw, boundary_pre, boundary_post, mode="edge")
+
+    """ give tiny non-zero minimum value to prevent division by zero in homogeneous media """
+    pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
+    mu_min = ((10.0 / (boundary_widths[:n_dims] * pixel_size)) if (
+            boundary_widths != 0).any() else check_input_len(0, 0, n_dims)).astype(np.float32)
+    mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:n_dims]) * pixel_size)))
+    v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
+
+    # Pad the source term (scale later)
+    s = check_input_dims(source).astype(np.float32)
+    s = pad_boundaries(s, boundary_pre, boundary_post, mode="constant")
+
+    omega = check_input_len(omega, 1, n_dims)  # compute the fft over omega times the domain size
+    
+    return (n_dims, n_roi, n_ext, boundary_widths, boundary_pre, boundary_post,
+            overlap, n_domains, domain_size, v_min, v_raw, omega, s)
+    # return locals()
+
+
 def boundary_(x):
     """ Anti-reflection boundary layer (ARL). Linear window function """
     return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
@@ -65,6 +149,10 @@ def full_matrix(operator, d):
 def overlap_decay(x):
     """ Linear decay from 0 to 1 of size x """
     return np.interp(np.arange(x), [0, x - 1], [0, 1])
+
+
+def pad_boundaries(x, boundary_pre, boundary_post, mode):
+    return np.pad(x, (tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])), mode=mode)
 
 
 def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):

@@ -29,7 +29,8 @@ def u_ref_1d_h():
     x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size, dtype=np.float32)
     x = np.pad(x, (64, 64), mode='constant')
     h = base_.pixel_size
-    k = base_.k0
+    # k = base_.k0
+    k = (1. * 2. * np.pi) / 1.
     phi = k * x
     u_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
                np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(

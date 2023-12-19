@@ -4,7 +4,7 @@ from scipy.sparse.linalg import norm as spnorm
 from scipy.sparse import diags as spdiags
 
 from helmholtzbase import HelmholtzBase
-from utilities import check_input_len, full_matrix, relative_error
+from utilities import full_matrix, relative_error
 
 
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
@@ -14,24 +14,20 @@ from utilities import check_input_len, full_matrix, relative_error
 def test_accretive(n, boundary_widths, wrap_correction):
     """ Check that operator A = L + V (sum of propagator and medium operators) is accretive
         , i.e., has a non-negative real part """
-    source = np.zeros_like(n)
-    source[0] = 1.
     n_correction = 8
     if n.ndim == 3:
         n_correction = 2
-    base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, 
+    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
                          wrap_correction=wrap_correction, n_correction=n_correction)
-    d = base.domain_size
     patch = (0, 0, 0)
     if wrap_correction == 'L_omega':
-        omega = check_input_len(10, 1, base.n_dims)
         l_plus_1_operator = lambda x: (np.fft.ifftn((base.scaling[patch] * base.l_p + 1) *
-                                       np.fft.fftn(x, d*omega)))[
-                                       tuple([slice(0, d[i]) for i in range(3)])]
+                                       np.fft.fftn(x, base.domain_size*base.omega)))[
+                                       tuple([slice(0, base.domain_size[i]) for i in range(3)])]
     else:
         l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
-    l_plus_1 = full_matrix(l_plus_1_operator, d)
-    b = full_matrix(base.medium_operators[patch], d)
+    l_plus_1 = full_matrix(l_plus_1_operator, base.domain_size)
+    b = full_matrix(base.medium_operators[patch], base.domain_size)
     a = (l_plus_1 - b).todense()
 
     acc = np.min(np.real(np.linalg.eigvals(a + np.asarray(np.conj(a).T))))
@@ -46,22 +42,19 @@ def test_accretive(n, boundary_widths, wrap_correction):
 def test_contraction(n, boundary_widths, wrap_correction):
     """ Check that potential V is a contraction,
         i.e., the operator norm ||V|| < 1 """
-    source = np.zeros_like(n)
-    source[0] = 1.
     n_correction = 8
     if n.ndim == 3:
         n_correction = 2
-    base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, 
+    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
                          wrap_correction=wrap_correction, n_correction=n_correction)
-    d = base.domain_size
     patch = (0, 0, 0)
     if wrap_correction == 'wrap_corr':
         scaling = base.scaling[patch]
-        v_corr = spdiags(base.v.ravel(), dtype=np.complex64) - scaling * full_matrix(base.wrap_corr, d)
+        v_corr = spdiags(base.v.ravel(), dtype=np.complex64) - scaling * full_matrix(base.wrap_corr, base.domain_size)
     else:
         # vc = np.max(np.abs(base.v))
-        v_corr = (full_matrix(base.medium_operators[patch], d) 
-                  - spdiags(np.ones(np.prod(d)), dtype=np.complex64))
+        v_corr = (full_matrix(base.medium_operators[patch], base.domain_size) 
+                  - spdiags(np.ones(np.prod(base.domain_size)), dtype=np.complex64))
     vc = spnorm(v_corr, 2)
     print(f'vc {vc:.2f}')
     assert vc < 1, f'||V|| not < 1, but {vc}'
@@ -72,36 +65,32 @@ def test_contraction(n, boundary_widths, wrap_correction):
                                                               (np.ones((5, 6, 7)), 0, 2), (np.ones((5, 6, 7)), 1, 2)])
 def test_compare_A(n, boundary_widths, n_correction):
     """ Check that the operator (A) is the same for wrap_correction = ['wrap_corr', 'L_omega'] """
-    source = np.zeros_like(n)
-    source[0] = 1.
-    base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, 
+    base_w = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
                            wrap_correction='wrap_corr', n_correction=n_correction)
-    d = base_w.domain_size
     patch = (0, 0, 0)
     scaling_w = base_w.scaling[patch]
     l_w_operator = lambda x: np.fft.ifftn((scaling_w * base_w.l_p + 1) * np.fft.fftn(x))
-    l_w_plus1 = full_matrix(l_w_operator, d)
-    # v_w = spdiags(base_w.v.ravel(), dtype=np.complex64) - scaling_w * full_matrix(base_w.wrap_corr, d)
+    l_w_plus1 = full_matrix(l_w_operator, base_w.domain_size)
+    # v_w = spdiags(base_w.v.ravel(), dtype=np.complex64) - scaling_w*full_matrix(base_w.wrap_corr, base_w.domain_size)
     # a_w = (l_w_plus1 + v_w)/scaling_w
-    b_w = full_matrix(base_w.medium_operators[patch], d)
+    b_w = full_matrix(base_w.medium_operators[patch], base_w.domain_size)
     a_w = ((l_w_plus1 - b_w)/scaling_w).todense()
 
-    base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')    
-    n_ = base_o.domain_size
+    base_o = HelmholtzBase(n=n, boundary_widths=boundary_widths, wrap_correction='L_omega')    
     scaling_o = base_o.scaling[patch]
-    omega = check_input_len(10, 1, base_o.n_dims)
-    l_o_operator = lambda x: (np.fft.ifftn((scaling_o * base_o.l_p + 1) * np.fft.fftn(x, n_*omega)))[
-                                           tuple([slice(0, n_[i]) for i in range(3)])]
-    l_o_plus1 = full_matrix(l_o_operator, d)
+    l_o_operator = lambda x: (np.fft.ifftn((scaling_o * base_o.l_p + 1) *
+                                           np.fft.fftn(x, base_o.domain_size*base_o.omega)))[
+                                           tuple([slice(0, base_o.domain_size[i]) for i in range(3)])]
+    l_o_plus1 = full_matrix(l_o_operator, base_w.domain_size)
     # v_o = np.diag(base_o.v.ravel())
     # a_o = (l_o_plus1 + v_o)/scaling_o
-    b_o = full_matrix(base_o.medium_operators[patch], d)
+    b_o = full_matrix(base_o.medium_operators[patch], base_w.domain_size)
     a_o = ((l_o_plus1 - b_o)/scaling_o).todense()
 
     # base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction=None)
     # l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
-    # l_plus_1 = full_matrix(l_plus_1_operator, d)
-    # b = full_matrix(base.medium_operators[patch], d)
+    # l_plus_1 = full_matrix(l_plus_1_operator, base_w.domain_size)
+    # b = full_matrix(base.medium_operators[patch], base_w.domain_size)
     # a = (l_plus_1 - b)/base.scaling[patch]
 
     if boundary_widths == 0:

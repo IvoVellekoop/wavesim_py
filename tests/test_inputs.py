@@ -7,8 +7,8 @@ from helmholtzbase import HelmholtzBase
 def setup_inputs():
     """ Setup base problem with dummy input """
     n = np.ones((256, 256, 1))
-    anysim = HelmholtzBase(n=n, setup_operators=False)
-    yield anysim
+    base_i = HelmholtzBase(n=n, setup_operators=False)
+    yield base_i
 
 
 def test_n(setup_inputs):

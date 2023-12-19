@@ -15,10 +15,9 @@ class AnySim:
         u = np.zeros_like(self.base.s, dtype=np.complex64)  # field u, initialize with 0s
         restrict, extend = self.domain_decomp_operators()  # Construct restriction and extension operators
         state = State(self.base)
-        state.init_norm = norm(np.sum(np.array([(self.map_domain(
-            self.base.medium_operators[patch](self.base.propagator(
-                self.map_domain(self.base.s, restrict, patch, self.base.n_dims),
-                self.base.scaling[patch])), extend, patch, self.base.n_dims))
+        state.init_norm = norm(np.sum(np.array([(self.map_domain(self.base.medium_operators[patch](
+            self.base.propagator(self.map_domain(self.base.s, restrict, patch, self.base.n_dims),
+                                 self.base.scaling[patch])), extend, patch, self.base.n_dims))
             for patch in self.base.domains_iterator]), axis=0))
 
         # Empty dicts of lists to store patch-wise source (s) and field (u)
@@ -54,7 +53,7 @@ class AnySim:
                 u[patch_slice] = u_dict[patch]
 
                 state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
-                residual += self.map_domain(t1, extend, patch, self.base.n_dims)  # add subdomain residuals to get full
+                residual += self.map_domain(t1, extend, patch, self.base.n_dims)  # add up all subdomain residuals
             state.log_full_residual(norm(residual))  # log residual for entire domain
             state.next(i)  # Check termination conditions
             if state.should_terminate:  # Proceed to next iteration or not

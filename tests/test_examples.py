@@ -8,7 +8,7 @@ from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 
 from helmholtzbase import HelmholtzBase
-from anysim import AnySim
+from anysim import iterate
 from save_details import LogPlot
 from utilities import relative_error
 
@@ -49,7 +49,7 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     source = np.zeros_like(n)
     source[0] = 1.
     base = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=10, source=source, wrap_correction=wrap_correction)
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -63,7 +63,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
     source = np.zeros_like(n)
     source[0] = 1.
     base = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=10, source=source, wrap_correction=wrap_correction)
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     u_ref = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -87,7 +87,7 @@ def test_2d_high_contrast(n_domains, wrap_correction):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=(31.5, 31.5),
                          n=n, source=source, wrap_correction=wrap_correction, max_iterations=int(1.e+4))
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -109,7 +109,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(30, 30), 
                          n=n, source=source, n_domains=n_domains, 
                          wrap_correction=wrap_correction, n_correction=200)
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -127,7 +127,7 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
 
     base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, 
                          wrap_correction=wrap_correction, max_iterations=500)
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     u_ref = loadmat(f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}'
                     + f'_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -145,7 +145,7 @@ def test_3d_disordered(n_domains, wrap_correction):
 
     base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 
                          wrap_correction=wrap_correction)
-    u_computed, state = AnySim(base).iterate()
+    u_computed, state = iterate(base)
     u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)

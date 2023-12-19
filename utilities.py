@@ -40,7 +40,7 @@ def full_matrix(operator, d):
     nf = np.prod(d)
     m = dok_matrix((nf, nf), dtype=np.complex64)
     b = np.zeros(d, dtype=np.complex64)
-    b[*(0,)*b.ndim] = 1
+    b.flat[0] = 1
     for i in range(nf):
         m[:, i] = operator(np.roll(b, i)).ravel()
     return m

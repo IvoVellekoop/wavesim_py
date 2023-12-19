@@ -64,4 +64,4 @@ class State(object):
         if self.subdomain_residuals.shape[0] < self.subdomain_residuals.shape[1]:
             self.subdomain_residuals = self.subdomain_residuals.T
         self.full_residuals = np.array(self.full_residuals)
-        return u
+        return np.squeeze(u)

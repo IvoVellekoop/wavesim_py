@@ -16,8 +16,9 @@ class AnySim:
         restrict, extend = self.domain_decomp_operators()  # Construct restriction and extension operators
         state = State(self.base)
         state.init_norm = norm(np.sum(np.array([(self.map_domain(
-            self.base.medium_operators[patch](self.base.propagator(self.map_domain(self.base.s, restrict, patch),
-                                                                   self.base.scaling[patch])), extend, patch))
+            self.base.medium_operators[patch](self.base.propagator(
+                self.map_domain(self.base.s, restrict, patch, self.base.n_dims),
+                self.base.scaling[patch])), extend, patch, self.base.n_dims))
             for patch in self.base.domains_iterator]), axis=0))
 
         # Empty dicts of lists to store patch-wise source (s) and field (u)
@@ -25,9 +26,10 @@ class AnySim:
         u_dict = defaultdict(list)
         for patch in self.base.domains_iterator:
             # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
-            s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.map_domain(self.base.s, restrict, patch)
+            s_dict[patch] = 1j * np.sqrt(self.base.scaling[patch]) * self.map_domain(self.base.s, restrict,
+                                                                                     patch, self.base.n_dims)
             # restrict full-domain field u to the patch subdomain
-            u_dict[patch] = self.map_domain(u, restrict, patch)
+            u_dict[patch] = self.map_domain(u, restrict, patch, self.base.n_dims)
 
         for i in range(self.base.max_iterations):
             residual = 0
@@ -52,7 +54,7 @@ class AnySim:
                 u[patch_slice] = u_dict[patch]
 
                 state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
-                residual += self.map_domain(t1, extend, patch)  # collect subdomain residuals to update full residual
+                residual += self.map_domain(t1, extend, patch, self.base.n_dims)  # add subdomain residuals to get full
             state.log_full_residual(norm(residual))  # log residual for entire domain
             state.next(i)  # Check termination conditions
             if state.should_terminate:  # Proceed to next iteration or not
@@ -84,9 +86,10 @@ class AnySim:
         return restrict, extend
 
     @staticmethod
-    def map_domain(x, mapping_operator, patch):
+    def map_domain(x, mapping_operator, patch, n_dims):
         """ Map x to extended domain or restricted subdomain """
-        for dim in range(x.ndim):  # For applying in every dimension
+        # n_dims = np.squeeze(x).ndim
+        for dim in range(n_dims):  # For applying in every dimension
             x = np.moveaxis(x, dim, -1)  # Transpose
             x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
             x = np.moveaxis(x, -1, dim)  # Transpose back

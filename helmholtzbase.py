@@ -8,10 +8,10 @@ class HelmholtzBase:
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)
                  ppw=4,  # points per wavelength
-                 boundary_widths=20,  # Width of absorbing boundaries
+                 boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
                  source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                  n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-                 overlap=0,  # Overlap between subdomains in each dimension
+                 overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  n_correction=8,  # number of points used in the wrapping correction
                  max_iterations=int(1.e+4),  # Maximum number iterations
@@ -21,8 +21,8 @@ class HelmholtzBase:
         self.n_dims = (np.squeeze(self.n)).ndim  # Number of dimensions in problem
         self.n_roi = np.array(self.n.shape)  # Num of points in ROI (Region of Interest)
         self.boundary_widths = check_input_len(boundary_widths, 0, self.n_dims)
-        self.boundary_pre = np.floor(self.boundary_widths).astype(int)
-        self.boundary_post = np.ceil(self.boundary_widths).astype(np.float32)
+        self.boundary_pre = np.floor(self.boundary_widths)
+        self.boundary_post = np.ceil(self.boundary_widths)
         self.wavelength = wavelength  # Wavelength in um (micron)
         self.ppw = ppw  # points per wavelength
         self.k0 = (1. * 2. * np.pi) / self.wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
@@ -34,16 +34,15 @@ class HelmholtzBase:
         if n_domains is None:
             self.n_domains = self.n_ext // self.max_subdomain_size
         else:
-            self.n_domains = check_input_len(n_domains, 1, self.n_dims)  
+            self.n_domains = check_input_len(n_domains, 1, self.n_dims)
 
-        self.overlap = check_input_len(overlap, 0, self.n_dims).astype(int)  # Overlap between subdomains in each dimension
+        # Overlap between subdomains in each axis
+        self.overlap = check_input_len(overlap, 0, self.n_dims).astype(int)
 
-        if (self.n_domains == 1).all():  # If 1 domain, implies no domain decomposition
-            self.domain_size = self.n_ext.copy()
-        else:  # Else, domain decomposition
-            self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
-            # determines number of subdomains based on max size, ensures that all are of the same size, and size is int
-            self.modify_domains_n_boundary()
+        self.domain_size = None
+        # determines number of subdomains based on max size, ensures that all are of the same size (pads if necessary),
+        # modifies boundary_post and n_ext, and casts parameters to int
+        self.modify_domains_n_boundaries()
 
         self.domains_iterator = list(product(range(self.n_domains[0]), range(self.n_domains[1]),
                                              range(self.n_domains[2])))  # to iterate through subdomains in all dims
@@ -61,7 +60,7 @@ class HelmholtzBase:
                                for i in range(self.n_dims)])  # crop array from n_ext to n_roi
 
         self.wrap_correction = wrap_correction  # None OR 'wrap_corr'
-        self.n_correction = n_correction  # number of corner points (c.p.) in the upper and lower triangular corners of the wrap_corr matrix
+        self.n_correction = n_correction  # number of points used in the wrapping correction
 
         self.max_iterations = max_iterations
         self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
@@ -87,13 +86,12 @@ class HelmholtzBase:
         """ Get (1) Medium b = 1 - v - corrections and (2) Propagator (L+1)^(-1) operators, and (3) pad source """
         v_raw = self.k0 ** 2 * self.n ** 2
         # pad v_raw with boundaries using edge values
-        v_raw = np.squeeze(np.pad(v_raw, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])),
-                                  mode="edge"))
+        v_raw = self.pad_boundaries(v_raw, mode="edge")
+
         # get the medium and propagator operators, and scaling
         self.medium_operators, self.propagator, self.scaling = self.make_operators(v_raw)
         # Pad the source term (scale later)
-        self.s = np.squeeze(np.pad(self.s, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])), 
-                                   mode="constant"))
+        self.s = self.pad_boundaries(self.s, mode="constant")
 
     def make_operators(self, v_raw):
         """ Make the medium and propagator operators, and, if applicable,
@@ -104,10 +102,11 @@ class HelmholtzBase:
         self.v = -1j * (v_raw - v0)
 
         # Make the wrap_corr operator (If wrap_correction=True)
-        d = self.domain_size[:self.n_dims]
-        crop2domain = tuple([slice(0, d[i]) for i in range(self.n_dims)]) # crop from the padded domain to the original domain
+        d = self.domain_size.copy()
+        crop2domain = tuple([slice(0, d[i]) for i in range(3)])  # crop from the padded domain to the original domain
 
         omega = 10  # compute the fft over omega times the domain size
+        omega = check_input_len(omega, 1, self.n_dims)
         if self.wrap_correction == 'L_omega':
             n_fft = d * omega
         else:
@@ -117,8 +116,8 @@ class HelmholtzBase:
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
             side = np.zeros(d, dtype=np.complex64)
-            side[-1,...] = 1.0
-            k_wrap = np.real(ifftn(l_p * fftn(side))[:, *(0,)*(self.n_dims - 1)]) # discard tiny imaginary part due to numerical errors
+            side[-1, ...] = 1.0
+            k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
 
             # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
             wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
@@ -154,10 +153,10 @@ class HelmholtzBase:
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
         if self.wrap_correction == 'L_omega':
-            propagator = lambda x, subdomain_scaling: (ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
+            propagator = lambda x, subdomain_scaling: (ifftn((1 / (subdomain_scaling * self.l_p + 1)) *
                                                        fftn(x, n_fft)))[crop2domain]
         else:
-            propagator = lambda x, subdomain_scaling: ifftn(np.squeeze(1 / (subdomain_scaling * self.l_p + 1)) *
+            propagator = lambda x, subdomain_scaling: ifftn((1 / (subdomain_scaling * self.l_p + 1)) *
                                                             fftn(x))
 
         return medium_operators, propagator, scaling
@@ -175,30 +174,39 @@ class HelmholtzBase:
                             patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j]) for
                       j in range(self.n_dims)])
 
-    def modify_domains_n_boundary(self):
-        """ Increase boundary_post in dimension(s) until all subdomains are of the same size """
-        while (self.domain_size[:self.n_dims] != np.max(self.domain_size[:self.n_dims])).any():
-            self.boundary_post[:self.n_dims] += self.n_domains[:self.n_dims] * (np.max(self.domain_size[:self.n_dims]) 
-                                                                                - self.domain_size[:self.n_dims])
-            self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
-            self.domain_size[:self.n_dims] = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
-
-        """ Increase number of subdomains until subdomain size is less than max_subdomain_size """
-        while (self.domain_size > self.max_subdomain_size).any():
-            self.n_domains[np.where(self.domain_size > self.max_subdomain_size)] += 1
+    def modify_domains_n_boundaries(self):
+        if (self.n_domains == 1).all():  # If 1 domain, implies no domain decomposition
+            self.domain_size = self.n_ext.copy()
+        else:  # Else, domain decomposition
             self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
-        """ Increase boundary_post in dimension(s) until the subdomain size is int """
-        while (self.domain_size % 1 != 0).any() or (self.boundary_post % 1 != 0).any():
-            self.boundary_post += np.round(self.n_domains * (np.ceil(self.domain_size) - self.domain_size), 2)
-            self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
-            self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
+            """ Increase boundary_post in dimension(s) until all subdomains are of the same size """
+            while (self.domain_size[:self.n_dims] != np.max(self.domain_size[:self.n_dims])).any():
+                self.boundary_post[:self.n_dims] += (self.n_domains[:self.n_dims] *
+                                                     (np.max(self.domain_size[:self.n_dims])
+                                                      - self.domain_size[:self.n_dims]))
+                self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
+                self.domain_size[:self.n_dims] = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
 
+            """ Increase number of subdomains until subdomain size is less than max_subdomain_size """
+            while (self.domain_size > self.max_subdomain_size).any():
+                self.n_domains[np.where(self.domain_size > self.max_subdomain_size)] += 1
+                self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
+
+            """ Increase boundary_post in dimension(s) until the subdomain size is int """
+            while (self.domain_size % 1 != 0).any() or (self.boundary_post % 1 != 0).any():
+                self.boundary_post += np.round(self.n_domains * (np.ceil(self.domain_size) - self.domain_size), 2)
+                self.n_ext = self.n_roi + self.boundary_pre + self.boundary_post
+                self.domain_size = (self.n_ext + ((self.n_domains - 1) * self.overlap)) / self.n_domains
+
+        self.boundary_pre = self.boundary_pre.astype(int)
         self.boundary_post = self.boundary_post.astype(int)
         self.n_ext = self.n_ext.astype(int)
         self.n_domains = self.n_domains.astype(int)
-        self.domain_size[self.n_dims:] = 0
         self.domain_size = self.domain_size.astype(int)
+
+    def pad_boundaries(self, x, mode):
+        return np.pad(x, (tuple([[self.boundary_pre[i], self.boundary_post[i]] for i in range(3)])), mode=mode)
 
     @staticmethod
     def laplacian_sq_f(n_fft, n_dims, pixel_size=1.):
@@ -207,6 +215,8 @@ class HelmholtzBase:
         for d in range(1, n_dims):
             l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
                 (2 * np.pi * fftfreq(n_fft[d], pixel_size)) ** 2, axis=0).astype(np.complex64)
+        for _ in range(3 - n_dims):
+            l_p = np.expand_dims(l_p, axis=-1)
         return l_p
 
     @staticmethod
@@ -224,13 +234,17 @@ class HelmholtzBase:
         # construct slice to select the side pixels
         left = (slice(0, n_correction))
         right = (slice(-n_correction, None))
-        for i in range(x.ndim):
-            if idx_shift==-1 or idx_shift=='all':
+        n_dims = np.squeeze(x).ndim
+        for _ in range(n_dims):
+            if idx_shift == -1 or idx_shift == 'all':
                 corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-            if idx_shift==+1 or idx_shift=='all':
+            if idx_shift == +1 or idx_shift == 'all':
                 corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-            x = np.rollaxis(x, -1)
-            corr = np.rollaxis(corr, -1)
+            x = x.transpose((1, 2, 0))
+            corr = corr.transpose((1, 2, 0))
+        for _ in range(3-n_dims):
+            x = x.transpose((1, 2, 0))
+            corr = corr.transpose((1, 2, 0))
         return corr
 
 # n = np.ones((19, 19), dtype=np.float32)

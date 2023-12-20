@@ -12,7 +12,9 @@ from anysim import iterate
 from save_details import LogPlot
 from utilities import relative_error
 
+# load dictionary of results from matlab wavesim/anysim for comparison and validation
 matlab_results = loadmat('matlab_results.mat')
+
 
 def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
     """ Compute, Print, and Assert relative error between computed and reference field """

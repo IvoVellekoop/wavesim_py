@@ -178,9 +178,3 @@ class HelmholtzBase:
             corr = corr.transpose((1, 2, 0))
 
         return corr
-
-# n = np.ones((19, 19), dtype=np.float32)
-# source = np.zeros_like(n)
-# source[0] = 1.
-# base = HelmholtzBase(n=n, source=source, n_domains=2, boundary_widths=5, wrap_correction='wrap_corr')
-# print('Done.')

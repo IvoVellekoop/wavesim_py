@@ -5,6 +5,8 @@ from utilities import pad_func, preprocess
 
 
 class HelmholtzBase:
+    """" Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
+     and setting up wrapping and transfer corrections """
     def __init__(self, 
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
                  wavelength=1.,  # Wavelength in um (micron)
@@ -45,8 +47,8 @@ class HelmholtzBase:
                                              range(self.n_domains[2])))  # to iterate through subdomains in all dims
         self.total_domains = np.prod(self.n_domains).astype(int)
 
-        self.crop2roi = tuple([slice(self.boundary_pre[i], -self.boundary_post[i])
-                               for i in range(self.n_dims)])  # crop array from n_ext to n_roi
+        self.crop2roi = tuple([slice(self.boundary_pre[d], -self.boundary_post[d])
+                               for d in range(self.n_dims)])  # crop array from n_ext to n_roi
 
         # Stopping criteria
         self.max_iterations = max_iterations
@@ -71,7 +73,8 @@ class HelmholtzBase:
 
     def make_operators(self):
         """ Make the medium and propagator operators, and, if applicable,
-        the wrapping correction and wrapping transfer operators. """
+        the wrapping correction and wrapping transfer operators.
+        :return: medium_operators, propagator, scaling"""
         # Make v
         v0 = (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw))) / 2
         v0 = v0 + 1j * self.v_min
@@ -83,7 +86,7 @@ class HelmholtzBase:
         else:
             n_fft = self.domain_size.copy()
         
-        l_p = self.laplacian_sq_f(n_fft, self.n_dims, self.pixel_size)  # Fourier coordinates in n_dims
+        l_p = self.laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
             side = np.zeros(self.domain_size, dtype=np.complex64)
@@ -134,13 +137,17 @@ class HelmholtzBase:
 
     def patch_slice(self, patch):
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
-        return tuple([slice(patch[j] * (self.domain_size[j] - self.overlap[j]), 
-                            patch[j] * (self.domain_size[j] - self.overlap[j]) + self.domain_size[j]) for
-                      j in range(self.n_dims)])
+        return tuple([slice(patch[d] * (self.domain_size[d] - self.overlap[d]), 
+                            patch[d] * (self.domain_size[d] - self.overlap[d]) + self.domain_size[d]) for
+                      d in range(self.n_dims)])
 
     @staticmethod
-    def laplacian_sq_f(n_fft, n_dims, pixel_size=1.):
-        """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions """
+    def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
+        """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
+        :param n_dims: number of dimensions
+        :param n_fft: window length
+        :param pixel_size: sample spacing
+        :return Laplacian squared in Fourier coordinates"""
         l_p = ((2 * np.pi * fftfreq(n_fft[0], pixel_size)) ** 2).astype(np.complex64)
         for d in range(1, n_dims):
             l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
@@ -172,9 +179,25 @@ class HelmholtzBase:
                 corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
             x = x.transpose((1, 2, 0))
             corr = corr.transpose((1, 2, 0))
-        
+
         # Reshape back to original size
         for _ in range(3-n_dims):
             corr = corr.transpose((1, 2, 0))
 
         return corr
+
+    def transfer_correction(self, x, current_patch):
+        """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain
+        :param x: Dictionary with all patches/subdomains of x
+        :param current_patch: Current subdomain, as a 3-element position tuple
+        :return: x_transfer: Field(s) to transfer
+        """
+        x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
+        for d in range(self.n_dims):
+            for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain in axis (d)
+                patch_shift = np.zeros_like(current_patch)
+                patch_shift[d] = idx_shift
+                neighbour_patch = tuple(np.array(current_patch) + patch_shift)  # get neighbouring subdomain location
+                if neighbour_patch in self.domains_iterator:  # check if subdomain exists
+                    x_transfer += self.scaling[current_patch] * self.wrap_corr(x[neighbour_patch], idx_shift)
+        return x_transfer

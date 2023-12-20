@@ -10,6 +10,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
                overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
                omega=10):  # compute the fft over omega times the domain size
+    """ Set up parameters to pass to HelmholtzBase """
 
     n = check_input_dims(n)
     n_dims = (np.squeeze(n)).ndim  # Number of dimensions in problem
@@ -39,18 +40,18 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     else:  # Else, domain decomposition
         domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
 
-        """ Increase boundary_post in dimension(s) until all subdomains are of the same size """
+        # Increase boundary_post in dimension(s) until all subdomains are of the same size
         while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
             boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
             n_ext = n_roi + boundary_pre + boundary_post
             domain_size[:n_dims] = (n_ext + ((n_domains - 1) * overlap)) / n_domains
 
-        """ Increase number of subdomains until subdomain size is less than max_subdomain_size """
+        # Increase number of subdomains until subdomain size is less than max_subdomain_size
         while (domain_size > max_subdomain_size).any():
             n_domains[np.where(domain_size > max_subdomain_size)] += 1
             domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
 
-        """ Increase boundary_post in dimension(s) until the subdomain size is int """
+        # Increase boundary_post in dimension(s) until the subdomain size is int
         while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
             boundary_post += np.round(n_domains * (np.ceil(domain_size) - domain_size), 2)
             n_ext = n_roi + boundary_pre + boundary_post
@@ -87,19 +88,21 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
 
 def boundary_(x):
-    """ Anti-reflection boundary layer (ARL). Linear window function """
+    """ Anti-reflection boundary layer (ARL). Linear window function
+    :param x: Size of the ARL
+    :return boundary_: Boundary"""
     return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
 
 
-def check_input_dims(a):
+def check_input_dims(x):
     """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source) """
-    for _ in range(3 - a.ndim):
-        a = np.expand_dims(a, axis=-1)
-    return a
+    for _ in range(3 - x.ndim):
+        x = np.expand_dims(x, axis=-1)
+    return x
 
 
 def check_input_len(x, e, n_dims):
-    """ Convert 'x' to a 3-element numpy array, appropriately, i.e., either repeat, or add 0 or 1. """
+    """ Convert 'x' to a 3-element numpy array, appropriately, i.e., either repeat, or add 'e'. """
     if isinstance(x, int) or isinstance(x, float):
         x = n_dims*tuple((x,)) + (3-n_dims) * (e,)
     elif len(x) == 1:
@@ -112,15 +115,14 @@ def check_input_len(x, e, n_dims):
 
 
 def dft_matrix(n):
-    """ Create a discrete Fourier transform matrix. Faster than scipy dft function """
+    """ Create a discrete Fourier transform matrix of size n x n. Faster than scipy dft function """
     r = np.arange(n)
     omega = np.exp((-2 * np.pi * 1j) / n)  # remove the '-' for inverse fourier
     return np.vander(omega ** r, increasing=True).astype(np.complex64)  # faster than meshgrid
 
 
 def full_matrix(operator, d):
-    """ Converts operator to an 2D square matrix of size d.
-    (operator should be a function taking a single column vector as input?) """
+    """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) """
     nf = np.prod(d)
     m = dok_matrix((nf, nf), dtype=np.complex64)
     b = np.zeros(d, dtype=np.complex64)
@@ -146,13 +148,10 @@ def full_matrix(operator, d):
 #     return m
 
 
-def overlap_decay(x):
-    """ Linear decay from 0 to 1 of size x """
-    return np.interp(np.arange(x), [0, x - 1], [0, 1])
-
-
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
-    return np.pad(x, (tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])), mode=mode)
+    """ Pad 'x' with boundary_pre (before) and boundary_post (after) """
+    pad_width = tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])
+    return np.pad(x, pad_width, mode)
 
 
 def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):

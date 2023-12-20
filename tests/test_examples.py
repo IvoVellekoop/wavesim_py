@@ -72,8 +72,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega')])
-                                                        # , (2, None), (3, None), (4, None), (5, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (2, None), (3, None)])
 def test_2d_high_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
         Compare with reference solution (matlab repo result) """
@@ -96,8 +95,7 @@ def test_2d_high_contrast(n_domains, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr')])#, (1, 'L_omega')
-                                                        #, (2, None), (3, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (2, None), (3, None)])
 def test_2d_low_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure with low refractive index contrast. 
         Compare with reference solution (matlab repo result) """
@@ -111,7 +109,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(wavelength=0.532, ppw=3*abs(n_fat), boundary_widths=(30, 30), 
                          n=n, source=source, n_domains=n_domains, 
-                         wrap_correction=wrap_correction, n_correction=200)
+                         wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
     u_ref = matlab_results['u2d_lc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -136,8 +134,7 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr')])
-                                                        #, (2, None), (3, None)])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (2, None), (3, None)])
 def test_3d_disordered(n_domains, wrap_correction):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
     n_roi = (128, 48, 96)

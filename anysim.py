@@ -6,7 +6,9 @@ from state import State
 
 
 def iterate(base: HelmholtzBase):
-    """ AnySim update """
+    """ AnySim update
+    :param base: Helmholtz base parameters
+    :return: computed field u, state object """
 
     u = np.zeros_like(base.s, dtype=np.complex64)  # field u, initialize with 0s
     restrict, extend = domain_decomp_operators(base)  # Construct restriction and extension operators
@@ -25,15 +27,11 @@ def iterate(base: HelmholtzBase):
 
     for i in range(base.max_iterations):
         residual = 0
-        for idx, patch in enumerate(base.domains_iterator):
-            # idx gives the index in the list of domains_iterator
-            # patch gives the 3-element position tuple of subdomain (e.g., (0,0,0))
-
+        for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
             print(f'Iteration {i + 1}, sub-domain {patch}. ', end='\r')
 
             t1 = base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
-            # Communication between subdomains (Add the transfer_correction with previous and/or next subdomain)
-            t1 = t1 - transfer_correction(base, u_dict, patch, idx)
+            t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
             t1 = base.propagator(t1, base.scaling[patch])  # (L+1)^-1 t1
             t1 = base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
 
@@ -87,16 +85,3 @@ def map_domain(x, mapping_operator, patch):
         x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
         x = np.moveaxis(x, -1, dim)  # Transpose back
     return x.astype(np.complex64)
-
-
-def transfer_correction(base, x, current_patch, idx):
-    """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain """
-    x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
-    for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain
-        if 0 <= idx + idx_shift < len(base.domains_iterator):  # check if subdomain is on the edge
-            neighbour_patch = base.domains_iterator[idx + idx_shift]  # get the neighbouring subdomain location
-            x_neighbour = x[neighbour_patch].copy()  # get the neighbouring subdomain field
-            # get the field(s) to transfer
-            x_transfer += base.scaling[current_patch] * base.wrap_corr(x_neighbour, idx_shift)
-            # x_transfer += self.transfer(x_neighbour, base.scaling[current_patch], idx_shift)
-    return x_transfer

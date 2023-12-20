@@ -12,6 +12,7 @@ from anysim import iterate
 from save_details import LogPlot
 from utilities import relative_error
 
+matlab_results = loadmat('matlab_results.mat')
 
 def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
     """ Compute, Print, and Assert relative error between computed and reference field """
@@ -64,7 +65,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
     source[0] = 1.
     base = HelmholtzBase(n=n, n_domains=n_domains, boundary_widths=10, source=source, wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
-    u_ref = np.squeeze(loadmat('anysim_matlab/u.mat')['u'])
+    u_ref = np.squeeze(matlab_results['u'])
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -75,7 +76,7 @@ def test_2d_high_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
         Compare with reference solution (matlab repo result) """
     oversampling = 0.25
-    im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
+    im = np.asarray(open('logo_structure_vector.png')) / 255
     n_iron = 2.8954 + 2.9179j
     n_contrast = n_iron - 1
     n_im = ((np.where(im[:, :, 2] > 0.25, 1, 0) * n_contrast) + 1)
@@ -83,12 +84,12 @@ def test_2d_high_contrast(n_domains, wrap_correction):
     # n2d = np.asarray(fromarray(n_im).resize((n_roi,n_roi), BILINEAR)) # resize cannot work with complex values?
     if os.path.basename(os.getcwd()) == 'tests':
         os.chdir('..')
-    n = loadmat('anysim_matlab/n2d.mat')['n']
+    n = matlab_results['n2d_hc']
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), boundary_widths=(31.5, 31.5),
                          n=n, source=source, wrap_correction=wrap_correction, max_iterations=int(1.e+4))
     u_computed, state = iterate(base)
-    u_ref = loadmat('anysim_matlab/u2d.mat')['u2d']
+    u_ref = matlab_results['u2d_hc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -99,7 +100,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     """ Test for propagation in 2D structure with low refractive index contrast. 
         Compare with reference solution (matlab repo result) """
     oversampling = 0.25
-    im = np.asarray(open('anysim_matlab/logo_structure_vector.png')) / 255
+    im = np.asarray(open('logo_structure_vector.png')) / 255
     n_water = 1.33
     n_fat = 1.46
     n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
@@ -110,7 +111,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
                          n=n, source=source, n_domains=n_domains, 
                          wrap_correction=wrap_correction, n_correction=200)
     u_computed, state = iterate(base)
-    u_ref = loadmat('anysim_matlab/u2d_lc.mat')['u2d']
+    u_ref = matlab_results['u2d_lc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -128,8 +129,7 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
     base = HelmholtzBase(boundary_widths=boundary_widths, n=n_sample, source=source, 
                          wrap_correction=wrap_correction, max_iterations=500)
     u_computed, state = iterate(base)
-    u_ref = loadmat(f'anysim_matlab/u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}'
-                    + f'_bw_{boundary_widths[0]}_{boundary_widths[1]}_{boundary_widths[2]}.mat')['u']
+    u_ref = matlab_results[f'u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}_bw_20_24_32']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
 
@@ -138,14 +138,14 @@ def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
                                                         #, (2, None), (3, None)])
 def test_3d_disordered(n_domains, wrap_correction):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
-    n_roi = (128, 128, 128)
-    n_sample = loadmat(f'anysim_matlab/n3d_disordered.mat')['n_sample']
+    n_roi = (128, 48, 96)
+    n_sample = matlab_results['n3d_disordered']
     source = np.zeros_like(n_sample, dtype=np.complex64)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
     base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 
                          wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
-    u_ref = loadmat(f'anysim_matlab/u3d_disordered.mat')['u']
+    u_ref = matlab_results['u3d_disordered']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)

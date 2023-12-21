@@ -97,8 +97,7 @@ def test_compare_A(n, boundary_widths, n_correction):
         rel_err = relative_error(a_w, a_o)
     else:
         crop2roi = tuple([slice(base_w.boundary_pre[0], -base_w.boundary_post[0]) 
-                          for _ in range(2)])  # crop array from n_ext to n_roi
-
+                          for _ in range(2)])  # crop to n_roi, excluding boundaries
         rel_err = relative_error(a_w[crop2roi], a_o[crop2roi])
 
     print(f'{rel_err:.2e}')

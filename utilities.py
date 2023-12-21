@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.fft import fftfreq
 from scipy.sparse import dok_matrix
 
 
@@ -9,28 +10,22 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
                boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
                n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
                omega=10):  # compute the fft over omega times the domain size
-    """ Set up parameters to pass to HelmholtzBase """
+    """ Set up and preprocess parameters to pass to HelmholtzBase """
 
-    n = check_input_dims(n)
+    n = check_input_dims(n)  # Ensure n is a 3-d array
     n_dims = (np.squeeze(n)).ndim  # Number of dimensions in problem
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
-    boundary_widths = check_input_len(boundary_widths, 0, n_dims)
+    boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
+    # Separate into _pre (before) and _post (after) boundaries, as _post can be changed to satisfy domain
+    # decomposition conditions (max subdomain size, all subdomains same size, domain size is int)
     boundary_pre = np.floor(boundary_widths)
     boundary_post = np.ceil(boundary_widths)
 
+    # determine number of subdomains based on max size, ensure that all are of the same size (pad if not),
+    # modify boundary_post and n_ext, and cast parameters to int
     n_ext = n_roi + boundary_pre + boundary_post  # n_roi + boundaries on either side(s)
-
-    max_subdomain_size = 500  # max permissible size of one sub-domain
-    # Number of subdomains to decompose into in each dimension
-    if n_domains is None:
-        n_domains = n_ext // max_subdomain_size
-    else:
-        n_domains = check_input_len(n_domains, 1, n_dims)
-
-    # determines number of subdomains based on max size, ensures that all are of the same size (pads if necessary),
-    # modifies boundary_post and n_ext, and casts parameters to int
-
+    n_domains = check_input_len(n_domains, 1, n_dims)  # Ensure n_domains is a 3-element array with 1s after n_dims
     if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
         domain_size = n_ext.copy()
     else:  # Else, domain decomposition
@@ -43,6 +38,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
             domain_size[:n_dims] = n_ext/n_domains
 
         # Increase number of subdomains until subdomain size is less than max_subdomain_size
+        max_subdomain_size = 500  # max permissible size of one sub-domain
         while (domain_size > max_subdomain_size).any():
             n_domains[np.where(domain_size > max_subdomain_size)] += 1
             domain_size = n_ext/n_domains
@@ -53,32 +49,30 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
             n_ext = n_roi + boundary_pre + boundary_post
             domain_size = n_ext/n_domains
 
+    # Cast below 4 parameters to int because they are used in padding, indexing/slicing, creation of arrays
     boundary_pre = boundary_pre.astype(int)
     boundary_post = boundary_post.astype(int)
-    n_ext = n_ext.astype(int)
     n_domains = n_domains.astype(int)
     domain_size = domain_size.astype(int)
 
     k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
-    v_raw = k0 ** 2 * n ** 2
+    v_raw = (k0 ** 2) * (n ** 2)
+    v_raw = pad_boundaries(v_raw, boundary_pre, boundary_post, mode="edge")  # pad v_raw using edge values
 
-    # pad v_raw with boundaries using edge values
-    v_raw = pad_boundaries(v_raw, boundary_pre, boundary_post, mode="edge")
-
-    """ give tiny non-zero minimum value to prevent division by zero in homogeneous media """
+    # compute tiny non-zero minimum value to prevent division by zero in homogeneous media
     pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
     mu_min = ((10.0 / (boundary_widths[:n_dims] * pixel_size)) if (
             boundary_widths != 0).any() else check_input_len(0, 0, n_dims)).astype(np.float32)
     mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:n_dims]) * pixel_size)))
     v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
-    # Pad the source term (scale later)
-    s = check_input_dims(source)
-    s = pad_boundaries(s, boundary_pre, boundary_post, mode="constant")
+    source = check_input_dims(source)  # Ensure source term is a 3-d array
+    source = pad_boundaries(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
 
-    omega = check_input_len(omega, 1, n_dims)  # compute the fft over omega times the domain size
-    
-    return (n_roi, n_ext, s, n_dims, boundary_widths, boundary_pre, boundary_post,
+    # compute the fft over omega times the domain size
+    omega = check_input_len(omega, 1, n_dims)  # Ensure omega is a 3-element array with 1s after n_dims
+
+    return (n_roi, source, n_dims, boundary_widths, boundary_pre, boundary_post,
             n_domains, domain_size, omega, v_min, v_raw)
     # return locals()
 
@@ -144,8 +138,27 @@ def full_matrix(operator, d):
 #     return m
 
 
+def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
+    """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
+    :param n_dims: number of dimensions
+    :param n_fft: window length
+    :param pixel_size: sample spacing
+    :return Laplacian squared in Fourier coordinates"""
+    l_p = coordinates_f(n_fft[0], pixel_size) ** 2
+    for d in range(1, n_dims):
+        l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(coordinates_f(n_fft[d], pixel_size) ** 2, axis=0)
+
+    for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
+        l_p = np.expand_dims(l_p, axis=-1)
+    return l_p
+
+
+def coordinates_f(n_, pixel_size=1.):
+    return (2 * np.pi * fftfreq(n_, pixel_size)).astype(np.complex64)
+
+
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
-    """ Pad 'x' with boundary_pre (before) and boundary_post (after) """
+    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
     pad_width = tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])
     return np.pad(x, pad_width, mode)
 
@@ -156,8 +169,8 @@ def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
         left_boundary = boundary_(boundary_pre[i])
         right_boundary = np.flip(boundary_(boundary_post[i]))
         full_filter = np.concatenate((left_boundary, np.ones(n_roi[i]), right_boundary))
-        m = np.moveaxis(m, i, -1) * full_filter
-        m = np.moveaxis(m, -1, i)
+        m = np.moveaxis(m, i, -1) * full_filter  # transpose m to multiply last axis with full_filter
+        m = np.moveaxis(m, -1, i)  # transpose back
     return m.astype(np.complex64)
 
 

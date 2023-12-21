@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
-from scipy.fft import fftn, ifftn, fftfreq
-from utilities import pad_func, preprocess
+from scipy.fft import fftn, ifftn
+from utilities import laplacian_sq_f, pad_func, preprocess
 
 
 class HelmholtzBase:
@@ -34,7 +34,7 @@ class HelmholtzBase:
         self.medium_operators = None
         self.propagator = None
 
-        (self.n_roi, self.n_ext, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
+        (self.n_roi, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
          self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw) = (
             preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega))
 
@@ -42,22 +42,23 @@ class HelmholtzBase:
         # for name, val in base.items():
         #     exec('self.'+name+' = val')
 
-        self.domains_iterator = list(product(range(self.n_domains[0]), range(self.n_domains[1]),
-                                             range(self.n_domains[2])))  # to iterate through subdomains in all dims
-        self.total_domains = np.prod(self.n_domains).astype(int)
-
+        # to iterate through subdomains in all dimensions
+        self.domains_iterator = list(product(*(range(self.n_domains[i]) for i in range(3))))
+        
+        self.total_domains = np.prod(self.n_domains).astype(int)  # total number of domains across all dimensions
+        
         self.crop2roi = tuple([slice(self.boundary_pre[d], -self.boundary_post[d])
-                               for d in range(self.n_dims)])  # crop array from n_ext to n_roi
+                               for d in range(self.n_dims)])  # crop to n_roi, excluding boundaries
+
+        self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
 
         # Stopping criteria
         self.max_iterations = int(max_iterations)
-        self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
         self.threshold_residual = 1.e-6
-        self.divergence_limit = 1.e+12
+        self.divergence_limit = 1.e+6
 
         self.print_details()
-        if setup_operators:
-            # Get (1) Medium b = 1 - v + corrections and (2) Propagator (L+1)^(-1) operators, and (3) scaling
+        if setup_operators:  # Get Medium (b = 1 - v + corrections) and Propagator (L+1)^(-1) operators, and scaling
             self.medium_operators, self.propagator, self.scaling = self.make_operators()
 
     def print_details(self):
@@ -77,7 +78,7 @@ class HelmholtzBase:
         # Make v
         v0 = (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw))) / 2
         v0 = v0 + 1j * self.v_min
-        self.v = -1j * (self.v_raw - v0)
+        self.v = -1j * (self.v_raw - v0)  # shift v_raw
 
         # Make the wrap_corr operator (If wrap_correction=True)
         if self.wrap_correction == 'L_omega':
@@ -85,7 +86,7 @@ class HelmholtzBase:
         else:
             n_fft = self.domain_size.copy()
         
-        l_p = self.laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
+        l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
             side = np.zeros(self.domain_size, dtype=np.complex64)
@@ -100,7 +101,7 @@ class HelmholtzBase:
 
             self.wrap_corr = lambda x, idx_shift='all': 1j * self.compute_wrap_corr(x, wrap_matrix, idx_shift)
 
-        # Compute (and apply to v) the scaling. Scaling computation includes wrap_corr if wrap_correction=True
+        # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
         for patch in self.domains_iterator:
             patch_slice = self.patch_slice(patch)
@@ -108,20 +109,21 @@ class HelmholtzBase:
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
                 v_norm += self.n_dims * np.linalg.norm(wrap_matrix, 2)
             scaling[patch] = 0.95/v_norm
-            self.v[patch_slice] = scaling[patch] * self.v[patch_slice]
+            self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
         b = 1 - self.v
-        b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, n_dims=self.n_dims)
-        # Make the medium operator(s)
+        b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
+        
+        # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
         for patch in self.domains_iterator:
-            patch_slice = self.patch_slice(patch)
-            b_block = b[patch_slice]
+            patch_slice = self.patch_slice(patch)  # get slice/indices for the subdomain patch
+            b_patch = b[patch_slice]
             if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                medium_operators[patch] = lambda x, b_ = b_block: (b_ * x + scaling[patch] * self.wrap_corr(x))
+                medium_operators[patch] = lambda x, b_ = b_patch: (b_ * x + scaling[patch] * self.wrap_corr(x))
             else:
-                medium_operators[patch] = lambda x, b_ = b_block: b_ * x
+                medium_operators[patch] = lambda x, b_ = b_patch: b_ * x
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
@@ -140,25 +142,9 @@ class HelmholtzBase:
                             patch[d] * self.domain_size[d] + self.domain_size[d]) for d in range(self.n_dims)])
 
     @staticmethod
-    def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
-        """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
-        :param n_dims: number of dimensions
-        :param n_fft: window length
-        :param pixel_size: sample spacing
-        :return Laplacian squared in Fourier coordinates"""
-        l_p = ((2 * np.pi * fftfreq(n_fft[0], pixel_size)) ** 2).astype(np.complex64)
-        for d in range(1, n_dims):
-            l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(
-                (2 * np.pi * fftfreq(n_fft[d], pixel_size)) ** 2, axis=0).astype(np.complex64)
-        for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
-            l_p = np.expand_dims(l_p, axis=-1)
-        return l_p
-
-    @staticmethod
     def compute_wrap_corr(x, wrap_matrix, idx_shift='all'):
         """ Function to compute the wrapping correction in 3 dimensions. 
-        Possible efficiency improvement: Compute corrections as six separate arrays (for the edges only) 
-        to save memory.
+        Possible efficiency improvement: Compute corrections as six separate arrays (for the edges only) to save memory
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :param idx_shift: Apply correction to left [-1], right [+1], or both ['all'] edges
@@ -178,7 +164,7 @@ class HelmholtzBase:
             x = x.transpose((1, 2, 0))
             corr = corr.transpose((1, 2, 0))
 
-        # Reshape back to original size
+        # Reshape corr back to original size
         for _ in range(3-n_dims):
             corr = corr.transpose((1, 2, 0))
 

@@ -13,8 +13,11 @@ def iterate(base: HelmholtzBase):
     u = np.zeros_like(base.s, dtype=np.complex64)  # field u, initialize with 0s
     restrict, extend = domain_decomp_operators(base)  # Construct restriction and extension operators
     state = State(base)
-    state.init_norm = norm(np.sum(np.array([(map_domain(base.medium_operators[patch](base.propagator(map_domain(
-        base.s, restrict, patch), base.scaling[patch])), extend, patch)) for patch in base.domains_iterator]), axis=0))
+    # list of preconditioner i.e. medium(propagator()) applied to source term in each subdomain patch
+    norm_patch = [(map_domain(base.medium_operators[patch](base.propagator(
+        map_domain(base.s, restrict, patch), base.scaling[patch])), extend, patch)) for patch in base.domains_iterator]
+    # initial norm for residual computation. Summing up all patches of medium(propagator(source)) and taking norm
+    state.init_norm = norm(np.sum(np.array(norm_patch), axis=0))
 
     # Empty dicts of lists to store patch-wise source (s) and field (u)
     s_dict = defaultdict(list)
@@ -22,8 +25,7 @@ def iterate(base: HelmholtzBase):
     for patch in base.domains_iterator:
         # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
         s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * map_domain(base.s, restrict, patch)
-        # restrict full-domain field u to the patch subdomain
-        u_dict[patch] = map_domain(u, restrict, patch)
+        u_dict[patch] = map_domain(u, restrict, patch)  # restrict full-domain field u to the subdomain patch
 
     for i in range(base.max_iterations):
         residual = 0
@@ -64,7 +66,8 @@ def domain_decomp_operators(base):
     else:
         ones = np.eye(base.domain_size[0])
         restrict0_ = []
-        [restrict0_.append(np.zeros((base.domain_size[dim], base.n_ext[dim]))) 
+        n_ext = base.n_roi + base.boundary_pre + base.boundary_post
+        [restrict0_.append(np.zeros((base.domain_size[dim], n_ext[dim]))) 
             for dim in range(base.n_dims)]
         for dim in range(base.n_dims):
             for patch in range(base.n_domains[dim]):

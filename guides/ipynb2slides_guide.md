@@ -20,7 +20,7 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
 ### To open in browser (google chrome)
 
-4. Although these packages should already be installed through the .yml file while setting up the environment, if the current working directory does not open jupyter in a browser window after entering the command:
+5. Although these packages should already be installed through the .yml file while setting up the environment, if the current working directory does not open jupyter in a browser window after entering the command:
 
         jupyter notebook
         
@@ -33,12 +33,12 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
             jupyter notebook
 
-5. The environment should now be visible in the Select Kernel dropdown.
+6. The environment should now be visible in the Select Kernel dropdown.
 
 
 ### To convert the current jupyter notebook into a presentation (plotly plots stay interactive)
 
-1. Open the jupter notebook in a browser window and check that running all cells gives the expected output
+1. Open the jupyter notebook in a browser window and check that running all cells gives the expected output
 
 2. In the toolbar at the top, Click **View** --> **Cell Toolbar** ---> **Slideshow**
 
@@ -62,6 +62,6 @@ We need to add the conda environment to jupyter notebooks so that it can be sele
 
             jupyter nbconvert --to slides --no-input <filename>.ipynb --SlidesExporter.reveal_transition=none --SlidesExporter.reveal_theme=serif
 
-6. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
+5. Double-click the .html presentation \<filename\>.html that should now be in the current working directory.
 
-7. To convert the .html slides to pdf, add _?print-pdf_ in the URL in the web browser between _html_ and _#_.
+6. To convert the .html slides to pdf, add _?print-pdf_ in the URL in the web browser between _html_ and _#_.

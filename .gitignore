@@ -1,8 +1,9 @@
+*.html
+*.ipynb
+*.json
+*.mp4
 *.pdf
 *.png
-*.mp4
-*.ipynb
-*.html
 *.sh
 .idea
 .ipynb_checkpoints

@@ -9,16 +9,16 @@ class HelmholtzBase:
      and setting up wrapping and transfer corrections """
     def __init__(self, 
                  n=np.ones((1, 1, 1)),  # Refractive index distribution
+                 source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                  wavelength=1.,  # Wavelength in um (micron)
                  ppw=4,  # points per wavelength
                  boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
-                 source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
-                 overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                  n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-                 omega=10,  # compute the fft over omega times the domain size
+                 overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
+                 omega=10,  # compute the fft over omega times the domain size
                  n_correction=8,  # number of points used in the wrapping correction
-                 max_iterations=int(1.e+4),  # Maximum number iterations
+                 max_iterations=int(1.e+4),  # Maximum number of iterations
                  setup_operators=True):  # Set up Medium (+corrections) and Propagator operators, and scaling
 
         self.pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
@@ -35,11 +35,11 @@ class HelmholtzBase:
         self.medium_operators = None
         self.propagator = None
 
-        (self.n_dims, self.n_roi, self.n_ext, self.boundary_widths, self.boundary_pre, self.boundary_post,
-         self.overlap, self.n_domains, self.domain_size, self.v_min, self.v_raw, self.omega, self.s) = (
-            preprocess(n, wavelength, ppw, boundary_widths, source, overlap, n_domains, omega))
+        (self.n_roi, self.n_ext, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
+         self.n_domains, self.overlap, self.domain_size, self.omega, self.v_min, self.v_raw) = (
+            preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, overlap, omega))
 
-        # base = preprocess(n, wavelength, ppw, boundary_widths, source, n_domains, overlap, omega)
+        # base = preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, overlap, omega)
         # for name, val in base.items():
         #     exec('self.'+name+' = val')
 
@@ -51,7 +51,7 @@ class HelmholtzBase:
                                for d in range(self.n_dims)])  # crop array from n_ext to n_roi
 
         # Stopping criteria
-        self.max_iterations = max_iterations
+        self.max_iterations = int(max_iterations)
         self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
         self.threshold_residual = 1.e-6
         self.divergence_limit = 1.e+12

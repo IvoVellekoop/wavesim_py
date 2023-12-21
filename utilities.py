@@ -3,12 +3,12 @@ from scipy.sparse import dok_matrix
 
 
 def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
+               source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                wavelength=1.,  # Wavelength in um (micron)
                ppw=4,  # points per wavelength
                boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
-               source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
-               overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
+               overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                omega=10):  # compute the fft over omega times the domain size
     """ Set up parameters to pass to HelmholtzBase """
 
@@ -77,13 +77,13 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
     # Pad the source term (scale later)
-    s = check_input_dims(source).astype(np.float32)
+    s = check_input_dims(source)
     s = pad_boundaries(s, boundary_pre, boundary_post, mode="constant")
 
     omega = check_input_len(omega, 1, n_dims)  # compute the fft over omega times the domain size
     
-    return (n_dims, n_roi, n_ext, boundary_widths, boundary_pre, boundary_post,
-            overlap, n_domains, domain_size, v_min, v_raw, omega, s)
+    return (n_roi, n_ext, s, n_dims, boundary_widths, boundary_pre, boundary_post,
+            n_domains, overlap, domain_size, omega, v_min, v_raw)
     # return locals()
 
 

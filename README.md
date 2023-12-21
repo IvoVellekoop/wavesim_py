@@ -1,52 +1,69 @@
-## Running the code
+# Running the code
 
-To run with the default options/flags:
+test/test_examples.py contains 2 examples each of 1D, 2D, and 3D problems. The minimum 2 inputs that all require are n (refractive index distribution, a 3-dimensional array) and source (source term, of the same size as n). 
 
-        python anysim_combined.py
+## Simple example (1D, homogeneous medium)
 
-The flags that can be specified, along with the options for each of them are given below:
+        import numpy as np
+        from helmholtzbase import HelmholtzBase  # to set up medium, propagation operators, and scaling
+        from anysim import iterate  # to run the anysim iteration
 
-topic = 'Helmholtz'
+        n = np.ones((256, 1, 1))        # Refractive index distribution
+        source = np.zeros_like(n)       # Source term
+        source[0] = 1.                  # Amplitude 1. at location [0]
+        base = HelmholtzBase(n, source) # to set up medium and propagation operators, and scaling
+        u, state = iterate(base)        # Field u and state object with information about the run
 
-""" Helmholtz (the only one for now) or Maxwell """
+All other parameters have defaults. Details about n, source, and the other parameters are given below, with the default values defined given in the headers:
 
-# test = 'FreeSpace'
-""" 
-'FreeSpace'
-    (Simulates free-space propagation and compares the result to the analytical solution), OR
-'1D'
-    (Simulates 1-D propagation of light through a slab of glass), OR
-'2D'
-    (Simulates propagation of light in a 2-D structure made of iron (uses the scalar wave equation)), OR 
-'2D_low_contrast'
-    (Simulates propagation of light in a 2-D structure made of fat and water (uses the scalar wave equation)) 
-"""
+## n = np.ones((1, 1, 1))
+3-dimensional array with refractive index distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, simply fill the first 1 or 2 dimensions with values > 1 and leave the other dimension(s) as 1.
 
-# smallest_circle_problem = False
-""" True (V0 as in AnySim) or False (V0 as in WaveSim) """
+## source=np.zeros((1, 1, 1))
+Source term, a 3-dimensional array, with the same size as n, and default as 0 everywhere. Set up amplitude(s) at the desired location(s), following the same principle as n for 1, 2, or 3-dimensional problems.
 
-# absorbing_boundaries = False
-""" True (add absorbing boundaries) or False (don't add) """
+## wavelength = 1.
+Wavelength in um (micron)
 
-# wrap_correction = 'None'
-""" 
-'None'
+## ppw = 4
+points per wavelength
+
+## boundary_widths = (20, 20, 20)
+Width of absorbing boundaries. 3-element tuple indicating boundaries in x, y, and z dimensions.
+
+## n_domains = (1, 1, 1)
+Number of subdomains to decompose the problem into. 3-element tuple indicating number of domains in x, y, and z dimensions.
+
+## overlap = (0, 0, 0)
+Applicable only when number of domains > 1. Overlap between subdomains. 3-element tuple indicating overlap in x, y, and z dimensions.
+
+## wrap_correction = None
+None
     (Use the usual Laplacian and eliminate wrap-around effects with absorbing boundaries), OR
 'L_omega'
-    (Do the fast convolution over a much larger domain to eliminate wrap-around effects without absorbing boundaries), OR
-'L_corr'
-    (Add the wrap-aroound correction term to V to correct for the wrap-around effects without absorbing boundaries)
-"""
+    (Do the fast convolution over a much larger domain such that there are no wrap-around effects in the Laplacian), OR
+'wrap_corr'
+    (Add the wrapping correction term to the medium operator to correct for the wrap-around effects, allowing for smaller absorbing boundaries only to tackle reflections)
 
+## omega = 10
+Compute the fft over omega times the domain size. The fft is used for implementing the Laplacian in the wrap_correction='L_omega' case, or the wrapping corrections in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
+
+## n_correction = 8
+Number of points used in the wrapping correction in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
+
+## max_iterations = int(1.e+4)
+[int] Maximum number of iterations
+
+## setup_operators = True
+Boolean for whether to set up Medium (+corrections) and Propagator operators, and scaling
 
 ---
+---
+# Installing Miniconda on a Linux system (or Windows Subsystem for Linux)
 
 Below are the instructions for setting up Miniconda (a much lighter counterpart of Anaconda) to work in conda environments, and the conda environment corresponding to this project.
 
----
-## Installing Miniconda on a Linux system (or Windows Subsystem for Linux)
-
-1. Download the appropriate (i.e. Linux/Windows/MacOS) installer from https://docs.conda.io/en/latest/miniconda.html
+1. Download the appropriate (i.e. Linux/Windows/macOS) installer from https://docs.conda.io/en/latest/miniconda.html
 
 Assuming Linux for the step ahead. Instructions also available at https://conda.io/projects/conda/en/stable/user-guide/install/linux.html
 
@@ -65,7 +82,7 @@ Assuming Linux for the step ahead. Instructions also available at https://conda.
 A list of installed packages appears if it has been installed correctly.
 
 ---
-## Setting up a conda environment
+# Setting up a conda environment
 
 Instructions also available at https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
 
@@ -90,11 +107,11 @@ Avoid using the base environment altogether. It is a good backup environment to 
 
     * a .yml file in the current directory
 
-                conda env create -f setting_up/anysim_cluster.yml
+                conda env create -f environment.yml
 
 4. To update the current conda environment from a .yml file:
 
-        conda env update --name anysim_cluster --file setting_up/anysim_cluster.yml --prune
+        conda env update --name anysim_cluster --file environment.yml --prune
 
 4. To export current environment to a .yml file:
 
@@ -109,13 +126,13 @@ Avoid using the base environment altogether. It is a good backup environment to 
 
         python -m pip install <package name>
 
-7. After updating conda, setting up a new environment, installing packages, it is a nice idea to clean-up any installation packages or tarballs as they are not needed anymore:
+7. After updating conda, setting up a new environment, installing packages, it is a nice idea to clean up any installation packages or tarballs as they are not needed anymore:
 
         conda clean --all
 
 ---
 
-## If problem with specifying fonts in matplotlib.rc 
+# If problem with specifying fonts in matplotlib.rc 
 
 Example of an error: "findfont: Generic family 'sans-serif' not found because none of the following families were found: Time New Roman"
 
@@ -129,6 +146,6 @@ Example of an error: "findfont: Generic family 'sans-serif' not found because no
 
 ---
 
-## For animations, ffmpeg package needed
+# For animations, ffmpeg package needed (below command for Linux)
 
         sudo apt-get install ffmpeg

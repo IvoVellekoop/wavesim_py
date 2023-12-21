@@ -87,7 +87,7 @@ def test_compare_A(n, boundary_widths, n_correction):
     b_o = full_matrix(base_o.medium_operators[patch], base_w.domain_size)
     a_o = ((l_o_plus1 - b_o)/scaling_o).todense()
 
-    # base = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction=None)
+    # base = HelmholtzBase(n=n, boundary_widths=boundary_widths, wrap_correction=None)
     # l_plus_1_operator = lambda x: np.fft.ifftn((base.scaling[patch] * base.l_p + 1) * np.fft.fftn(x))
     # l_plus_1 = full_matrix(l_plus_1_operator, base_w.domain_size)
     # b = full_matrix(base.medium_operators[patch], base_w.domain_size)
@@ -113,7 +113,7 @@ def test_compare_A(n, boundary_widths, n_correction):
 #     source[0] = 1.
 
 #     # Get the operator A = (L+1)-B = (L+1)-(1-V) = L+V for the full-domain problem (baseline to compare against)
-#     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction='wrap_corr', cp=296)
+#     base = HelmholtzBase(n=n, n_domains=1, wrap_correction='wrap_corr')
 #     x = np.eye(base.domain_size[0], dtype=np.float32)
 #     l_plus_1_inv = base.propagator(x, base.scaling[base.domains_iterator[0]])
 #     l_plus_1 = np.linalg.inv(l_plus_1_inv)
@@ -121,7 +121,7 @@ def test_compare_A(n, boundary_widths, n_correction):
 #     a = l_plus_1 - b
 
 #     # Get the subdomain operators and transfer corrections (2 subdomains) and reconstruct A
-#     base2 = HelmholtzBase(n=n, source=source, n_domains=2, wrap_correction='wrap_corr', cp=296)
+#     base2 = HelmholtzBase(n=n, n_domains=2, wrap_correction='wrap_corr')
 #     sub_n = base2.domain_size[0]
 #     x_ = np.eye(sub_n, dtype=np.float32)
 

@@ -6,9 +6,7 @@ from helmholtzbase import HelmholtzBase
 @pytest.fixture
 def setup_inputs():
     """ Setup base problem with dummy input """
-    n = np.ones((256, 256, 1))
-    base_i = HelmholtzBase(n=n, setup_operators=False)
-    yield base_i
+    yield HelmholtzBase(n=np.ones((256, 256, 1)), setup_operators=False)
 
 
 def test_n(setup_inputs):
@@ -26,6 +24,5 @@ def test_n_domains(setup_inputs):
 def test_input_boundary_widths(boundary_widths):
     """ Input parameters (here, boundary_widths) should be 3-element numpy arrays irrespective of input type and shape.
         Elements beyond the dimensions of the problem should be either 1 or 0"""
-    n = np.ones((256, 256, 1))
-    anysim_bw = HelmholtzBase(n=n, boundary_widths=boundary_widths, setup_operators=False)
+    anysim_bw = HelmholtzBase(n=np.ones((256, 256, 1)), boundary_widths=boundary_widths, setup_operators=False)
     assert np.array_equal(anysim_bw.boundary_widths, np.array([10, 10, 0]))

@@ -34,9 +34,6 @@ Width of absorbing boundaries. 3-element tuple indicating boundaries in x, y, an
 ## n_domains = (1, 1, 1)
 Number of subdomains to decompose the problem into. 3-element tuple indicating number of domains in x, y, and z dimensions.
 
-## overlap = (0, 0, 0)
-Applicable only when number of domains > 1. Overlap between subdomains. 3-element tuple indicating overlap in x, y, and z dimensions.
-
 ## wrap_correction = None
 None
     (Use the usual Laplacian and eliminate wrap-around effects with absorbing boundaries), OR

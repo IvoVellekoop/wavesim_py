@@ -14,7 +14,6 @@ class HelmholtzBase:
                  ppw=4,  # points per wavelength
                  boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
                  n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-                 overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  omega=10,  # compute the fft over omega times the domain size
                  n_correction=8,  # number of points used in the wrapping correction
@@ -36,10 +35,10 @@ class HelmholtzBase:
         self.propagator = None
 
         (self.n_roi, self.n_ext, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
-         self.n_domains, self.overlap, self.domain_size, self.omega, self.v_min, self.v_raw) = (
-            preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, overlap, omega))
+         self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw) = (
+            preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega))
 
-        # base = preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, overlap, omega)
+        # base = preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega)
         # for name, val in base.items():
         #     exec('self.'+name+' = val')
 
@@ -69,7 +68,7 @@ class HelmholtzBase:
         print('Boundaries widths (Pre): \t', self.boundary_pre)
         print('\t\t (Post): \t', self.boundary_post)
         if self.total_domains > 1:
-            print(f'Decomposing into {self.n_domains} domains of size {self.domain_size}, overlap {self.overlap}')
+            print(f'Decomposing into {self.n_domains} domains of size {self.domain_size}')
 
     def make_operators(self):
         """ Make the medium and propagator operators, and, if applicable,
@@ -137,9 +136,8 @@ class HelmholtzBase:
 
     def patch_slice(self, patch):
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
-        return tuple([slice(patch[d] * (self.domain_size[d] - self.overlap[d]), 
-                            patch[d] * (self.domain_size[d] - self.overlap[d]) + self.domain_size[d]) for
-                      d in range(self.n_dims)])
+        return tuple([slice(patch[d] * self.domain_size[d], 
+                            patch[d] * self.domain_size[d] + self.domain_size[d]) for d in range(self.n_dims)])
 
     @staticmethod
     def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):

@@ -8,7 +8,6 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
                ppw=4,  # points per wavelength
                boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
                n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-               overlap=(0, 0, 0),  # Overlap between subdomains in each dimension
                omega=10):  # compute the fft over omega times the domain size
     """ Set up parameters to pass to HelmholtzBase """
 
@@ -29,33 +28,30 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     else:
         n_domains = check_input_len(n_domains, 1, n_dims)
 
-    # Overlap between subdomains in each axis
-    overlap = check_input_len(overlap, 0, n_dims).astype(int)
-
     # determines number of subdomains based on max size, ensures that all are of the same size (pads if necessary),
     # modifies boundary_post and n_ext, and casts parameters to int
 
     if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
         domain_size = n_ext.copy()
     else:  # Else, domain decomposition
-        domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+        domain_size = n_ext/n_domains
 
         # Increase boundary_post in dimension(s) until all subdomains are of the same size
         while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
             boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size[:n_dims] = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+            domain_size[:n_dims] = n_ext/n_domains
 
         # Increase number of subdomains until subdomain size is less than max_subdomain_size
         while (domain_size > max_subdomain_size).any():
             n_domains[np.where(domain_size > max_subdomain_size)] += 1
-            domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+            domain_size = n_ext/n_domains
 
         # Increase boundary_post in dimension(s) until the subdomain size is int
         while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
             boundary_post += np.round(n_domains * (np.ceil(domain_size) - domain_size), 2)
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size = (n_ext + ((n_domains - 1) * overlap)) / n_domains
+            domain_size = n_ext/n_domains
 
     boundary_pre = boundary_pre.astype(int)
     boundary_post = boundary_post.astype(int)
@@ -83,7 +79,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     omega = check_input_len(omega, 1, n_dims)  # compute the fft over omega times the domain size
     
     return (n_roi, n_ext, s, n_dims, boundary_widths, boundary_pre, boundary_post,
-            n_domains, overlap, domain_size, omega, v_min, v_raw)
+            n_domains, domain_size, omega, v_min, v_raw)
     # return locals()
 
 

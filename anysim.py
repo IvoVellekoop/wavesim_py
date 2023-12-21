@@ -69,9 +69,8 @@ def domain_decomp_operators(base):
         for dim in range(base.n_dims):
             for patch in range(base.n_domains[dim]):
                 restrict_mid_ = restrict0_[dim].copy()
-                restrict_mid_[:, slice(patch * (base.domain_size[dim] - base.overlap[dim]),
-                                       patch * (base.domain_size[dim] - base.overlap[dim])
-                                       + base.domain_size[dim])] = ones
+                restrict_mid_[:, slice(patch * base.domain_size[dim],
+                                       patch * base.domain_size[dim] + base.domain_size[dim])] = ones
                 restrict[dim].append(restrict_mid_.T)
                 extend[dim].append(restrict_mid_)
     return restrict, extend

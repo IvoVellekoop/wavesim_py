@@ -84,7 +84,7 @@ class LogPlot:
         """ Save parameters and stats """
         print('Saving stats...')
         save_string = (f'n_dims {self.base.n_dims}; boundaries width {self.base.boundary_widths}; '
-                       + f'n_domains {self.base.n_domains}; overlap {self.base.overlap}')
+                       + f'n_domains {self.base.n_domains}')
         if self.base.wrap_correction:
             save_string += f'; {self.base.wrap_correction}; n_correction {self.base.n_correction}'
         if self.base.total_domains > 1:
@@ -121,15 +121,14 @@ class LogPlot:
     def plot_common_things(self, plt_common):
         """ Plot things common to all """
         if self.base.total_domains > 1:
-            plt_common.axvline(
-                x=(self.base.domain_size[0]-self.base.boundary_widths[0]-self.base.overlap[0])*self.base.pixel_size,
-                c='b', ls='dashdot', lw=1.5)
-            plt_common.axvline(
-                x=(self.base.domain_size[0]-self.base.boundary_widths[0])*self.base.pixel_size,
-                c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
+            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size, 
+                               c='b', ls='dashdot', lw=1.5)
+            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size, 
+                               c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.base.total_domains - 1):
-                plt_common.axvline(x=(i * (self.base.domain_size[0] - self.base.overlap[0]) + self.base.domain_size[0] -
-                                      self.base.boundary_widths[0]) * self.base.pixel_size, c='b', ls='dashdot', lw=1.5)
+                plt_common.axvline(x=(i * self.base.domain_size[0] + self.base.domain_size[0] 
+                                      - self.base.boundary_widths[0]) * self.base.pixel_size, 
+                                   c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_reference'):
             plt_common.plot(self.x, np.real(self.u_reference), 'k', lw=2., label=self.label)
         plt_common.ylabel('Amplitude')

@@ -53,8 +53,8 @@ class State(object):
     def finalize(self, u):
         """ Rescale u and crop to ROI, and convert residual lists to arrays """
         for patch in self.base.domains_iterator:  # patch gives 3-element position tuple of subdomain (e.g., (0,0,0))
-            current_patch = tuple([slice(patch[j]*(self.base.domain_size[j]-self.base.overlap[j]),
-                                   patch[j]*(self.base.domain_size[j]-self.base.overlap[j])+self.base.domain_size[j])
+            current_patch = tuple([slice(patch[j] * self.base.domain_size[j], 
+                                         patch[j] * self.base.domain_size[j] + self.base.domain_size[j])
                                    for j in range(self.base.n_dims)])
             u[current_patch] = np.sqrt(self.base.scaling[patch]) * u[current_patch]  # rescale u
         u = u[self.base.crop2roi]  # Crop u to ROI

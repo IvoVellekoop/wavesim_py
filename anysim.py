@@ -32,10 +32,12 @@ def iterate(base: HelmholtzBase):
         for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
             print(f'Iteration {i + 1}, sub-domain {patch}. ', end='\r')
 
+            # r = B·(u - (L+1)^-1·(B·u + s))
             t1 = base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
             t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
             t1 = base.propagator(t1, base.scaling[patch])  # (L+1)^-1 t1
             t1 = base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
+            t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
 
             state.log_subdomain_residual(norm(t1), patch)  # log residual for current subdomain
 

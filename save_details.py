@@ -62,7 +62,7 @@ class LogPlot:
         if self.animate_iters:
             self.u_iter = self.state.u_iter.copy()
             self.plot_iter_step = 1
-            if self.base.n_dims > 1 and self.state.iterations*self.base.total_domains > 100:
+            if self.state.iterations*self.base.total_domains > 100:
                 self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/100))
                 self.truncate_iterations = True
                 for i in self.base.domains_iterator:
@@ -103,18 +103,18 @@ class LogPlot:
 
         if self.base.n_dims == 1:
             self.x = np.arange(self.base.n_roi[0]) * self.base.pixel_size
-            self.plot_field_n_residual()    # png
+            self.plot_field_n_residual()  # png
             if self.animate_iters:
-                self.anim_field_iters()         # movie/animation/GIF
+                self.anim_field_n_residual_1d()  # movie/animation/GIF
         elif self.base.n_dims == 2:
-            self.image_field_n_residual()   # png
+            self.image_field_n_residual()  # png
             if self.animate_iters:
-                self.anim_field_n_residual()        # movie/animation/GIF
+                self.anim_field_n_residual()  # movie/animation/GIF
         elif self.base.n_dims == 3:
             for idx, z_slice in enumerate([0, int(self.u_computed.shape[2] / 2), int(self.u_computed.shape[2] - 1)]):
-                self.image_field_n_residual(z_slice)    # png
+                self.image_field_n_residual(z_slice)  # png
                 if self.animate_iters:
-                    self.anim_field_n_residual(idx, z_slice)         # movie/animation/GIF
+                    self.anim_field_n_residual(idx, z_slice)  # movie/animation/GIF
         plt.close('all')
         print('Plotting done.')
 
@@ -131,43 +131,42 @@ class LogPlot:
                                    c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_reference'):
             plt_common.plot(self.x, np.real(self.u_reference), 'k', lw=2., label=self.label)
-        plt_common.ylabel('Amplitude')
-        plt_common.xlabel("$x~[\lambda]$")
-        plt_common.xlim([self.x[0] - self.x[1] * 2, self.x[-1] + self.x[1] * 2])
+        plt_common.set_ylabel('Amplitude')
+        plt_common.set_xlabel("$x~[\lambda]$")
+        plt_common.set_xlim([self.x[0] - self.x[1] * 2, self.x[-1] + self.x[1] * 2])
         plt_common.grid()
 
     def plot_field_n_residual(self):
         """ Plot the (1D) final field and residual wrt iterations and save as png """
-        plt.subplots(figsize=figsize, ncols=1, nrows=2)
+        fig, ax = plt.subplots(figsize=figsize, ncols=1, nrows=2)
+        ax = ax.flatten()
 
-        plt.subplot(2, 1, 1)
-        self.plot_common_things(plt)
-        plt.plot(self.x, np.real(self.u_computed), 'r', lw=1., label='AnySim')
+        self.plot_common_things(ax[0])
+        ax[0].plot(self.x, np.real(self.u_computed), 'r', lw=1., label='AnySim')
         title = 'Field'
         if hasattr(self, 'u_reference'):
-            plt.plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
+            ax[0].plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
             title += f' (Relative Error = {self.rel_err:.2e})'
-        # plt.axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
-        plt.title(title)
-        plt.legend(ncols=2, framealpha=0.8)
+        # ax[0].axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
+        ax[0].set_title(title)
+        ax[0].legend(ncols=2, framealpha=0.8)
 
-        plt.subplot(2, 1, 2)
-        res_plots = plt.loglog(np.arange(1, self.state.iterations+1),
+        res_plots = ax[1].loglog(np.arange(1, self.state.iterations+1),
                                self.state.subdomain_residuals, lw=1.5)
         if self.base.total_domains > 1:
-            plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
+            ax[1].legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
                        title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
-        plt.loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
+        ax[1].loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
                    ls='dashed', label='Full Residual')
-        plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
-        plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
+        ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
+        ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
         y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
-        plt.ylim([y_min, y_max])
-        plt.title('Residual. Iterations = {:.2e}'.format(self.state.iterations))
-        plt.ylabel('Residual')
-        plt.xlabel('Iterations')
-        plt.grid()
+        ax[1].set_ylim([y_min, y_max])
+        ax[1].set_title('Residual. Iterations = {:.2e}'.format(self.state.iterations))
+        ax[1].set_ylabel('Residual')
+        ax[1].set_xlabel('Iterations')
+        ax[1].grid()
 
         title_text = ''
         title_text = f'{title_text} Absorbing boundaries ({self.base.boundary_widths}). '
@@ -195,8 +194,8 @@ class LogPlot:
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
         if self.state.iterations*self.base.total_domains > 100:
-            plot_iters = (self.state.iterations*self.base.total_domains/10)
-            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters)
+            plot_iters = int(self.state.iterations*self.base.total_domains/10)
+            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(int)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]
         else:
@@ -211,8 +210,70 @@ class LogPlot:
             title.set_text(title_text)
             return plot_data, title,
 
-        ani = animation.FuncAnimation(
-            fig, animate, interval=100, blit=True, frames=plot_iters)
+        ani = animation.FuncAnimation(fig, animate, interval=100, blit=True, frames=plot_iters)
+        writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
+        ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
+        ani_name += f'.mp4'
+        ani.save(ani_name, writer=writer)
+        plt.close('all')
+
+    def anim_field_n_residual_1d(self):  # movie/animation/GIF
+        """ Plot an animation of the field and residual wrt iterations and save as mp4 """
+        u_iter = np.real(self.u_iter)
+        u_iter = np.reshape(u_iter, [-1, u_iter.shape[2]], 'F')
+
+        fig, ax = plt.subplots(figsize=figsize, ncols=1, nrows=2)
+        ax = ax.flatten()
+
+        plt.subplot(2,1,1)
+        self.plot_common_things(ax[0])
+        ax[0].plot([], [], 'r', lw=2., animated=True, label='AnySim')
+        ax[0].legend(ncols=2, framealpha=0.8)
+
+        if self.truncate_iterations:
+            plot_iters = len(u_iter)
+            iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step)
+            residuals = self.state.full_residuals[::self.plot_iter_step]
+            subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step, :]
+        else:
+            plot_iters = self.state.iterations * self.base.total_domains
+            iters_trunc = np.arange(self.state.iterations)
+            residuals = self.state.full_residuals.copy()
+            subdomain_residuals = self.state.subdomain_residuals.copy()
+        domains_trunc = self.base.domains_iterator * self.state.iterations
+
+        frames = []
+        for i in range(plot_iters):
+            line0, = ax[0].plot(self.x, u_iter[i], 'r', lw=2., animated=True)
+            text0 = ax[0].text(0.35, 1.01,
+                               f'Iteration {iters_trunc[i//self.base.total_domains]+1}, Subdomain {domains_trunc[i]}.',
+                               ha="left", va="bottom", transform=ax[0].transAxes)
+
+            line1, = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
+                                  residuals[:i//self.base.total_domains+1], lw=2., c='k', label='Full Residual')
+            if self.base.total_domains > 1:
+                lines2 = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
+                                      subdomain_residuals[:i//self.base.total_domains+1, :], lw=1.5)
+            else:
+                lines2 = []
+
+            frames.append([line0, text0, line1] + lines2)
+
+        if self.base.total_domains > 1:
+            ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
+                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+        ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
+        ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
+        y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
+        y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
+        ax[1].set_title('Residual')
+        ax[1].set_ylim([y_min, y_max])
+        ax[1].set_ylabel('Residual')
+        ax[1].set_xlabel('Iterations')
+        ax[1].grid()
+        plt.tight_layout()
+
+        ani = animation.ArtistAnimation(fig, frames, interval=100, blit=True)
         writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'))
         ani_name = f'{self.run_loc}/{self.run_id}_{self.state.iterations}iters_Field'
         ani_name += f'.mp4'
@@ -289,7 +350,7 @@ class LogPlot:
         plt.close('all')
 
     def anim_field_n_residual(self, idx=0, z_slice=0):  # movie/animation/GIF
-        """ Plot an animation of the (2D/3D) field image wrt iterations and save as mp4 """
+        """ Plot an animation of the (2D/3D) field image and residual wrt iterations and save as mp4 """
         if self.base.n_dims == 3:
             u_iter = self.u_iter[..., idx]
         else:

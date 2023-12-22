@@ -6,7 +6,6 @@ from scipy.sparse import diags as spdiags
 from helmholtzbase import HelmholtzBase
 from utilities import full_matrix, relative_error
 
-
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
                                                 (np.ones((20, 21)), 0), (np.ones((15, 16)), 5),
                                                 (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
@@ -108,8 +107,6 @@ def test_compare_A(n, boundary_widths, n_correction):
 # def test_subdomain_op_reconstruction():
 #     """ Check splitting of operators into subdomains still gives the original operator after reconstruction """
 #     n = np.ones((256, 1, 1), dtype=np.float32)
-#     source = np.zeros_like(n)
-#     source[0] = 1.
 
 #     # Get the operator A = (L+1)-B = (L+1)-(1-V) = L+V for the full-domain problem (baseline to compare against)
 #     base = HelmholtzBase(n=n, n_domains=1, wrap_correction='wrap_corr')

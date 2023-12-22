@@ -26,18 +26,26 @@ def iterate(base: HelmholtzBase):
         # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
         s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * map_domain(base.s, restrict, patch)
         u_dict[patch] = map_domain(u, restrict, patch)  # restrict full-domain field u to the subdomain patch
+    ut_dict = u_dict.copy()
 
     for i in range(base.max_iterations):
         residual = 0
         for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
             print(f'Iteration {i + 1}, sub-domain {patch}. ', end='\r')
 
-            # r = B·(u - (L+1)^-1·(B·u + s))
-            t1 = base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
-            t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
-            t1 = base.propagator(t1, base.scaling[patch])  # (L+1)^-1 t1
-            t1 = base.medium_operators[patch](u_dict[patch] - t1)  # B(u - t1). subdomain residual
-            t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
+            ut_dict[patch] = iterate1(base, u_dict, s_dict, patch)
+
+            # # r = B·(u - (L+1)^-1·(B·u + s))
+            # t1 = base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
+            # t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
+            # t1 = base.propagator(t1, base.scaling[patch])  # (L+1)^-1 t
+            # ut_dict[patch] = u_dict[patch] - t1
+
+        for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
+            t1 = iterate2(base, ut_dict, patch)
+
+            # t1 = base.medium_operators[patch](ut_dict[patch])  # B(u - t). subdomain residual
+            # t1 = t1 - base.transfer_correction(ut_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
 
             state.log_subdomain_residual(norm(t1), patch)  # log residual for current subdomain
 
@@ -89,3 +97,16 @@ def map_domain(x, mapping_operator, patch):
         x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
         x = np.moveaxis(x, -1, dim)  # Transpose back
     return x.astype(np.complex64)
+
+
+def iterate1(base, u_dict, s_dict, patch):
+    # r = B·(u - (L+1)^-1·(B·u + s))
+    t1 = base.medium_operators[patch](u_dict[patch]) + s_dict[patch]  # B(u) + s
+    t1 = t1 - base.transfer_correction(u_dict, patch)  # Add transfer_correction w/ previous &// next subdomain
+    t1 = base.propagator(t1, base.scaling[patch])  # (L+1)^-1 t
+    return u_dict[patch] - t1
+
+
+def iterate2(base, ut_dict, patch):
+        t1 = base.medium_operators[patch](ut_dict[patch])  # B(u - t). subdomain residual
+        return t1 - base.transfer_correction(ut_dict, patch)  # Add transfer_correction w/ previous &// next subdomain

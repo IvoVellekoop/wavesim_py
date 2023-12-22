@@ -170,7 +170,7 @@ class HelmholtzBase:
 
         return corr
 
-    def transfer_correction(self, x, current_patch):
+    def transfer_correction(self, x, current_patch, t1=0):
         """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain
         :param x: Dictionary with all patches/subdomains of x
         :param current_patch: Current subdomain, as a 3-element position tuple

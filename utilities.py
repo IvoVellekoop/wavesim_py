@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.fft import fftfreq
+from numpy.fft import fftfreq
 from scipy.sparse import dok_matrix
 
 
@@ -35,7 +35,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
         while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
             boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size[:n_dims] = n_ext/n_domains
+            domain_size = n_ext/n_domains
 
         # Increase number of subdomains until subdomain size is less than max_subdomain_size
         max_subdomain_size = 500  # max permissible size of one sub-domain
@@ -45,9 +45,9 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
         # Increase boundary_post in dimension(s) until the subdomain size is int
         while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
-            boundary_post += np.round(n_domains * (np.ceil(domain_size) - domain_size), 2)
+            boundary_post = np.round(boundary_post + n_domains * (np.ceil(domain_size) - domain_size), 2)
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size = n_ext/n_domains
+            domain_size = np.round(n_ext/n_domains, 2)
 
     # Cast below 4 parameters to int because they are used in padding, indexing/slicing, creation of arrays
     boundary_pre = boundary_pre.astype(int)

@@ -36,11 +36,15 @@ Number of subdomains to decompose the problem into. 3-element tuple indicating n
 
 ## wrap_correction = None
 None
-    (Use the usual Laplacian and eliminate wrap-around effects with absorbing boundaries), OR
+    (Eliminate wrap-around effects with absorbing boundaries), OR
+
 'L_omega'
     (Do the fast convolution over a much larger domain such that there are no wrap-around effects in the Laplacian), OR
+
 'wrap_corr'
     (Add the wrapping correction term to the medium operator to correct for the wrap-around effects, allowing for smaller absorbing boundaries only to tackle reflections)
+
+wrap_correction defaults to 'wrap_corr' when n_domains > 1.
 
 ## omega = 10
 Compute the fft over omega times the domain size. The fft is used for implementing the Laplacian in the wrap_correction='L_omega' case, or the wrapping corrections in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
@@ -48,7 +52,7 @@ Compute the fft over omega times the domain size. The fft is used for implementi
 ## n_correction = 8
 Number of points used in the wrapping correction in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
 
-## max_iterations = int(1.e+4)
+## max_iterations = 10000
 [int] Maximum number of iterations
 
 ## setup_operators = True

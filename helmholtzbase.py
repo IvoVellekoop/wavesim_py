@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import product
-from scipy.fft import fftn, ifftn
+from numpy.fft import fftn, ifftn
+from collections import defaultdict
 from utilities import laplacian_sq_f, pad_func, preprocess
 
 
@@ -12,27 +13,13 @@ class HelmholtzBase:
                  source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
                  wavelength=1.,  # Wavelength in um (micron)
                  ppw=4,  # points per wavelength
-                 boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
-                 n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
+                 boundary_widths=10,  # Width of absorbing boundaries
+                 n_domains=1,  # Number of subdomains to decompose into, in each dimension
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  omega=10,  # compute the fft over omega times the domain size
                  n_correction=8,  # number of points used in the wrapping correction
                  max_iterations=int(1.e+4),  # Maximum number of iterations
                  setup_operators=True):  # Set up Medium (+corrections) and Propagator operators, and scaling
-
-        self.pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
-
-        self.v = None
-        self.l_p = None
-        self.scaling = None
-
-        self.wrap_correction = wrap_correction
-        self.n_correction = n_correction
-        self.wrap_corr = None
-        self.wrap_transfer = None
-
-        self.medium_operators = None
-        self.propagator = None
 
         (self.n_roi, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
          self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw) = (
@@ -42,13 +29,36 @@ class HelmholtzBase:
         # for name, val in base.items():
         #     exec('self.'+name+' = val')
 
+        self.pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
+
+        self.v = None
+        self.l_p = None
+        self.scaling = None
+
+        self.total_domains = np.prod(self.n_domains).astype(int)  # total number of domains across all dimensions
+        if self.total_domains == 1:
+            self.wrap_correction = wrap_correction
+        else:
+            self.wrap_correction = 'wrap_corr'
+
+        smallest_domain_size = np.min(self.domain_size[:self.n_dims])
+        if n_correction > smallest_domain_size/3:
+            self.n_correction = int(smallest_domain_size/3)
+        else:
+            self.n_correction = n_correction
+
+        self.wrap_corr = None
+        self.wrap_matrix = None
+        self.medium_operators = None
+        self.propagator_operators = None
+        self.l_plus1_operators = None
+
         # to iterate through subdomains in all dimensions
         self.domains_iterator = list(product(*(range(self.n_domains[i]) for i in range(3))))
-        
-        self.total_domains = np.prod(self.n_domains).astype(int)  # total number of domains across all dimensions
-        
+
+        # crop to n_roi, excluding boundaries
         self.crop2roi = tuple([slice(self.boundary_pre[d], -self.boundary_post[d])
-                               for d in range(self.n_dims)])  # crop to n_roi, excluding boundaries
+                               for d in range(self.n_dims)])
 
         self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
 
@@ -58,14 +68,15 @@ class HelmholtzBase:
         self.divergence_limit = 1.e+6
 
         self.print_details()
-        if setup_operators:  # Get Medium (b = 1 - v + corrections) and Propagator (L+1)^(-1) operators, and scaling
-            self.medium_operators, self.propagator, self.scaling = self.make_operators()
+        if setup_operators:  # Get Medium (b = 1 - v + corrections), Propagator (L+1)^(-1), and (L+1) operators, and Scaling
+            self.medium_operators, self.propagator_operators, self.l_plus1_operators, self.scaling = self.make_operators()
 
     def print_details(self):
         """ Print main information about the problem """
         print(f'\n{self.n_dims} dimensional problem')
         if self.wrap_correction:
             print('Wrap correction: \t', self.wrap_correction)
+            print('n_correction: \t', self.n_correction)
         print('Boundaries widths (Pre): \t', self.boundary_pre)
         print('\t\t (Post): \t', self.boundary_post)
         if self.total_domains > 1:
@@ -85,56 +96,71 @@ class HelmholtzBase:
             n_fft = self.domain_size * self.omega
         else:
             n_fft = self.domain_size.copy()
-        
+
         l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
-        if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+        if self.wrap_correction == 'wrap_corr':
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
             side = np.zeros(self.domain_size, dtype=np.complex64)
             side[-1, ...] = 1.0
             k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
 
             # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-            wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
+            self.wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
             for r in range(self.n_correction):
                 size = r + 1
-                wrap_matrix[r, :] = k_wrap[self.n_correction-size:2*self.n_correction-size]
+                self.wrap_matrix[r, :] = k_wrap[self.n_correction-size:2*self.n_correction-size]
 
-            self.wrap_corr = lambda x, idx_shift='all': 1j * self.compute_wrap_corr(x, wrap_matrix, idx_shift)
+            self.wrap_corr = lambda x, idx_shift='all': 1j * self.compute_wrap_corr(x, self.wrap_matrix, idx_shift)
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
         for patch in self.domains_iterator:
             patch_slice = self.patch_slice(patch)
             v_norm = np.max(np.abs(self.v[patch_slice]))
-            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
-                v_norm += self.n_dims * np.linalg.norm(wrap_matrix, 2)
+            if self.wrap_correction == 'wrap_corr':
+                v_norm += self.n_dims * np.linalg.norm(self.wrap_matrix, 2)
             scaling[patch] = 0.95/v_norm
             self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
         b = 1 - self.v
         b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
-        
+
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
         for patch in self.domains_iterator:
             patch_slice = self.patch_slice(patch)  # get slice/indices for the subdomain patch
             b_patch = b[patch_slice]
-            if self.wrap_correction == 'wrap_corr' or self.total_domains > 1:
+            if self.wrap_correction == 'wrap_corr':
                 medium_operators[patch] = lambda x, b_ = b_patch: (b_ * x + scaling[patch] * self.wrap_corr(x))
             else:
                 medium_operators[patch] = lambda x, b_ = b_patch: b_ * x
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
-        if self.wrap_correction == 'L_omega':
-            crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
-            propagator = lambda x, subdomain_scaling: (ifftn((1 / (subdomain_scaling * self.l_p + 1)) *
-                                                       fftn(x, n_fft)))[crop2domain]
-        else:
-            propagator = lambda x, subdomain_scaling: ifftn((1 / (subdomain_scaling * self.l_p + 1)) * fftn(x))
+        propagator_operators = {}
+        l_plus1_operators = {}
+        crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
+        for patch in self.domains_iterator:
+            if self.wrap_correction == 'L_omega':
+                propagator_operators[patch] = lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) * 
+                                                         fftn(x, n_fft)))[crop2domain]
+                l_plus1_operators[patch] = lambda x: (ifftn((scaling[patch] * self.l_p + 1) * fftn(x, n_fft)))[crop2domain]
+            else:
+                propagator_operators[patch] = lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x))
+                l_plus1_operators[patch] = lambda x: ifftn((scaling[patch] * self.l_p + 1) * fftn(x))
 
-        return medium_operators, propagator, scaling
+        # if self.wrap_correction == 'L_omega':
+        #     crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
+        #     propagator = lambda x, subdomain_scaling: (ifftn((1 / (subdomain_scaling * self.l_p + 1)) *
+        #                                                fftn(x, n_fft)))[crop2domain]
+        #     self.l_operator = lambda x, subdomain_scaling: (ifftn((subdomain_scaling * self.l_p + 1) * 
+        #                                                     fftn(x, n_fft)))[crop2domain]
+        # else:
+        #     propagator = lambda x, subdomain_scaling: ifftn((1 / (subdomain_scaling * self.l_p + 1)) * fftn(x))
+        #     self.l_operator = lambda x, subdomain_scaling: ifftn((subdomain_scaling * self.l_p + 1) * fftn(x))
+
+        return medium_operators, propagator_operators, l_plus1_operators, scaling
 
     def patch_slice(self, patch):
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
@@ -157,10 +183,14 @@ class HelmholtzBase:
         right = (slice(-n_correction, None))
         n_dims = np.squeeze(x).ndim
         for _ in range(n_dims):
+            # if idx_shift == -1 or idx_shift == 'all':
+            #     corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+            # if idx_shift == +1 or idx_shift == 'all':
+            #     corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
             if idx_shift == -1 or idx_shift == 'all':
-                corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-            if idx_shift == +1 or idx_shift == 'all':
                 corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
+            if idx_shift == +1 or idx_shift == 'all':
+                corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
             x = x.transpose((1, 2, 0))
             corr = corr.transpose((1, 2, 0))
 
@@ -170,18 +200,74 @@ class HelmholtzBase:
 
         return corr
 
-    def transfer_correction(self, x, current_patch, t1=0):
-        """ Transfer correction from neighbouring subdomains to be added to t1 of current subdomain
-        :param x: Dictionary with all patches/subdomains of x
-        :param current_patch: Current subdomain, as a 3-element position tuple
-        :return: x_transfer: Field(s) to transfer
+    @staticmethod
+    def compute_transfer_corr(x, wrap_matrix):
+        """ Function to compute the transfer corrections in 3 dimensions. Corrections computed as six separate arrays (for the edges only) to save memory
+        :param x: Array to which wrapping correction is to be applied
+        :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
+        :return: corr: Dict of List of correction arrays corresponding to x
         """
-        x_transfer = np.zeros_like(x[current_patch], dtype=np.complex64)
-        for d in range(self.n_dims):
-            for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain in axis (d)
-                patch_shift = np.zeros_like(current_patch)
-                patch_shift[d] = idx_shift
-                neighbour_patch = tuple(np.array(current_patch) + patch_shift)  # get neighbouring subdomain location
-                if neighbour_patch in self.domains_iterator:  # check if subdomain exists
-                    x_transfer += self.scaling[current_patch] * self.wrap_corr(x[neighbour_patch], idx_shift)
-        return x_transfer
+        n_dims = np.squeeze(x).ndim
+
+        # construct slices to select the side pixels
+        n_correction = wrap_matrix.shape[0]
+        left = np.arange(0, n_correction)
+        right = np.arange(-n_correction, 0)
+
+        corr_dict = defaultdict(list)
+        for dim in range(n_dims):
+            for idx_shift in [-1, +1]:  # Correction for left [-1] or right [+1] edge
+                edge = (dim, idx_shift)
+                if idx_shift == -1:
+                    corr_dict[edge] = np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
+                if idx_shift == +1:
+                    corr_dict[edge] = np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+
+                # Reshape back to original size
+                for _ in range(edge[0]):
+                    corr_dict[edge] = corr_dict[edge].transpose(2, 0, 1)
+
+            x = x.transpose((1, 2, 0))
+
+        return corr_dict
+
+    def medium(self, x, y=None):
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.medium_operators[patch](x[patch])
+            if y is not None:
+                t[patch] += y[patch]
+        return t
+    
+    def l_plus1(self, x):
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.l_plus1_operators[patch](x[patch])
+        return t
+
+    def propagator(self, x):
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.propagator_operators[patch](x[patch])
+        return t
+
+    def transfer(self, x, t):
+        if self.total_domains == 1:
+            return t
+        else:
+            left_edges = [(slice(None),) * d + (slice(0, self.n_correction),) for d in range(self.n_dims)]
+            right_edges = [(slice(None),) * d + (slice(-self.n_correction, None),) for d in range(self.n_dims)]
+
+            for patch in self.domains_iterator:
+                x_corr = self.compute_transfer_corr(x[patch], self.wrap_matrix)
+                for d in range(self.n_dims):
+                    for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain in axis (d)
+                        patch_shift = np.zeros_like(patch)
+                        patch_shift[d] = idx_shift
+                        neighbour_patch = tuple(np.array(patch) + patch_shift)  # get neighbouring subdomain location
+                        if neighbour_patch in self.domains_iterator:  # check if subdomain exists
+                            if idx_shift == -1:
+                                t[neighbour_patch][right_edges[d]] -= 1j * self.scaling[neighbour_patch] * x_corr[d, idx_shift]
+                            if idx_shift == +1:
+                                t[neighbour_patch][left_edges[d]] -= 1j * self.scaling[neighbour_patch] * x_corr[d, idx_shift]
+            return t

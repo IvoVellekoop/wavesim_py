@@ -51,7 +51,7 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     n = np.ones((256, 1, 1), dtype=np.float32)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, source=source, boundary_widths=10, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed, u_ref, threshold=1.e-3)
@@ -65,7 +65,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
     n[99:130] = 1.5
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(n=n, source=source, boundary_widths=10, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
     u_ref = np.squeeze(matlab_results['u'])
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -108,7 +108,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3*abs(n_fat), 
-                         boundary_widths=30, n_domains=n_domains, wrap_correction=wrap_correction)
+                         boundary_widths=10, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
     u_ref = matlab_results['u2d_lc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -141,7 +141,7 @@ def test_3d_disordered(n_domains, wrap_correction):
     source = np.zeros_like(n_sample, dtype=np.complex64)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = HelmholtzBase(n=n_sample, source=source, boundary_widths=20, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = iterate(base)
     u_ref = matlab_results['u3d_disordered']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

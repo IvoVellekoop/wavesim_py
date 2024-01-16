@@ -169,9 +169,9 @@ class LogPlot:
         ax[1].grid()
 
         title_text = ''
-        title_text = f'{title_text} Absorbing boundaries ({self.base.boundary_widths}). '
+        title_text = f'{title_text} Absorbing boundaries {self.base.boundary_widths}. '
         if self.base.wrap_correction:
-            title_text += f'{self.base.wrap_correction}. '
+            title_text = f'{self.base.wrap_correction}. '
         plt.suptitle(title_text)
 
         plt.tight_layout()
@@ -338,9 +338,9 @@ class LogPlot:
         plt.tight_layout()
 
         title_text = ''
-        title_text = f'{title_text} Absorbing boundaries ({self.base.boundary_widths}). '
+        title_text = f'{title_text} Absorbing boundaries {self.base.boundary_widths}. '
         if self.base.wrap_correction:
-            title_text += f'{title_text} {self.base.wrap_correction}. '
+            title_text = f'{title_text} {self.base.wrap_correction}. '
         plt.suptitle(title_text)
 
         plt.tight_layout()

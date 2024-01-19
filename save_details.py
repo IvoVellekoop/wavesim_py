@@ -145,7 +145,7 @@ class LogPlot:
         ax[0].plot(self.x, np.real(self.u_computed), 'r', lw=1., label='AnySim')
         title = 'Field'
         if hasattr(self, 'u_reference'):
-            ax[0].plot(self.x, np.real(self.u_reference - self.u_computed), 'g', lw=1., label='Error')
+            ax[0].plot(self.x, np.abs(self.u_reference - self.u_computed)*10, 'g', lw=1., label='Error*10')
             title += f' (Relative Error = {self.rel_err:.2e})'
         # ax[0].axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
         ax[0].set_title(title)

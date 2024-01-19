@@ -110,7 +110,7 @@ class HelmholtzBase:
                 size = r + 1
                 self.wrap_matrix[r, :] = k_wrap[self.n_correction-size:2*self.n_correction-size]
 
-            self.wrap_corr = lambda x, idx_shift='all': 1j * self.compute_wrap_corr(x, self.wrap_matrix, idx_shift)
+            self.wrap_corr = lambda x: 1j * self.compute_wrap_corr(x, self.wrap_matrix)
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -140,25 +140,16 @@ class HelmholtzBase:
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
         propagator_operators = {}
         l_plus1_operators = {}
-        crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
-        for patch in self.domains_iterator:
-            if self.wrap_correction == 'L_omega':
+        if self.wrap_correction == 'L_omega':
+            crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
+            for patch in self.domains_iterator:
                 propagator_operators[patch] = lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) * 
                                                          fftn(x, n_fft)))[crop2domain]
                 l_plus1_operators[patch] = lambda x: (ifftn((scaling[patch] * self.l_p + 1) * fftn(x, n_fft)))[crop2domain]
-            else:
+        else:
+            for patch in self.domains_iterator:
                 propagator_operators[patch] = lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x))
                 l_plus1_operators[patch] = lambda x: ifftn((scaling[patch] * self.l_p + 1) * fftn(x))
-
-        # if self.wrap_correction == 'L_omega':
-        #     crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
-        #     propagator = lambda x, subdomain_scaling: (ifftn((1 / (subdomain_scaling * self.l_p + 1)) *
-        #                                                fftn(x, n_fft)))[crop2domain]
-        #     self.l_operator = lambda x, subdomain_scaling: (ifftn((subdomain_scaling * self.l_p + 1) * 
-        #                                                     fftn(x, n_fft)))[crop2domain]
-        # else:
-        #     propagator = lambda x, subdomain_scaling: ifftn((1 / (subdomain_scaling * self.l_p + 1)) * fftn(x))
-        #     self.l_operator = lambda x, subdomain_scaling: ifftn((subdomain_scaling * self.l_p + 1) * fftn(x))
 
         return medium_operators, propagator_operators, l_plus1_operators, scaling
 
@@ -168,12 +159,11 @@ class HelmholtzBase:
                             patch[d] * self.domain_size[d] + self.domain_size[d]) for d in range(self.n_dims)])
 
     @staticmethod
-    def compute_wrap_corr(x, wrap_matrix, idx_shift='all'):
+    def compute_wrap_corr(x, wrap_matrix):
         """ Function to compute the wrapping correction in 3 dimensions. 
         Possible efficiency improvement: Compute corrections as six separate arrays (for the edges only) to save memory
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
-        :param idx_shift: Apply correction to left [-1], right [+1], or both ['all'] edges
         :return: corr: Correction array corresponding to x
         """
         corr = np.zeros(x.shape, dtype='complex64')
@@ -183,14 +173,8 @@ class HelmholtzBase:
         right = (slice(-n_correction, None))
         n_dims = np.squeeze(x).ndim
         for _ in range(n_dims):
-            # if idx_shift == -1 or idx_shift == 'all':
-            #     corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-            # if idx_shift == +1 or idx_shift == 'all':
-            #     corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-            if idx_shift == -1 or idx_shift == 'all':
-                corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-            if idx_shift == +1 or idx_shift == 'all':
-                corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+            corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+            corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
             x = x.transpose((1, 2, 0))
             corr = corr.transpose((1, 2, 0))
 
@@ -200,9 +184,44 @@ class HelmholtzBase:
 
         return corr
 
+    def medium(self, x, y=None):
+        """ Apply medium operators to subdomains/patches of x 
+        :param x: Dict of List of arrays to which medium operators are to be applied
+        :param y: Dict of List of arrays to add for first medium operator application 
+                  in AnySim iteration, i.e., Bx + y
+        :return: t: Dict of List of subdomain-wise Bx [+y]
+        """
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.medium_operators[patch](x[patch])
+            if y is not None:
+                t[patch] += y[patch]
+        return t
+    
+    def l_plus1(self, x):
+        """ Apply L+1 operators to subdomains/patches of x 
+        :param x: Dict of List of arrays to which L+1 operators are to be applied
+        :return: t: Dict of List of subdomain-wise (L+1)
+        """
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.l_plus1_operators[patch](x[patch])
+        return t
+
+    def propagator(self, x):
+        """ Apply propagator operators (L+1)^-1 to subdomains/patches of x 
+        :param x: Dict of List of arrays to which propagator operators are to be applied
+        :return: t: Dict of List of subdomain-wise (L+1)^-1
+        """
+        t = defaultdict(list)
+        for patch in self.domains_iterator:
+            t[patch] = self.propagator_operators[patch](x[patch])
+        return t
+
     @staticmethod
     def compute_transfer_corr(x, wrap_matrix):
-        """ Function to compute the transfer corrections in 3 dimensions. Corrections computed as six separate arrays (for the edges only) to save memory
+        """ Function to compute the transfer corrections in 3 dimensions. 
+            Corrections computed as six separate arrays (for the edges only) to save memory
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :return: corr: Dict of List of correction arrays corresponding to x
@@ -231,27 +250,12 @@ class HelmholtzBase:
 
         return corr_dict
 
-    def medium(self, x, y=None):
-        t = defaultdict(list)
-        for patch in self.domains_iterator:
-            t[patch] = self.medium_operators[patch](x[patch])
-            if y is not None:
-                t[patch] += y[patch]
-        return t
-    
-    def l_plus1(self, x):
-        t = defaultdict(list)
-        for patch in self.domains_iterator:
-            t[patch] = self.l_plus1_operators[patch](x[patch])
-        return t
-
-    def propagator(self, x):
-        t = defaultdict(list)
-        for patch in self.domains_iterator:
-            t[patch] = self.propagator_operators[patch](x[patch])
-        return t
-
     def transfer(self, x, t):
+        """ Transfer correction from relevant edges of subdomains in x to those in t 
+        :param x: Dict of List of arrays for which correction is computed
+        :param t: Dict of List of arrays to which correction is to be applied
+        :return: t:
+        """
         if self.total_domains == 1:
             return t
         else:

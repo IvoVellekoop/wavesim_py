@@ -1,10 +1,11 @@
 import pytest
 import numpy as np
-from numpy.fft import fftn, ifftn
-from scipy.sparse.linalg import norm as spnorm
+from collections import defaultdict
 from scipy.sparse import diags as spdiags
+from scipy.sparse.linalg import norm as spnorm
 
 from helmholtzbase import HelmholtzBase
+from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix, pad_boundaries, relative_error
 
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
@@ -29,11 +30,11 @@ def test_accretive(n, boundary_widths, wrap_correction):
     assert np.round(acc, 12) >= 0, f'a is not accretive. {acc}'
 
 
-@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 20), 
-                                                (np.ones((20, 21)), 0), (np.ones((20, 21)), 5),
+@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10), 
+                                                (np.ones((20, 21)), 0), (np.ones((20, 21)), 10),
                                                 (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
-def test_contraction(n, boundary_widths, wrap_correction):
+def test_v_contraction(n, boundary_widths, wrap_correction):
     """ Check that potential V is a contraction,
         i.e., the operator norm ||V|| < 1 """
     n_correction = 8
@@ -52,6 +53,29 @@ def test_contraction(n, boundary_widths, wrap_correction):
     vc = spnorm(v_corr, 2)
     print(f'vc {vc:.2f}')
     assert vc < 1, f'||V|| not < 1, but {vc}'
+
+
+@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10), 
+                                                (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
+                                                (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_op_contraction(n, boundary_widths, wrap_correction):
+    """ Check that preconditioned operator is a contraction,
+        i.e., the operator norm || 1 - B[1 - (L+1)^(-1)B] || < 1 """
+    n_correction = 8
+    if n.ndim == 3:
+        n_correction = 2
+    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
+                         wrap_correction=wrap_correction, n_correction=n_correction)
+    patch = (0, 0, 0)
+    op_ = lambda x: base.medium_operators[patch](x - base.propagator_operators[patch](base.medium_operators[patch](x)))
+
+    n_ext = base.n_roi + base.boundary_pre + base.boundary_post
+    mat_ = spdiags(np.ones(np.prod(n_ext)), dtype=np.complex64) - base.alpha * full_matrix(op_, n_ext)
+    norm_ = spnorm(mat_, 2)
+
+    print(f'norm_ {norm_}')
+    assert norm_ < 1, f'||op|| not < 1, but {norm_}'
 
 
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 4), 
@@ -93,4 +117,4 @@ def test_compare_A(n, boundary_widths):
     rel_err = relative_error(a_w, a_o)
     print(f'Relative error \t\t {rel_err:.2e}')
     # print(f'{rel_err:.2e}, {relative_error(a, a_o):.2e}, {relative_error(a, a_w):.2e}')
-    assert rel_err <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). relative error {rel_err:.2e}'
+    assert rel_err <= 1.e-4, f'Operator A (wrap_corr case) != A (L_omega case). relative error {rel_err:.2e}'

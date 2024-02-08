@@ -1,4 +1,5 @@
 import time
+import torch
 import numpy as np
 from collections import defaultdict
 from helmholtzbase import HelmholtzBase
@@ -18,7 +19,7 @@ class State(object):
 
     def log_subdomain_residual(self, residual_s, patch):
         """ Normalize subdomain residual wrt preconditioned source """
-        self.subdomain_residuals[patch].append((residual_s/self.init_norm).astype(np.float32))
+        self.subdomain_residuals[patch].append((residual_s/self.init_norm))#.astype(np.float32))
 
     def log_full_residual(self, residual_f):
         """ Normalize full domain residual wrt preconditioned source """
@@ -34,7 +35,7 @@ class State(object):
         if self.base.n_dims == 1:
             self.u_iter[patch].append(u)
         elif self.base.n_dims == 2:
-            self.u_iter[patch].append(np.abs(u))
+            self.u_iter[patch].append(torch.abs(u))
         elif self.base.n_dims == 3:
             self.u_iter[patch].append(np.abs(u[..., np.array([0, u.shape[-1]//2, -1])]))
 
@@ -60,8 +61,10 @@ class State(object):
         u = u[self.base.crop2roi]  # Crop u to ROI
 
         # convert residuals to arrays and reshape if needed
-        self.subdomain_residuals = np.array(list(map(list, self.subdomain_residuals.values())))
+        # self.subdomain_residuals = np.array(list(map(list, self.subdomain_residuals.values())))
+        self.subdomain_residuals = torch.tensor(list(map(list, self.subdomain_residuals.values())))
         if self.subdomain_residuals.shape[0] < self.subdomain_residuals.shape[1]:
             self.subdomain_residuals = self.subdomain_residuals.T
-        self.full_residuals = np.array(self.full_residuals)
+        # self.full_residuals = np.array(self.full_residuals)
+        self.full_residuals = torch.tensor(self.full_residuals)
         return np.squeeze(u)

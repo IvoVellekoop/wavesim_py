@@ -1,6 +1,8 @@
+import torch
 import numpy as np
-from numpy.linalg import norm
+from torch.linalg import norm
 from collections import defaultdict
+
 from helmholtzbase import HelmholtzBase
 from state import State
 
@@ -10,14 +12,15 @@ def iterate(base: HelmholtzBase):
     :param base: Helmholtz base parameters
     :return: u (computed field), state (object) """
 
-    u = np.zeros_like(base.s, dtype=np.complex64)  # field u, initialize with 0s
+    # u = np.zeros_like(base.s, dtype=np.complex64)  # field u, initialize with 0s
+    u = torch.zeros_like(base.s, device=base.device, dtype=torch.complex64)
     restrict, extend = domain_decomp_operators(base)  # Construct restriction and extension operators
     state = State(base)
     # list of preconditioner i.e. medium(propagator()) applied to source term in each subdomain patch
     norm_patch = [(map_domain(base.medium_operators[patch](base.propagator_operators[patch](
         map_domain(base.s, restrict, patch))), extend, patch)) for patch in base.domains_iterator]
     # initial norm for residual computation. Summing up all patches of medium(propagator(source)) and taking norm
-    state.init_norm = norm(np.sum(np.array(norm_patch), axis=0))
+    state.init_norm = norm(sum(norm_patch))
 
     # Empty dicts of lists to store patch-wise source (s) and field (u)
     s_dict = defaultdict(list)
@@ -47,7 +50,7 @@ def iterate(base: HelmholtzBase):
             patch_slice = base.patch_slice(patch)
             u[patch_slice] = u_dict[patch]
 
-            state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
+            # state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
             residual += map_domain(t_dict[patch], extend, patch)  # add up all subdomain residuals
 
         state.log_full_residual(norm(residual))  # log residual for entire domain
@@ -67,14 +70,16 @@ def domain_decomp_operators(base):
         [restrict[dim].append(1.) for dim in range(base.n_dims)]
         [extend[dim].append(1.) for dim in range(base.n_dims)]
     else:
-        ones = np.eye(base.domain_size[0])
+        # ones = np.eye(base.domain_size[0])
+        ones = torch.eye(base.domain_size[0], dtype=torch.complex64, device=base.device)
         restrict0_ = []
         n_ext = base.n_roi + base.boundary_pre + base.boundary_post
-        [restrict0_.append(np.zeros((base.domain_size[dim], n_ext[dim]))) 
-            for dim in range(base.n_dims)]
+        # [restrict0_.append(np.zeros((base.domain_size[dim], n_ext[dim]))) 
+        #     for dim in range(base.n_dims)]
+        [restrict0_.append(torch.zeros((base.domain_size[dim], n_ext[dim]), dtype=torch.complex64, device=base.device)) for dim in range(base.n_dims)]
         for dim in range(base.n_dims):
             for patch in range(base.n_domains[dim]):
-                restrict_mid_ = restrict0_[dim].copy()
+                restrict_mid_ = restrict0_[dim].clone()
                 restrict_mid_[:, slice(patch * base.domain_size[dim],
                                        patch * base.domain_size[dim] + base.domain_size[dim])] = ones
                 restrict[dim].append(restrict_mid_.T)
@@ -84,9 +89,13 @@ def domain_decomp_operators(base):
 
 def map_domain(x, mapping_operator, patch):
     """ Map x to extended domain or restricted subdomain """
-    n_dims = np.squeeze(x).ndim
-    for dim in range(n_dims):  # For applying in every dimension
-        x = np.moveaxis(x, dim, -1)  # Transpose
-        x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
-        x = np.moveaxis(x, -1, dim)  # Transpose back
-    return x.astype(np.complex64)
+    if isinstance(mapping_operator[0][0], float):
+        pass
+    else:
+        n_dims = torch.squeeze(x).ndim
+        for dim in range(n_dims):  # For applying in every dimension
+            x = torch.moveaxis(x, dim, -1)  # Transpose
+            # x = np.dot(x, mapping_operator[dim][patch[dim]])  # Apply (appropriate) mapping operator
+            x = torch.tensordot(x, mapping_operator[dim][patch[dim]], ((-1,),(0,))) # Apply (appropriate) mapping operator
+            x = torch.moveaxis(x, -1, dim)  # Transpose back
+    return x#.astype(np.complex64)

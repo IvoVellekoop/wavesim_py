@@ -1,8 +1,13 @@
 import numpy as np
 from itertools import product
-from numpy.fft import fftn, ifftn
+# from numpy.fft import fftn, ifftn
 from collections import defaultdict
 from utilities import laplacian_sq_f, pad_func, preprocess
+
+import torch
+from torch.fft import fftn, ifftn
+from torchvision.transforms import Lambda
+torch.set_default_dtype(torch.float32)
 
 
 class HelmholtzBase:
@@ -22,7 +27,7 @@ class HelmholtzBase:
                  setup_operators=True):  # Set up Medium (+corrections) and Propagator operators, and scaling
 
         (self.n_roi, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
-         self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw) = (
+         self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw, self.device) = (
             preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega))
 
         # base = preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega)
@@ -100,17 +105,19 @@ class HelmholtzBase:
         l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr':
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
-            side = np.zeros(self.domain_size, dtype=np.complex64)
+            # side = np.zeros(self.domain_size, dtype=np.complex64)
+            side = torch.zeros(*self.domain_size, device=self.device)
             side[-1, ...] = 1.0
             k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
 
             # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-            self.wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
+            # self.wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
+            self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction), dtype=torch.complex64, device=self.device)
             for r in range(self.n_correction):
                 size = r + 1
                 self.wrap_matrix[r, :] = k_wrap[self.n_correction-size:2*self.n_correction-size]
 
-            self.wrap_corr = lambda x: 1j * self.compute_wrap_corr(x, self.wrap_matrix)
+            self.wrap_corr = Lambda(lambda x: 1j * self.compute_wrap_corr(x, self.wrap_matrix))
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -118,13 +125,14 @@ class HelmholtzBase:
             patch_slice = self.patch_slice(patch)
             v_norm = np.max(np.abs(self.v[patch_slice]))
             if self.wrap_correction == 'wrap_corr':
-                v_norm += self.n_dims * np.linalg.norm(self.wrap_matrix, 2)
+                v_norm += self.n_dims * torch.linalg.norm(self.wrap_matrix, 2).cpu().numpy()
             scaling[patch] = 0.95/v_norm
             self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
         b = 1 - self.v
         b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
+        b = torch.tensor(b).to(self.device)
 
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
@@ -132,9 +140,9 @@ class HelmholtzBase:
             patch_slice = self.patch_slice(patch)  # get slice/indices for the subdomain patch
             b_patch = b[patch_slice]
             if self.wrap_correction == 'wrap_corr':
-                medium_operators[patch] = lambda x, b_ = b_patch: (b_ * x + scaling[patch] * self.wrap_corr(x))
+                medium_operators[patch] = Lambda(lambda x, b_ = b_patch: (b_ * x + scaling[patch] * self.wrap_corr(x)))
             else:
-                medium_operators[patch] = lambda x, b_ = b_patch: b_ * x
+                medium_operators[patch] = Lambda(lambda x, b_ = b_patch: b_ * x)
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
@@ -143,13 +151,13 @@ class HelmholtzBase:
         if self.wrap_correction == 'L_omega':
             crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
             for patch in self.domains_iterator:
-                propagator_operators[patch] = lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) * 
-                                                         fftn(x, n_fft)))[crop2domain]
-                l_plus1_operators[patch] = lambda x: (ifftn((scaling[patch] * self.l_p + 1) * fftn(x, n_fft)))[crop2domain]
+                propagator_operators[patch] = Lambda(lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) * 
+                                                         fftn(x, tuple(n_fft))))[crop2domain])
+                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * self.l_p + 1) * fftn(x, tuple(n_fft))))[crop2domain])
         else:
             for patch in self.domains_iterator:
-                propagator_operators[patch] = lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x))
-                l_plus1_operators[patch] = lambda x: ifftn((scaling[patch] * self.l_p + 1) * fftn(x))
+                propagator_operators[patch] = Lambda(lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x)))
+                l_plus1_operators[patch] = Lambda(lambda x: ifftn((scaling[patch] * self.l_p + 1) * fftn(x)))
 
         return medium_operators, propagator_operators, l_plus1_operators, scaling
 
@@ -166,21 +174,26 @@ class HelmholtzBase:
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :return: corr: Correction array corresponding to x
         """
-        corr = np.zeros(x.shape, dtype='complex64')
+        # corr = np.zeros(x.shape, dtype='complex64')
+        corr = torch.zeros_like(x)
+
         n_correction = wrap_matrix.shape[0]
         # construct slice to select the side pixels
         left = (slice(0, n_correction))
         right = (slice(-n_correction, None))
         n_dims = np.squeeze(x).ndim
         for _ in range(n_dims):
-            corr[left] += np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-            corr[right] += np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-            x = x.transpose((1, 2, 0))
-            corr = corr.transpose((1, 2, 0))
+            corr[left] += torch.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+            corr[right] += torch.tensordot(wrap_matrix, x[left], ((1,), (0,)))
+            # x = x.transpose((1, 2, 0))
+            x = x.permute((1, 2, 0))
+            # corr = corr.transpose((1, 2, 0))
+            corr = corr.permute((1, 2, 0))
 
         # Reshape corr back to original size
         for _ in range(3-n_dims):
-            corr = corr.transpose((1, 2, 0))
+            # corr = corr.transpose((1, 2, 0))
+            corr = corr.permute((1, 2, 0))
 
         return corr
 
@@ -226,7 +239,8 @@ class HelmholtzBase:
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :return: corr: Dict of List of correction arrays corresponding to x
         """
-        n_dims = np.squeeze(x).ndim
+        # n_dims = np.squeeze(x).ndim
+        n_dims = torch.squeeze(x).ndim
 
         # construct slices to select the side pixels
         n_correction = wrap_matrix.shape[0]
@@ -238,15 +252,17 @@ class HelmholtzBase:
             for idx_shift in [-1, +1]:  # Correction for left [-1] or right [+1] edge
                 edge = (dim, idx_shift)
                 if idx_shift == -1:
-                    corr_dict[edge] = np.tensordot(wrap_matrix, x[left], ((1,), (0,)))
+                    corr_dict[edge] = torch.tensordot(wrap_matrix, x[left], ((1,), (0,)))
                 if idx_shift == +1:
-                    corr_dict[edge] = np.tensordot(wrap_matrix, x[right], ((0,), (0,)))
+                    corr_dict[edge] = torch.tensordot(wrap_matrix, x[right], ((0,), (0,)))
 
                 # Reshape back to original size
                 for _ in range(edge[0]):
-                    corr_dict[edge] = corr_dict[edge].transpose(2, 0, 1)
+                    # corr_dict[edge] = corr_dict[edge].transpose(2, 0, 1)
+                    corr_dict[edge] = corr_dict[edge].permute(2, 0, 1)
 
-            x = x.transpose((1, 2, 0))
+            # x = x.transpose((1, 2, 0))
+            x = x.permute((1, 2, 0))
 
         return corr_dict
 

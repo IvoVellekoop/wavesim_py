@@ -1,6 +1,15 @@
 import numpy as np
-from numpy.fft import fftfreq
-from scipy.sparse import dok_matrix
+# from numpy.fft import fftfreq
+# from scipy.sparse import dok_matrix
+
+import torch
+from torch.fft import fftfreq
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+torch.set_default_dtype(torch.float32)
+
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
 def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
@@ -67,13 +76,15 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
     source = check_input_dims(source)  # Ensure source term is a 3-d array
-    source = pad_boundaries(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
+    # source = pad_boundaries(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
+    source = torch.tensor(source, dtype=torch.complex64, device=device)
+    source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
 
     # compute the fft over omega times the domain size
     omega = check_input_len(omega, 1, n_dims)  # Ensure omega is a 3-element array with 1s after n_dims
 
     return (n_roi, source, n_dims, boundary_widths, boundary_pre, boundary_post,
-            n_domains, domain_size, omega, v_min, v_raw)
+            n_domains, domain_size, omega, v_min, v_raw, device)
     # return locals()
 
 
@@ -114,11 +125,15 @@ def dft_matrix(n):
 def full_matrix(operator, d):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) """
     nf = np.prod(d)
-    m = dok_matrix((nf, nf), dtype=np.complex64)
+    # m = dok_matrix((nf, nf), dtype=np.complex64)
+    m = torch.zeros(*(nf, nf), dtype=torch.complex64, device=device)
+
     b = np.zeros(d, dtype=np.complex64)
     b.flat[0] = 1
+    b = torch.tensor(b, device=device)
     for i in range(nf):
-        m[:, i] = operator(np.roll(b, i)).ravel()
+        # m[:, i] = operator(np.roll(b, i)).ravel()
+        m[:, i] = torch.ravel(operator(torch.roll(b, i)))
     return m
 
 
@@ -146,21 +161,30 @@ def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
     :return Laplacian squared in Fourier coordinates"""
     l_p = coordinates_f(n_fft[0], pixel_size) ** 2
     for d in range(1, n_dims):
-        l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(coordinates_f(n_fft[d], pixel_size) ** 2, axis=0)
+        # l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(coordinates_f(n_fft[d], pixel_size) ** 2, axis=0)
+        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size) ** 2, 0)
 
     for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
-        l_p = np.expand_dims(l_p, axis=-1)
+        # l_p = np.expand_dims(l_p, axis=-1)
+        l_p = torch.unsqueeze(l_p, -1)
     return l_p
 
 
 def coordinates_f(n_, pixel_size=1.):
-    return (2 * np.pi * fftfreq(n_, pixel_size)).astype(np.complex64)
+    # return (2 * np.pi * fftfreq(n_, pixel_size)).astype(np.complex64)
+    return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
 
 
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
     """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
     pad_width = tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])
     return np.pad(x, pad_width, mode)
+
+def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
+    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
+    LoL = [[boundary_pre[i], boundary_post[i]] for i in range(3)]
+    pad_width = tuple(element for L in reversed(LoL) for element in L)
+    return torch.nn.functional.pad(x, pad_width, mode)
 
 
 def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
@@ -177,3 +201,4 @@ def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
 def relative_error(e, e_true):
     """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+    # return torch.mean(torch.abs(e - e_true) ** 2) / torch.mean(torch.abs(e_true) ** 2)

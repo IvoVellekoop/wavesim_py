@@ -21,7 +21,7 @@ class LogPlot:
         """ Logging and Plotting Class """
         self.base = base
         self.state = state
-        self.u_computed = u_computed
+        self.u_computed = u_computed.cpu().numpy()
         if u_reference is not None:
             self.u_reference = u_reference
         self.animate_iters = animate_iters
@@ -60,7 +60,8 @@ class LogPlot:
             self.label = 'Reference solution'
 
         if self.animate_iters:
-            self.u_iter = self.state.u_iter.copy()
+            # self.u_iter = self.state.u_iter.copy()
+            self.u_iter = self.state.u_iter.cpu().numpy()
             self.plot_iter_step = 1
             if self.state.iterations*self.base.total_domains > 100:
                 self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/100))
@@ -152,7 +153,7 @@ class LogPlot:
         ax[0].legend(ncols=2, framealpha=0.8)
 
         res_plots = ax[1].loglog(np.arange(1, self.state.iterations+1),
-                               self.state.subdomain_residuals, lw=1.5)
+                               self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
                        title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
@@ -233,13 +234,15 @@ class LogPlot:
         if self.truncate_iterations:
             plot_iters = len(u_iter)
             iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step)
-            residuals = self.state.full_residuals[::self.plot_iter_step]
-            subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step, :]
+            residuals = self.state.full_residuals.cpu().numpy()[::self.plot_iter_step]
+            subdomain_residuals = self.state.subdomain_residuals.cpu().numpy()[::self.plot_iter_step, :]
         else:
             plot_iters = self.state.iterations * self.base.total_domains
             iters_trunc = np.arange(self.state.iterations)
-            residuals = self.state.full_residuals.copy()
-            subdomain_residuals = self.state.subdomain_residuals.copy()
+            # residuals = self.state.full_residuals.copy()
+            residuals = self.state.full_residuals.cpu().numpy()
+            # subdomain_residuals = self.state.subdomain_residuals.copy()
+            subdomain_residuals = self.state.subdomain_residuals.cpu().numpy()
         domains_trunc = self.base.domains_iterator * self.state.iterations
 
         frames = []
@@ -308,7 +311,7 @@ class LogPlot:
 
         plt.subplot(2, 2, 2)
         res_plots = plt.loglog(np.arange(1, self.state.iterations+1),
-                               self.state.subdomain_residuals, lw=1.5)
+                               self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
                        title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
@@ -376,13 +379,15 @@ class LogPlot:
         if self.truncate_iterations:
             plot_iters = len(u_iter)
             iters_trunc = np.arange(0, self.state.iterations, self.plot_iter_step)
-            residuals = self.state.full_residuals[::self.plot_iter_step]
-            subdomain_residuals = self.state.subdomain_residuals[::self.plot_iter_step, :]
+            residuals = self.state.full_residuals.cpu().numpy()[::self.plot_iter_step]
+            subdomain_residuals = self.state.subdomain_residuals.cpu().numpy()[::self.plot_iter_step, :]
         else:
             plot_iters = self.state.iterations * self.base.total_domains
             iters_trunc = np.arange(self.state.iterations)
-            residuals = self.state.full_residuals.copy()
-            subdomain_residuals = self.state.subdomain_residuals.copy()
+            # residuals = self.state.full_residuals.copy()
+            residuals = self.state.full_residuals.cpu().numpy()
+            # subdomain_residuals = self.state.subdomain_residuals.copy()
+            subdomain_residuals = self.state.subdomain_residuals.cpu().numpy()
         domains_trunc = self.base.domains_iterator * self.state.iterations
 
         frames = []

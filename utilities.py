@@ -1,15 +1,14 @@
 import numpy as np
 # from numpy.fft import fftfreq
 # from scipy.sparse import dok_matrix
-
+import os
 import torch
 from torch.fft import fftfreq
+
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 torch.set_default_dtype(torch.float32)
-
-import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
 def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
@@ -22,7 +21,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     """ Set up and preprocess parameters to pass to HelmholtzBase """
 
     n = check_input_dims(n)  # Ensure n is a 3-d array
-    n_dims = (np.squeeze(n)).ndim  # Number of dimensions in problem
+    n_dims = get_dims(n)  # Number of dimensions in problem
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
     boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
@@ -76,7 +75,6 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
     source = check_input_dims(source)  # Ensure source term is a 3-d array
-    # source = pad_boundaries(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
     source = torch.tensor(source, dtype=torch.complex64, device=device)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
 
@@ -153,6 +151,11 @@ def full_matrix(operator, d):
 #     return m
 
 
+def get_dims(n):
+    n = squeeze_(n)
+    return n.ndim
+
+
 def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
     """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
     :param n_dims: number of dimensions
@@ -161,29 +164,27 @@ def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
     :return Laplacian squared in Fourier coordinates"""
     l_p = coordinates_f(n_fft[0], pixel_size) ** 2
     for d in range(1, n_dims):
-        # l_p = np.expand_dims(l_p, axis=-1) + np.expand_dims(coordinates_f(n_fft[d], pixel_size) ** 2, axis=0)
         l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size) ** 2, 0)
 
     for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
-        # l_p = np.expand_dims(l_p, axis=-1)
         l_p = torch.unsqueeze(l_p, -1)
     return l_p
 
 
 def coordinates_f(n_, pixel_size=1.):
-    # return (2 * np.pi * fftfreq(n_, pixel_size)).astype(np.complex64)
     return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
 
 
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
     """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
-    pad_width = tuple([[boundary_pre[i], boundary_post[i]] for i in range(3)])
+    pad_width = tuple((boundary_pre[i], boundary_post[i]) for i in range(3))
     return np.pad(x, pad_width, mode)
+
 
 def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
     """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
-    LoL = [[boundary_pre[i], boundary_post[i]] for i in range(3)]
-    pad_width = tuple(element for L in reversed(LoL) for element in L)
+    l_o_l = [[boundary_pre[i], boundary_post[i]] for i in range(3)]  # List of Lists [[a0,b0],[a1,b1],[a2,b2]]
+    pad_width = tuple(element for L in reversed(l_o_l) for element in L)  # rearrange to  (a2, b2, a1, b1, a0, b0)
     return torch.nn.functional.pad(x, pad_width, mode)
 
 
@@ -198,7 +199,20 @@ def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
     return m.astype(np.complex64)
 
 
+def max_abs_error(e, e_true):
+    """ (Normalized) Maximum Absolute Error (MAE) ||e-e_true||_{inf} / ||e_true|| """
+    return np.max(np.abs(e - e_true)) / np.linalg.norm(e_true)  # np.max(np.abs(e_true))  # 
+
+
 def relative_error(e, e_true):
     """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
-    # return torch.mean(torch.abs(e - e_true) ** 2) / torch.mean(torch.abs(e_true) ** 2)
+
+
+def squeeze_(n):
+    while True:
+        try:
+            n = np.squeeze(n, axis=-1)
+        except ValueError:
+            break
+    return n

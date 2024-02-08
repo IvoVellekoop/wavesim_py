@@ -52,7 +52,6 @@ class HelmholtzBase:
         else:
             self.n_correction = n_correction
 
-        self.wrap_corr = None
         self.wrap_matrix = None
         self.medium_operators = None
         self.propagator_operators = None
@@ -73,8 +72,10 @@ class HelmholtzBase:
         self.divergence_limit = 1.e+6
 
         self.print_details()
-        if setup_operators:  # Get Medium (b = 1 - v + corrections), Propagator (L+1)^(-1), and (L+1) operators, and Scaling
-            self.medium_operators, self.propagator_operators, self.l_plus1_operators, self.scaling = self.make_operators()
+        if setup_operators:
+            # Get Medium (b = 1 - v + corrections), Propagator (L+1)^(-1), and (L+1) operators, and Scaling
+            (self.medium_operators, self.propagator_operators,
+             self.l_plus1_operators, self.scaling) = self.make_operators()
 
     def print_details(self):
         """ Print main information about the problem """
@@ -105,19 +106,16 @@ class HelmholtzBase:
         l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr':
             # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
-            # side = np.zeros(self.domain_size, dtype=np.complex64)
             side = torch.zeros(*self.domain_size, device=self.device)
             side[-1, ...] = 1.0
             k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
 
             # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-            # self.wrap_matrix = np.zeros((self.n_correction, self.n_correction), dtype=np.complex64)
-            self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction), dtype=torch.complex64, device=self.device)
+            self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction),
+                                           dtype=torch.complex64, device=self.device)
             for r in range(self.n_correction):
                 size = r + 1
                 self.wrap_matrix[r, :] = k_wrap[self.n_correction-size:2*self.n_correction-size]
-
-            self.wrap_corr = Lambda(lambda x: 1j * self.compute_wrap_corr(x, self.wrap_matrix))
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -139,10 +137,7 @@ class HelmholtzBase:
         for patch in self.domains_iterator:
             patch_slice = self.patch_slice(patch)  # get slice/indices for the subdomain patch
             b_patch = b[patch_slice]
-            if self.wrap_correction == 'wrap_corr':
-                medium_operators[patch] = Lambda(lambda x, b_ = b_patch: (b_ * x + scaling[patch] * self.wrap_corr(x)))
-            else:
-                medium_operators[patch] = Lambda(lambda x, b_ = b_patch: b_ * x)
+            medium_operators[patch] = Lambda(lambda x, b_=b_patch: b_ * x)
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
@@ -151,9 +146,10 @@ class HelmholtzBase:
         if self.wrap_correction == 'L_omega':
             crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
             for patch in self.domains_iterator:
-                propagator_operators[patch] = Lambda(lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) * 
-                                                         fftn(x, tuple(n_fft))))[crop2domain])
-                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * self.l_p + 1) * fftn(x, tuple(n_fft))))[crop2domain])
+                propagator_operators[patch] = Lambda(lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) *
+                                                                      fftn(x, tuple(n_fft))))[crop2domain])
+                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * self.l_p + 1) *
+                                                                   fftn(x, tuple(n_fft))))[crop2domain])
         else:
             for patch in self.domains_iterator:
                 propagator_operators[patch] = Lambda(lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x)))
@@ -165,37 +161,6 @@ class HelmholtzBase:
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
         return tuple([slice(patch[d] * self.domain_size[d], 
                             patch[d] * self.domain_size[d] + self.domain_size[d]) for d in range(self.n_dims)])
-
-    @staticmethod
-    def compute_wrap_corr(x, wrap_matrix):
-        """ Function to compute the wrapping correction in 3 dimensions. 
-        Possible efficiency improvement: Compute corrections as six separate arrays (for the edges only) to save memory
-        :param x: Array to which wrapping correction is to be applied
-        :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
-        :return: corr: Correction array corresponding to x
-        """
-        # corr = np.zeros(x.shape, dtype='complex64')
-        corr = torch.zeros_like(x)
-
-        n_correction = wrap_matrix.shape[0]
-        # construct slice to select the side pixels
-        left = (slice(0, n_correction))
-        right = (slice(-n_correction, None))
-        n_dims = np.squeeze(x).ndim
-        for _ in range(n_dims):
-            corr[left] += torch.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-            corr[right] += torch.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-            # x = x.transpose((1, 2, 0))
-            x = x.permute((1, 2, 0))
-            # corr = corr.transpose((1, 2, 0))
-            corr = corr.permute((1, 2, 0))
-
-        # Reshape corr back to original size
-        for _ in range(3-n_dims):
-            # corr = corr.transpose((1, 2, 0))
-            corr = corr.permute((1, 2, 0))
-
-        return corr
 
     def medium(self, x, y=None):
         """ Apply medium operators to subdomains/patches of x 
@@ -209,6 +174,8 @@ class HelmholtzBase:
             t[patch] = self.medium_operators[patch](x[patch])
             if y is not None:
                 t[patch] += y[patch]
+        t = self.apply_corrections(x, t, 'wrapping')
+        t = self.apply_corrections(x, t, 'transfer')
         return t
     
     def l_plus1(self, x):
@@ -232,62 +199,74 @@ class HelmholtzBase:
         return t
 
     @staticmethod
-    def compute_transfer_corr(x, wrap_matrix):
+    def compute_corrections(x, wrap_matrix):
         """ Function to compute the transfer corrections in 3 dimensions. 
             Corrections computed as six separate arrays (for the edges only) to save memory
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :return: corr: Dict of List of correction arrays corresponding to x
         """
-        # n_dims = np.squeeze(x).ndim
-        n_dims = torch.squeeze(x).ndim
-
         # construct slices to select the side pixels
         n_correction = wrap_matrix.shape[0]
         left = np.arange(0, n_correction)
         right = np.arange(-n_correction, 0)
 
         corr_dict = defaultdict(list)
-        for dim in range(n_dims):
+        for dim in range(3):
             for idx_shift in [-1, +1]:  # Correction for left [-1] or right [+1] edge
                 edge = (dim, idx_shift)
-                if idx_shift == -1:
-                    corr_dict[edge] = torch.tensordot(wrap_matrix, x[left], ((1,), (0,)))
-                if idx_shift == +1:
-                    corr_dict[edge] = torch.tensordot(wrap_matrix, x[right], ((0,), (0,)))
-
-                # Reshape back to original size
-                for _ in range(edge[0]):
-                    # corr_dict[edge] = corr_dict[edge].transpose(2, 0, 1)
-                    corr_dict[edge] = corr_dict[edge].permute(2, 0, 1)
-
-            # x = x.transpose((1, 2, 0))
+                if x.shape[0] == 1:
+                    corr_dict[edge] = 0.0
+                else:
+                    if idx_shift == -1:
+                        corr_dict[edge] = torch.tensordot(wrap_matrix, x[left], ([1,], [0,]))
+                    if idx_shift == +1:
+                        corr_dict[edge] = torch.tensordot(wrap_matrix, x[right], ([0,], [0,]))
+                    # Reshape back to original size
+                    for _ in range(edge[0]):
+                        corr_dict[edge] = corr_dict[edge].permute(2, 0, 1)
             x = x.permute((1, 2, 0))
 
         return corr_dict
 
-    def transfer(self, x, t):
-        """ Transfer correction from relevant edges of subdomains in x to those in t 
-        :param x: Dict of List of arrays for which correction is computed
+    def apply_corrections(self, f, t, corr_type):
+        """ 
+        :param f: Dict of List of arrays for which correction is computed
         :param t: Dict of List of arrays to which correction is to be applied
-        :return: t:
+        :param corr_type: Type of correction: 'wrapping' or 'transfer'
         """
-        if self.total_domains == 1:
+        if corr_type == 'transfer' and self.total_domains == 1:
             return t
+        elif corr_type == 'wrapping' and self.wrap_correction != 'wrap_corr':
+            return t
+        elif corr_type != 'wrapping' and corr_type != 'transfer':
+            raise TypeError("Specify corr_type = 'wrapping' or 'transfer'")
         else:
-            left_edges = [(slice(None),) * d + (slice(0, self.n_correction),) for d in range(self.n_dims)]
-            right_edges = [(slice(None),) * d + (slice(-self.n_correction, None),) for d in range(self.n_dims)]
+            # multiplier for adding (m = 1) or subtracting (m = -1) correction
+            if corr_type == 'wrapping':
+                m = 1  
+            else:
+                m = -1
 
-            for patch in self.domains_iterator:
-                x_corr = self.compute_transfer_corr(x[patch], self.wrap_matrix)
-                for d in range(self.n_dims):
-                    for idx_shift in [-1, +1]:  # Transfer wrt previous (-1) and next (+1) subdomain in axis (d)
-                        patch_shift = np.zeros_like(patch)
-                        patch_shift[d] = idx_shift
-                        neighbour_patch = tuple(np.array(patch) + patch_shift)  # get neighbouring subdomain location
-                        if neighbour_patch in self.domains_iterator:  # check if subdomain exists
+            # For indexing edge patch of the domain of size n_correction (default=8) and applying correction to it
+            left = [(slice(None),) * d + (slice(0, self.n_correction),) for d in range(3)]
+            right = [(slice(None),) * d + (slice(-self.n_correction, None),) for d in range(3)]
+
+            for from_patch in self.domains_iterator:
+                # get Dict of List of (six) correction arrays corresponding to f's left and right edges in each axis
+                f_corr = self.compute_corrections(f[from_patch], self.wrap_matrix)
+                if corr_type == 'wrapping':
+                    to_patch = from_patch
+                for d in range(3):
+                    for idx_shift in [-1, +1]:  # Transfer from left (-1)/right (+1) of "f" to right/left of "t"
+                        if corr_type == 'transfer':
+                            patch_shift = np.zeros_like(from_patch)
+                            patch_shift[d] = idx_shift
+                            to_patch = tuple(np.array(from_patch) + patch_shift)  # get neighbouring subdomain location
+
+                        if to_patch in self.domains_iterator:  # check if subdomain exists
                             if idx_shift == -1:
-                                t[neighbour_patch][right_edges[d]] -= 1j * self.scaling[neighbour_patch] * x_corr[d, idx_shift]
+                                t[to_patch][right[d]] += m * 1j * self.scaling[to_patch] * f_corr[d, idx_shift]
                             if idx_shift == +1:
-                                t[neighbour_patch][left_edges[d]] -= 1j * self.scaling[neighbour_patch] * x_corr[d, idx_shift]
+                                t[to_patch][left[d]] += m * 1j * self.scaling[to_patch] * f_corr[d, idx_shift]
             return t

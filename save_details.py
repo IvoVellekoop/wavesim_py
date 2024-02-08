@@ -153,12 +153,12 @@ class LogPlot:
         ax[0].legend(ncols=2, framealpha=0.8)
 
         res_plots = ax[1].loglog(np.arange(1, self.state.iterations+1),
-                               self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
+                                 self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                       title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
         ax[1].loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
-                   ls='dashed', label='Full Residual')
+                     ls='dashed', label='Full Residual')
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
@@ -226,7 +226,7 @@ class LogPlot:
         fig, ax = plt.subplots(figsize=figsize, ncols=1, nrows=2)
         ax = ax.flatten()
 
-        plt.subplot(2,1,1)
+        plt.subplot(2, 1, 1)
         self.plot_common_things(ax[0])
         ax[0].plot([], [], 'r', lw=2., animated=True, label='AnySim')
         ax[0].legend(ncols=2, framealpha=0.8)

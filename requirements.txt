@@ -1,8 +1,7 @@
-matplotlib~=3.8.0
-numpy~=1.26.2
-Pillow~=10.0.1
-pytest~=7.4.0
-pytest-xdist~=3.5.0
+pytest~=7.4.4
+numpy~=1.26.4
 scipy~=1.11.4
-torch~=2.2.0
-torchvision~=0.17.0
+Pillow~=10.0.1
+torch~=2.2.0+cu118
+matplotlib~=3.8.2
+torchvision~=0.17.0+cu118

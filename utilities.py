@@ -75,6 +75,9 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
     source = check_input_dims(source)  # Ensure source term is a 3-d array
+    if source.shape != n.shape:
+        source = pad_boundaries(source, (0, 0, 0), tuple(np.array(n.shape) - np.array(source.shape)), 
+                                mode="constant")
     source = torch.tensor(source, dtype=torch.complex64, device=device)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
 

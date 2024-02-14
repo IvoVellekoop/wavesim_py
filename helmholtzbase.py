@@ -23,6 +23,7 @@ class HelmholtzBase:
                  wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
                  omega=10,  # compute the fft over omega times the domain size
                  n_correction=8,  # number of points used in the wrapping correction
+                 scaling=None,  # If you want to set custom scaling
                  max_iterations=int(1.e+4),  # Maximum number of iterations
                  setup_operators=True):  # Set up Medium (+corrections) and Propagator operators, and scaling
 
@@ -38,7 +39,7 @@ class HelmholtzBase:
 
         self.v = None
         self.l_p = None
-        self.scaling = None
+        self.scaling = scaling
 
         self.total_domains = np.prod(self.n_domains).astype(int)  # total number of domains across all dimensions
         if self.total_domains == 1:
@@ -119,13 +120,19 @@ class HelmholtzBase:
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
-        for patch in self.domains_iterator:
-            patch_slice = self.patch_slice(patch)
-            v_norm = np.max(np.abs(self.v[patch_slice]))
-            if self.wrap_correction == 'wrap_corr':
-                v_norm += self.n_dims * torch.linalg.norm(self.wrap_matrix, 2).cpu().numpy()
-            scaling[patch] = 0.95/v_norm
-            self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
+        if self.scaling:
+            for patch in self.domains_iterator:
+                scaling[patch] = self.scaling
+                patch_slice = self.patch_slice(patch)
+                self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
+        else:
+            for patch in self.domains_iterator:
+                patch_slice = self.patch_slice(patch)
+                v_norm = np.max(np.abs(self.v[patch_slice]))
+                if self.wrap_correction == 'wrap_corr':
+                    v_norm += self.n_dims * torch.linalg.norm(self.wrap_matrix, 2).cpu().numpy()
+                scaling[patch] = 0.95/v_norm
+                self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
         b = 1 - self.v

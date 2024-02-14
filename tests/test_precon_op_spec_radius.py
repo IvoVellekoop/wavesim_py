@@ -34,8 +34,8 @@ def operator_checks(n, boundary_widths, n_domains, wrap_correction):
     mat_ = (torch.diag(torch.ones(np.prod(n_ext), dtype=torch.complex64, device=base.device))
             - base.alpha * full_matrix(op_, n_ext))
     norm_ = np.linalg.norm(mat_.cpu().numpy(), 2)
-    sr = np.max(np.abs(np.linalg.eigvals(mat_.cpu().numpy())))
-    return norm_, sr
+    spec_radius = np.max(np.abs(np.linalg.eigvals(mat_.cpu().numpy())))
+    return norm_, spec_radius
 
 
 param_n_boundaries = [(np.ones(256), 0), (np.ones(256), 10),
@@ -44,21 +44,21 @@ param_n_boundaries = [(np.ones(256), 0), (np.ones(256), 10),
 
 
 @pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
-@pytest.mark.parametrize("n_domains", [2])
-@pytest.mark.parametrize("wrap_correction", ['wrap_corr'])
-def test_ndomains(operator_checks):
-    """ Check that spectral radius < 1 when number of domains > 1 
-    (for n_domains > 1, wrap_correction = 'wrap_corr' by default)"""
+@pytest.mark.parametrize("n_domains", [1])
+@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
+def test_1domain_wrap_options(operator_checks):
+    """ Check that spectral radius < 1 for 1-domain scenario for all wrapping correction options """
     norm_, spec_radius = operator_checks
     assert norm_ < 1, f'||Op|| not < 1, but {norm_}'
     assert spec_radius < 1, f'spectral radius not < 1, but {spec_radius}'
 
 
 @pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
-@pytest.mark.parametrize("n_domains", [1])
-@pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
-def test_1domain_wrap_options(operator_checks):
-    """ Check that spectral radius < 1 for 1-domain scenario for all wrapping correction options """
+@pytest.mark.parametrize("n_domains", [2])
+@pytest.mark.parametrize("wrap_correction", ['wrap_corr'])
+def test_ndomains(operator_checks):
+    """ Check that spectral radius < 1 when number of domains > 1 
+    (for n_domains > 1, wrap_correction = 'wrap_corr' by default)"""
     norm_, spec_radius = operator_checks
     assert norm_ < 1, f'||Op|| not < 1, but {norm_}'
     assert spec_radius < 1, f'spectral radius not < 1, but {spec_radius}'

@@ -210,9 +210,6 @@ def relative_error(e, e_true):
 
 
 def squeeze_(n):
-    while True:
-        try:
-            n = np.squeeze(n, axis=-1)
-        except ValueError:
-            break
+    while n.shape[-1] == 1:
+        n = np.squeeze(n, axis=-1)
     return n

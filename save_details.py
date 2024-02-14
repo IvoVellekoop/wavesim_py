@@ -1,6 +1,6 @@
 from helmholtzbase import HelmholtzBase
 from state import State
-from utilities import relative_error
+from utilities import max_abs_error, relative_error
 
 import os
 import numpy as np
@@ -13,7 +13,7 @@ font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial',
         'size': 12}  # 8-10 pt
 rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
-
+plt.rcParams['text.usetex'] = True
 
 class LogPlot:
     def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
@@ -27,6 +27,7 @@ class LogPlot:
         self.animate_iters = animate_iters
         self.truncate_iterations = False
         self.rel_err = None
+        self.mae = None
         if hasattr(self, 'u_reference'):
             self.compare()  # relative error between u and u_true
         self.x = None
@@ -75,6 +76,7 @@ class LogPlot:
         if self.u_reference.shape[0] != self.base.n_roi[0]:
             self.u_computed = self.u_computed[tuple([slice(0, self.base.n_roi[i]) for i in range(self.base.n_dims)])]
         self.rel_err = relative_error(self.u_computed, self.u_reference)
+        self.mae = max_abs_error(self.u_computed, self.u_reference)
 
     def log_and_plot(self):
         """ Call logging and plotting functions """
@@ -94,6 +96,8 @@ class LogPlot:
                         + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
         if self.rel_err:
             save_string += f'; relative error {self.rel_err:>2.2e}'
+        if self.mae:
+            save_string += f'; max abs error (normalized) {self.mae:>2.2e}'
         save_string += f' \n'
         with open(self.stats_file_name, 'a') as fileopen:
             fileopen.write(save_string)
@@ -147,7 +151,7 @@ class LogPlot:
         title = 'Field'
         if hasattr(self, 'u_reference'):
             ax[0].plot(self.x, np.abs(self.u_reference - self.u_computed)*10, 'g', lw=1., label='Error*10')
-            title += f' (Relative Error = {self.rel_err:.2e})'
+            title += f' (Rel Err = {self.rel_err:.2e}, MAE = {self.mae:.2e})'
         # ax[0].axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
         ax[0].set_title(title)
         ax[0].legend(ncols=2, framealpha=0.8)
@@ -336,7 +340,7 @@ class LogPlot:
             plt.subplot(2, 2, 4)
             im4 = plt.imshow(u_reference - u, cmap='seismic')
             plt.colorbar(mappable=im4, shrink=shrink, pad=pad)
-            plt.title(f'Difference. Relative error {self.rel_err:.2e}')
+            plt.title(f'Difference. Rel Err {self.rel_err:.2e}. MAE {self.mae:.2e}')
 
         plt.tight_layout()
 
@@ -429,7 +433,7 @@ class LogPlot:
             plt.colorbar(mappable=im2, ax=ax[2], shrink=shrink, pad=pad)
             ax[2].set_title(self.label)
             plt.colorbar(mappable=im3, ax=ax[3], shrink=shrink, pad=pad)
-            ax[3].set_title(f'Difference. Relative error {self.rel_err:.2e}')
+            ax[3].set_title(f'Difference. Rel Err {self.rel_err:.2e}. MAE {self.mae:.2e}')
         plt.tight_layout()
 
         ani = animation.ArtistAnimation(fig, frames, interval=100, blit=True)

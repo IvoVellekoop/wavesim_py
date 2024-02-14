@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict
 from helmholtzbase import HelmholtzBase
 from anysim import domain_decomp_operators, map_domain, precon_iteration
-from utilities import pad_boundaries_torch, relative_error, squeeze_
+from utilities import pad_boundaries_torch, max_abs_error, relative_error, squeeze_
 import torch
 torch.set_default_dtype(torch.float32)
 
@@ -48,10 +48,12 @@ def test_forward_iteration(n, n_domains):
         a_x2 = a_x2[base2.crop2roi]
     a_x = squeeze_(a_x.cpu().numpy())
     a_x2 = squeeze_(a_x2.cpu().numpy())
-    rel_err = relative_error(a_x2, a_x)
 
-    print('Relative error: {:.2e}'.format(rel_err))
-    assert rel_err <= 1.e-3
+    rel_err = relative_error(a_x2, a_x)
+    mae = max_abs_error(a_x2, a_x)
+    threshold = 1.e-3
+    assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
+    assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'
 
 
 @pytest.mark.parametrize("n", 
@@ -114,5 +116,7 @@ def test_precon_iteration(n, n_domains):
         t1 = t1[base.crop2roi]
 
     rel_err = relative_error(t2, t1)
-    print('Relative error: {:.2e}'.format(rel_err))
-    assert rel_err <= 1.e-3
+    mae = max_abs_error(t2, t1)
+    threshold = 1.e-3
+    assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
+    assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'

@@ -147,6 +147,12 @@ Example of an error: "findfont: Generic family 'sans-serif' not found because no
 
 ---
 
+# If problem with tex in matplotlib
+
+        sudo apt install texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+
+        python -m pip install latex
+
 # For animations, ffmpeg package needed (below command for Linux)
 
         sudo apt-get install ffmpeg

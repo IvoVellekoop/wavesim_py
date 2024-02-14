@@ -10,19 +10,20 @@ from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 from helmholtzbase import HelmholtzBase
 from anysim import run_algorithm
 from save_details import LogPlot
-from utilities import relative_error
+from utilities import max_abs_error, relative_error
 
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
 matlab_results = loadmat('matlab_results.mat')
 
 
-def compare(base: HelmholtzBase, u_computed, u_reference, threshold):
-    """ Compute, Print, and Assert relative error between computed and reference field """
+def compare(base: HelmholtzBase, u_computed, u_reference, threshold=1.e-3):
+    """ Compute, Print, and Assert relative and maximum absolute errors between computed and reference field """
     if u_reference.shape[0] != base.n_roi[0]:
         u_computed = u_computed[tuple([slice(0, base.n_roi[i]) for i in range(base.n_dims)])]
     rel_err = relative_error(u_computed, u_reference)
-    print('Relative error: {:.2e}'.format(rel_err))
-    assert rel_err <= threshold
+    mae = max_abs_error(u_computed, u_reference)
+    assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
+    assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'
 
 
 def u_ref_1d_h():
@@ -110,7 +111,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3*abs(n_fat), 
-                         boundary_widths=10, n_domains=n_domains, wrap_correction=wrap_correction)
+                         boundary_widths=10, n_domains=n_domains, wrap_correction=wrap_correction, n_correction=20)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u2d_lc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -132,7 +133,7 @@ def test_3d_homogeneous(n_domains, wrap_correction):
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
     base = HelmholtzBase(n=n_sample, source=source, n_domains=n_domains, 
-                         wrap_correction=wrap_correction, max_iterations=500)
+                         wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results[f'u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}_bw_20_24_32']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

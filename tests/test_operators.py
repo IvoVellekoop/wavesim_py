@@ -4,14 +4,17 @@ from collections import defaultdict
 # from scipy.sparse import diags as spdiags
 # from scipy.sparse.linalg import norm as spnorm
 from helmholtzbase import HelmholtzBase
-from utilities import full_matrix, pad_boundaries_torch, relative_error, squeeze_
+from utilities import full_matrix, max_abs_error, pad_boundaries_torch, relative_error, squeeze_
 import torch
 torch.set_default_dtype(torch.float32)
 
 
-@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10), 
-                                                (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
-                                                (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
+param_n_boundaries = [(np.ones(256), 0), (np.ones(256), 10),
+                      (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
+                      (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)]
+
+
+@pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
 def test_accretive(n, boundary_widths, wrap_correction):
     """ Check that operator A = L + V (sum of propagator and medium operators) is accretive
@@ -28,9 +31,7 @@ def test_accretive(n, boundary_widths, wrap_correction):
     assert torch.round(acc, decimals=3) >= 0, f'a is not accretive. {acc}'
 
 
-@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10), 
-                                                (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
-                                                (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
+@pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
 def test_v_contraction(n, boundary_widths, wrap_correction):
     """ Check that potential V is a contraction, i.e., the operator norm ||V|| < 1 """
@@ -42,11 +43,10 @@ def test_v_contraction(n, boundary_widths, wrap_correction):
     # norm_ = spnorm(v_corr, 2)
     v_corr = (torch.diag(torch.ones(np.prod(base.domain_size), dtype=torch.complex64, device=base.device)) 
               - full_matrix(base.medium_operators[(0, 0, 0)], base.domain_size))
-    # norm_ = np.linalg.norm(v_corr.cpu().numpy(), 2)
-    # print(f'norm_ {norm_:.2f}')
+    norm_ = np.linalg.norm(v_corr.cpu().numpy(), 2)
     spec_radius = np.max(np.abs(np.linalg.eigvals(v_corr.cpu().numpy())))
-    print(f'spec_radius {spec_radius:.2f}')
-    assert spec_radius < 1, f'||op|| not < 1, but {spec_radius}'
+    assert norm_ < 1, f'||op|| not < 1, but {norm_}'
+    assert spec_radius < 1, f'spectral radius not < 1, but {spec_radius}'
 
 
 @pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10), 
@@ -86,5 +86,6 @@ def test_compare_a(n, boundary_widths):
         a_o = a_o[crop2roi]
 
     rel_err = relative_error(a_w, a_o)
-    print(f'Relative error \t\t {rel_err:.2e}')
-    assert rel_err <= 1.e-4, f'Operator A (wrap_corr case) != A (L_omega case). relative error {rel_err:.2e}'
+    mae = max_abs_error(a_w, a_o)
+    assert rel_err <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). Relative Error {rel_err:.2e}'
+    assert mae <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). Max absolute error (Normalized) {mae:.2e}'

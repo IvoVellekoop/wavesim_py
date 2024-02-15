@@ -4,7 +4,8 @@ from collections import defaultdict
 # from scipy.sparse import diags as spdiags
 # from scipy.sparse.linalg import norm as spnorm
 from helmholtzbase import HelmholtzBase
-from utilities import max_abs_error, pad_boundaries_torch, relative_error, squeeze_
+from anysim import domain_decomp_operators, map_domain
+from utilities import full_matrix, max_abs_error, pad_boundaries_torch, relative_error, squeeze_
 import torch
 torch.set_default_dtype(torch.float32)
 
@@ -49,3 +50,39 @@ def test_compare_a(n, boundary_widths):
     mae = max_abs_error(a_w, a_o)
     assert rel_err <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). Relative Error {rel_err:.2e}'
     assert mae <= 1.e-3, f'Operator A (wrap_corr case) != A (L_omega case). Max absolute error (Normalized) {mae:.2e}'
+
+
+@pytest.mark.parametrize("n, boundary_widths", [(np.ones(256), 0), (np.ones(256), 10),
+                                                (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
+                                                (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)])
+@pytest.mark.parametrize("n_domains", [1, 2])
+@pytest.mark.parametrize("corr_type", ['wrapping', 'transfer'])
+def test_symmetry(n, boundary_widths, n_domains, corr_type):
+    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
+                         n_domains=n_domains, wrap_correction='wrap_corr',
+                         scaling=1.)
+    restrict, extend = domain_decomp_operators(base)
+
+    def corr(x):
+        u_dict = defaultdict(list)
+        for patch in base.domains_iterator:
+            u_dict[patch] = map_domain(x, restrict, patch)
+
+        c_dict = defaultdict(list)
+        y = torch.zeros_like(x, dtype=torch.complex64, device=base.device)
+        for patch in base.domains_iterator:
+            c_dict[patch] = map_domain(y, restrict, patch)
+
+        c_dict = base.apply_corrections(u_dict, c_dict, corr_type, im=False)
+        c_ = 0.
+        for patch in base.domains_iterator:
+            c_ += map_domain(c_dict[patch], extend, patch)
+        return c_
+
+    n_ext = base.n_roi + base.boundary_pre + base.boundary_post
+    c = full_matrix(corr, n_ext)
+    acc = torch.min(torch.real(torch.linalg.eigvals(1j*c + (1j*c).conj().t())))
+    print(f'acc {acc:.2e}')
+
+    assert torch.allclose(c, c.T)
+    assert torch.round(acc, decimals=3) >= 0, f'{corr_type} correction is not accretive. {acc}'

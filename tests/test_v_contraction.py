@@ -43,7 +43,7 @@ def check_assertions(norm_, spec_radius):
     if not spec_radius < 1:
         errors.append(f'spectral radius not < 1, but {spec_radius}')
     # assert no error message has been registered, else print messages
-    assert not errors, "errors occured:\n{}".format("\n".join(errors))
+    assert not errors, "errors occurred:\n{}".format("\n".join(errors))
 
 
 param_n_boundaries = [(np.ones(256), 0), (np.ones(256), 10),
@@ -60,7 +60,6 @@ def test_1domain_wrap_options(v_contraction):
     # assert norm_ < 1, f'||op|| not < 1, but {norm_}'
     # assert spec_radius < 1, f'spectral radius not < 1, but {spec_radius}'
     check_assertions(norm_, spec_radius)
-
 
 
 @pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)

@@ -4,6 +4,7 @@ import numpy as np
 import os
 import torch
 from torch.fft import fftfreq
+from itertools import chain
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -180,14 +181,14 @@ def coordinates_f(n_, pixel_size=1.):
 
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
     """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
-    pad_width = tuple((boundary_pre[i], boundary_post[i]) for i in range(3))
+    pad_width = tuple(zip(boundary_pre, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
     return np.pad(x, pad_width, mode)
 
 
 def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
     """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
-    l_o_l = [[boundary_pre[i], boundary_post[i]] for i in range(3)]  # List of Lists [[a0,b0],[a1,b1],[a2,b2]]
-    pad_width = tuple(element for L in reversed(l_o_l) for element in L)  # rearrange to  (a2, b2, a1, b1, a0, b0)
+    t = zip(boundary_pre[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
+    pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
     return torch.nn.functional.pad(x, pad_width, mode)
 
 

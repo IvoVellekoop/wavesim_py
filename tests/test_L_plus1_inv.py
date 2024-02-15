@@ -27,19 +27,19 @@ def check_l_plus1_inv(n, boundary_widths, n_domains, wrap_correction):
             x_ += map_domain(l_dict[patch], extend, patch)
         return x_
     
-    x = (rand(*base.s.shape) + 1j*rand(*base.s.shape)).to(base.device)
-    x_ = l_inv_l(x)
+    x_in = (rand(*base.s.shape) + 1j*rand(*base.s.shape)).to(base.device)
+    x_out = l_inv_l(x_in)
 
-    x = squeeze_(x.cpu().numpy())
-    x_ = squeeze_(x_.cpu().numpy())
+    x_in = squeeze_(x_in.cpu().numpy())
+    x_out = squeeze_(x_out.cpu().numpy())
     if boundary_widths != 0:
         crop2roi = tuple([slice(base.boundary_pre[0], -base.boundary_post[0]) 
                           for _ in range(base.n_dims)])  # crop to n_roi, excluding boundaries
-        x = x[crop2roi]
-        x_ = x_[crop2roi]
+        x_in = x_in[crop2roi]
+        x_out = x_out[crop2roi]
 
-    rel_err = relative_error(x_, x)
-    mae = max_abs_error(x_, x)
+    rel_err = relative_error(x_out, x_in)
+    mae = max_abs_error(x_out, x_in)
     print(f'Relative error ({rel_err:.2e})')
     print(f'Max absolute error (Normalized) ({mae:.2e})')
     return rel_err, mae

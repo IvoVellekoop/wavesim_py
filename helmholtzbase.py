@@ -1,5 +1,5 @@
 import numpy as np
-from itertools import product
+from itertools import chain, product
 # from numpy.fft import fftn, ifftn
 from collections import defaultdict
 from utilities import laplacian_sq_f, pad_func, preprocess
@@ -207,40 +207,40 @@ class HelmholtzBase:
 
     @staticmethod
     def compute_corrections(x, wrap_matrix):
-        """ Function to compute the transfer corrections in 3 dimensions. 
-            Corrections computed as six separate arrays (for the edges only) to save memory
+        """ Function to compute the transfer corrections in 3 dimensions. Corrections computed as six separate arrays
+        for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
         :return: corr: Dict of List of correction arrays corresponding to x
         """
         # construct slices to select the side pixels
         n_correction = wrap_matrix.shape[0]
-        left = np.arange(0, n_correction)
-        right = np.arange(-n_correction, 0)
+        left = [(slice(None),) * d + (slice(0, n_correction),) for d in range(3)]
+        right = [(slice(None),) * d + (slice(-n_correction, None),) for d in range(3)]
 
         corr_dict = defaultdict(list)
         for dim in range(3):
-            for idx_shift in [-1, +1]:  # Correction for left [-1] or right [+1] edge
-                edge = (dim, idx_shift)
-                if x.shape[0] == 1:
-                    corr_dict[edge] = 0.0
-                else:
-                    if idx_shift == -1:
-                        corr_dict[edge] = torch.tensordot(wrap_matrix, x[left], ([1,], [0,]))
-                    if idx_shift == +1:
-                        corr_dict[edge] = torch.tensordot(wrap_matrix, x[right], ([0,], [0,]))
-                    # Reshape back to original size
-                    for _ in range(edge[0]):
-                        corr_dict[edge] = corr_dict[edge].permute(2, 0, 1)
-            x = x.permute((1, 2, 0))
+            if x.shape[dim] != 1:
+                # (dim, -1) indicates correction for left edge in dimension dim, (dim, +1) for the right edge
 
+                # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of wrap matrix
+                # (of size n_correction) is always at axis=0. It should be at axis=dim, and torch.moveaxis() does this
+                corr_dict[(dim, -1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[left[dim]], ([1,], [dim,])),
+                                                      0, dim)
+                corr_dict[(dim, +1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[right[dim]], ([0,], [dim,])),
+                                                      0, dim)
+            else:  # no correction if dim doesn't exist
+                corr_dict[(dim, -1)] = 0.0
+                corr_dict[(dim, +1)] = 0.0
         return corr_dict
 
-    def apply_corrections(self, f, t, corr_type):
+    def apply_corrections(self, f, t, corr_type, im=True):
         """ 
         :param f: Dict of List of arrays for which correction is computed
         :param t: Dict of List of arrays to which correction is to be applied
         :param corr_type: Type of correction: 'wrapping' or 'transfer'
+        :param im: True/False for whether to multiply correction by 1j or not
+        :return: t: With corrections (if any) added to original t
         """
         if corr_type == 'transfer' and self.total_domains == 1:
             return t
@@ -250,30 +250,34 @@ class HelmholtzBase:
             raise TypeError("Specify corr_type = 'wrapping' or 'transfer'")
         else:
             # multiplier for adding (m = 1) or subtracting (m = -1) correction
-            if corr_type == 'wrapping':
-                m = 1  
-            else:
+            m = 1
+            if corr_type == 'transfer':
                 m = -1
 
+            # multiply correction by 1j (im=True) or not (im=False). For symmetry and accretivity check of corrections
+            if im:
+                m = m * 1j
+
             # For indexing edge patch of the domain of size n_correction (default=8) and applying correction to it
+            # first n_correction points in each axis
             left = [(slice(None),) * d + (slice(0, self.n_correction),) for d in range(3)]
+            # last n_correction points in each axis
             right = [(slice(None),) * d + (slice(-self.n_correction, None),) for d in range(3)]
+            # rearrange slices in dictionary similar to compute_corrections output
+            slices = list(chain.from_iterable(zip(right, left)))  # interleave right and left in an alternating way
+            edges = list(product(*(range(3), [-1, 1])))  # [(dim, -1 or 1) for dim in range(3)]
+            edges_dict = dict(zip(edges, slices))  # dictionary with keys similar to compute_corrections output
 
             for from_patch in self.domains_iterator:
                 # get Dict of List of (six) correction arrays corresponding to f's left and right edges in each axis
                 f_corr = self.compute_corrections(f[from_patch], self.wrap_matrix)
                 if corr_type == 'wrapping':
-                    to_patch = from_patch
-                for d in range(3):
-                    for idx_shift in [-1, +1]:  # Transfer from left (-1)/right (+1) of "f" to right/left of "t"
-                        if corr_type == 'transfer':
-                            patch_shift = np.zeros_like(from_patch)
-                            patch_shift[d] = idx_shift
-                            to_patch = tuple(np.array(from_patch) + patch_shift)  # get neighbouring subdomain location
-
-                        if to_patch in self.domains_iterator:  # check if subdomain exists
-                            if idx_shift == -1:
-                                t[to_patch][right[d]] += m * 1j * self.scaling[to_patch] * f_corr[d, idx_shift]
-                            if idx_shift == +1:
-                                t[to_patch][left[d]] += m * 1j * self.scaling[to_patch] * f_corr[d, idx_shift]
+                    to_patch = from_patch  # wrapping corrections added to same patch
+                for d, i in edges:  # d: dim (0,1,2), i: correction for right (-1) or left (+1) edge
+                    if corr_type == 'transfer':
+                        # shift current patch by -1 or 1 in dim d to find neighbouring patch
+                        patch_shift = (*(0,)*d, i, *(0,)*(3-d-1))  # for d = 1, patch_shift = (0, 1, 0) or (0, -1, 0)
+                        to_patch = tuple(np.add(from_patch, patch_shift))  # neighbouring patch
+                    if to_patch in self.domains_iterator:  # check if patch/subdomain exists
+                        t[to_patch][edges_dict[d, i]] += m * self.scaling[to_patch] * f_corr[d, i]
             return t

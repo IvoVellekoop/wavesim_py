@@ -10,10 +10,11 @@ import matplotlib.animation as animation
 from matplotlib import rc
 
 font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial', 'Cambria', or 'Symbol'
-        'size': 12}  # 8-10 pt
+        'size': 10}  # 8-10 pt
 rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
 plt.rcParams['text.usetex'] = True
+
 
 class LogPlot:
     def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
@@ -160,7 +161,7 @@ class LogPlot:
                                  self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
         ax[1].loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
                      ls='dashed', label='Full Residual')
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
@@ -168,7 +169,7 @@ class LogPlot:
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
         y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
         ax[1].set_ylim([y_min, y_max])
-        ax[1].set_title('Residual. Iterations = {:.2e}'.format(self.state.iterations))
+        ax[1].set_title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations = {self.state.iterations:.2e}')
         ax[1].set_ylabel('Residual')
         ax[1].set_xlabel('Iterations')
         ax[1].grid()
@@ -194,7 +195,7 @@ class LogPlot:
         self.plot_common_things(plt)
         plot_data, = plt.plot([], [], 'r', lw=2., animated=True, label='AnySim')
         plot_data.set_xdata(self.x)
-        plt.legend()
+        plt.legend(ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
         title = plt.title('')
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
@@ -233,7 +234,7 @@ class LogPlot:
         plt.subplot(2, 1, 1)
         self.plot_common_things(ax[0])
         ax[0].plot([], [], 'r', lw=2., animated=True, label='AnySim')
-        ax[0].legend(ncols=2, framealpha=0.8)
+        ax[0].legend(ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
 
         if self.truncate_iterations:
             plot_iters = len(u_iter)
@@ -268,7 +269,7 @@ class LogPlot:
 
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
@@ -318,7 +319,7 @@ class LogPlot:
                                self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                       title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                       title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
         plt.loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
                    ls='dashed')
         plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
@@ -326,7 +327,7 @@ class LogPlot:
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
         y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
         plt.ylim([y_min, y_max])
-        plt.title('Residual. Iterations = {:.2e}'.format(self.state.iterations))
+        plt.title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations {self.state.iterations:.2e}')
         plt.ylabel('Residual')
         plt.xlabel('Iterations')
         plt.grid()
@@ -418,7 +419,7 @@ class LogPlot:
         plt.colorbar(mappable=im0, ax=ax[0], shrink=shrink, pad=pad)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.n_domains[0] / 4) + 1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))

@@ -1,6 +1,5 @@
 import numpy as np
 from itertools import chain, product
-# from numpy.fft import fftn, ifftn
 from collections import defaultdict
 from utilities import laplacian_sq_f, pad_func, preprocess
 
@@ -35,7 +34,7 @@ class HelmholtzBase:
         # for name, val in base.items():
         #     exec('self.'+name+' = val')
 
-        self.pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
+        self.pixel_size = wavelength/ppw  # Grid pixel size in um (micron)
 
         self.v = None
         self.l_p = None
@@ -64,6 +63,8 @@ class HelmholtzBase:
         # crop to n_roi, excluding boundaries
         self.crop2roi = tuple([slice(self.boundary_pre[d], -self.boundary_post[d])
                                for d in range(self.n_dims)])
+        # map from padded to original domain
+        self.crop2domain = None  # Only applicable when wrap_correction='L_omega'
 
         self.alpha = 0.75  # ~step size of the Richardson iteration \in (0,1]
 
@@ -126,11 +127,14 @@ class HelmholtzBase:
                 patch_slice = self.patch_slice(patch)
                 self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
         else:
+            # multiplier for v_norm computation. m=2 for wrapping + transfer correction when n_domain > 1
+            m = 2 if self.total_domains > 1 else 1
+            # Compute scaling patch/subdomain-wise
             for patch in self.domains_iterator:
                 patch_slice = self.patch_slice(patch)
                 v_norm = np.max(np.abs(self.v[patch_slice]))
                 if self.wrap_correction == 'wrap_corr':
-                    v_norm += self.n_dims * torch.linalg.norm(self.wrap_matrix, 2).cpu().numpy()
+                    v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix.cpu(), 2)
                 scaling[patch] = 0.95/v_norm
                 self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
 
@@ -151,12 +155,13 @@ class HelmholtzBase:
         propagator_operators = {}
         l_plus1_operators = {}
         if self.wrap_correction == 'L_omega':
-            crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])  # map from padded to original domain
+            # map from padded to original domain
+            self.crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])
             for patch in self.domains_iterator:
                 propagator_operators[patch] = Lambda(lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) *
-                                                                      fftn(x, tuple(n_fft))))[crop2domain])
+                                                                      fftn(x, tuple(n_fft))))[self.crop2domain])
                 l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * self.l_p + 1) *
-                                                                   fftn(x, tuple(n_fft))))[crop2domain])
+                                                                   fftn(x, tuple(n_fft)))))
         else:
             for patch in self.domains_iterator:
                 propagator_operators[patch] = Lambda(lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x)))
@@ -185,14 +190,19 @@ class HelmholtzBase:
         t = self.apply_corrections(x, t, 'transfer')
         return t
     
-    def l_plus1(self, x):
+    def l_plus1(self, x, crop=True):
         """ Apply L+1 operators to subdomains/patches of x 
         :param x: Dict of List of arrays to which L+1 operators are to be applied
+        :param crop: Bool, whether to crop (L+1)x or not [only applicable when wrap_correction = 'L_omega']
         :return: t: Dict of List of subdomain-wise (L+1)
         """
         t = defaultdict(list)
-        for patch in self.domains_iterator:
-            t[patch] = self.l_plus1_operators[patch](x[patch])
+        if crop and self.wrap_correction == 'L_omega':
+            for patch in self.domains_iterator:
+                t[patch] = self.l_plus1_operators[patch](x[patch])[self.crop2domain]
+        else:
+            for patch in self.domains_iterator:
+                t[patch] = self.l_plus1_operators[patch](x[patch])
         return t
 
     def propagator(self, x):

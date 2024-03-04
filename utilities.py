@@ -38,25 +38,25 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
         domain_size = n_ext.copy()
     else:  # Else, domain decomposition
-        domain_size = n_ext/n_domains
+        domain_size = n_ext / n_domains
 
         # Increase boundary_post in dimension(s) until all subdomains are of the same size
         while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
             boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size = n_ext/n_domains
+            domain_size = n_ext / n_domains
 
         # Increase number of subdomains until subdomain size is less than max_subdomain_size
         max_subdomain_size = 500  # max permissible size of one sub-domain
         while (domain_size > max_subdomain_size).any():
             n_domains[np.where(domain_size > max_subdomain_size)] += 1
-            domain_size = n_ext/n_domains
+            domain_size = n_ext / n_domains
 
         # Increase boundary_post in dimension(s) until the subdomain size is int
         while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
             boundary_post = np.round(boundary_post + n_domains * (np.ceil(domain_size) - domain_size), 2)
             n_ext = n_roi + boundary_pre + boundary_post
-            domain_size = np.round(n_ext/n_domains, 2)
+            domain_size = np.round(n_ext / n_domains, 2)
 
     # Cast below 4 parameters to int because they are used in padding, indexing/slicing, creation of arrays
     boundary_pre = boundary_pre.astype(int)
@@ -77,7 +77,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
     source = check_input_dims(source)  # Ensure source term is a 3-d array
     if source.shape != n.shape:
-        source = pad_boundaries(source, (0, 0, 0), tuple(np.array(n.shape) - np.array(source.shape)), 
+        source = pad_boundaries(source, (0, 0, 0), tuple(np.array(n.shape) - np.array(source.shape)),
                                 mode="constant")
     source = torch.tensor(source, dtype=torch.complex64, device=device)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
@@ -107,9 +107,9 @@ def check_input_dims(x):
 def check_input_len(x, e, n_dims):
     """ Convert 'x' to a 3-element numpy array, appropriately, i.e., either repeat, or add 'e'. """
     if isinstance(x, int) or isinstance(x, float):
-        x = n_dims*tuple((x,)) + (3-n_dims) * (e,)
+        x = n_dims * tuple((x,)) + (3 - n_dims) * (e,)
     elif len(x) == 1:
-        x = n_dims*tuple(x) + (3-n_dims) * (e,)
+        x = n_dims * tuple(x) + (3 - n_dims) * (e,)
     elif isinstance(x, list) or isinstance(x, tuple):
         x += (3 - len(x)) * (e,)
     if isinstance(x, np.ndarray):
@@ -205,7 +205,12 @@ def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
 
 def max_abs_error(e, e_true):
     """ (Normalized) Maximum Absolute Error (MAE) ||e-e_true||_{inf} / ||e_true|| """
-    return np.max(np.abs(e - e_true)) / np.linalg.norm(e_true)  # np.max(np.abs(e_true))  # 
+    return np.max(np.abs(e - e_true)) / np.linalg.norm(e_true)
+
+
+def max_relative_error(e, e_true):
+    """Computes the maximum error, normalized by the rms of the true field."""
+    return np.max(np.abs(e - e_true)) / np.sqrt(np.mean(np.abs(e_true) ** 2))
 
 
 def relative_error(e, e_true):

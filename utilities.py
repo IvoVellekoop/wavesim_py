@@ -40,6 +40,8 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     else:  # Else, domain decomposition
         domain_size = n_ext / n_domains
 
+        # To add: n_domains unequal if one dimension much large than the other(s). Currently n_domains same in all dims
+
         # Increase boundary_post in dimension(s) until all subdomains are of the same size
         while (domain_size[:n_dims] != np.max(domain_size[:n_dims])).any():
             boundary_post[:n_dims] += (n_domains[:n_dims] * (np.max(domain_size[:n_dims]) - domain_size[:n_dims]))
@@ -136,7 +138,7 @@ def full_matrix(operator, d):
     for i in range(nf):
         # m[:, i] = operator(np.roll(b, i)).ravel()
         m[:, i] = torch.ravel(operator(torch.roll(b, i)))
-    return m
+    return m.cpu().numpy()
 
 
 # def full_matrix(operator, d):
@@ -156,6 +158,7 @@ def full_matrix(operator, d):
 
 
 def get_dims(n):
+    """ Return dimensions after applying the custom squeeze function """
     n = squeeze_(n)
     return n.ndim
 
@@ -219,6 +222,7 @@ def relative_error(e, e_true):
 
 
 def squeeze_(n):
+    """ Custom squeeze function that only squeezes the last dimension(s) if they are of size 1 """
     while n.shape[-1] == 1:
         n = np.squeeze(n, axis=-1)
     return n

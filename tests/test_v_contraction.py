@@ -4,34 +4,49 @@ from collections import defaultdict
 from helmholtzbase import HelmholtzBase
 from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix
-import torch
 
 
 @pytest.fixture
-def v_contraction(n, boundary_widths, n_domains, wrap_correction):
-    """ Check that V is a contraction, i.e., the operator norm ||V|| < 1 """
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, 
-                         n_domains=n_domains, wrap_correction=wrap_correction)
+def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
+    """ Check that V is a contraction, i.e., the operator norm || V || < 1 
+        and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
+    n = np.ones(n_size, dtype=np.complex64)
+    # a dummy base object to get the patch/subdomain-wise scaling
+    base_tmp = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction)
+    # base object with scaling = 1 to get v and then scale
+    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction,
+                         scaling=1.)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates B = 1 - V
     # both input and output are arrays, so it can be evaluated by full_matrix() as an operator
     def b_(x):
         u_dict = defaultdict(list)
-        for patch in base.domains_iterator:
-            u_dict[patch] = map_domain(x, restrict, patch)
+        for patch_ in base.domains_iterator:
+            u_dict[patch_] = map_domain(x, restrict, patch_)
         b_dict = base.medium(u_dict)
         b = 0.
-        for patch in base.domains_iterator:
-            b += map_domain(b_dict[patch], extend, patch)
+        for patch_ in base.domains_iterator:
+            b += map_domain(b_dict[patch_], extend, patch_)
         return b
     
     # compute full_matrix(B) and then V = 1 - B
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post
-    v = (torch.diag(torch.ones(np.prod(n_ext), dtype=torch.complex64, device=base.device)) 
-         - full_matrix(b_, n_ext))
-    norm_ = torch.linalg.norm(v, 2)
-    spec_radius = torch.max(torch.abs(torch.linalg.eigvals(v)))
+    v = np.eye(np.prod(n_ext), dtype=np.complex64) - full_matrix(b_, n_ext)
+
+    # scale the v patch/subdomain-wise
+    scale = np.zeros(n_ext, dtype=np.complex64)  # array the same shape as the simulation domain
+    for patch in base.domains_iterator:
+        scale[base.patch_slice(patch)] = base_tmp.scaling[patch]
+    # transform scale array to shape of v, with appropriate patch/subdomain-wise scaling
+    scale = np.expand_dims(scale.ravel(), axis=0)  # flatten scale and add axis for tiling
+    scale = np.repeat(scale, np.prod(n_ext), axis=0)
+    v = np.multiply(scale, v)
+
+    norm_ = np.linalg.norm(v, 2)
+    spec_radius = np.max(np.abs(np.linalg.eigvals(v)))
+    print(f'Norm ({norm_:.4e})')
+    print(f'Spectral radius ({spec_radius:.4e})')
     return norm_, spec_radius
 
 
@@ -46,12 +61,12 @@ def check_assertions(norm_, spec_radius):
     assert not errors, "errors occurred:\n{}".format("\n".join(errors))
 
 
-param_n_boundaries = [(np.ones(256), 0), (np.ones(256), 10),
-                      (np.ones((30, 32)), 0), (np.ones((30, 32)), 10),
-                      (np.ones((5, 6, 7)), 0), (np.ones((5, 6, 7)), 1)]
+param_n_boundaries = [(256, 0), (256, 10),
+                      ((30, 32), 0), ((30, 32), 10),
+                      ((5, 6, 7), 0), ((5, 6, 7), 1)]
 
 
-@pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
+@pytest.mark.parametrize("n_size, boundary_widths", param_n_boundaries)
 @pytest.mark.parametrize("n_domains", [1])
 @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
 def test_1domain_wrap_options(v_contraction):
@@ -62,7 +77,7 @@ def test_1domain_wrap_options(v_contraction):
     check_assertions(norm_, spec_radius)
 
 
-@pytest.mark.parametrize("n, boundary_widths", param_n_boundaries)
+@pytest.mark.parametrize("n_size, boundary_widths", param_n_boundaries)
 @pytest.mark.parametrize("n_domains", [2])
 @pytest.mark.parametrize("wrap_correction", ['wrap_corr'])
 def test_ndomains(v_contraction):

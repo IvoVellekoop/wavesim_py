@@ -7,7 +7,11 @@ from utilities import pad_boundaries_torch, max_abs_error, relative_error, squee
 import torch
 
 torch.set_default_dtype(torch.float32)
+from utilities import pad_boundaries_torch, max_abs_error, relative_error, squeeze_
+from torch import complex64, rand
 
+
+param_n = [1004, (90, 100), (30, 26, 29)]
 
 def forward_operator(x, n, n_domains, n_correction):
     """Construct forward operator for given number of subdomains and compute its action on x
@@ -64,28 +68,26 @@ def test_simple_decomposition():
     assert np.allclose(y_full, y_split)
 
 
-@pytest.mark.parametrize("n",
-                         [np.ones(256),
-                          np.ones((220, 256)),
-                          np.ones((30, 26, 29))])
+@pytest.mark.parametrize("n_size", param_n)
 @pytest.mark.parametrize("n_domains", [2, 3])
-def test_forward_iteration(n, n_domains):
+def test_forward_iteration(n_size, n_domains):
+    n = np.ones(n_size, dtype=np.complex64)
     source = np.zeros_like(n, dtype=np.complex64)
     source[0] = 1.
 
     # 1 domain problem
-    base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction='wrap_corr')
-    x = (torch.rand(*base.s.shape) + 1j * torch.rand(*base.s.shape)).to(base.device)
+    base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction='wrap_corr', scaling=1.)
+    x = rand(*base.s.shape, dtype=complex64, device=base.device)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
     x_dict = defaultdict(list)
     x_dict[patch] = x
     l_plus1_x = base.l_plus1_operators[patch](x_dict[patch])
     b_x = base.medium_operators[patch](x_dict[patch])
-    a_x = (l_plus1_x - b_x) / base.scaling[patch]
+    a_x = l_plus1_x - b_x
 
     # n_domains
-    base2 = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr')
-    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base2.s.shape) - np.array(base.s.shape)),
+    base2 = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr', scaling=1.)
+    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base2.s.shape)-np.array(base.s.shape)),
                               mode="constant")
     restrict, extend = domain_decomp_operators(base2)
     x_dict2 = defaultdict(list)
@@ -95,7 +97,7 @@ def test_forward_iteration(n, n_domains):
     b_x2 = base2.medium(x_dict2)
     a_x2 = 0.
     for patch2 in base2.domains_iterator:
-        a_x2_patch = (l_plus1_x2[patch2] - b_x2[patch2]) / base2.scaling[patch2]
+        a_x2_patch = l_plus1_x2[patch2] - b_x2[patch2]
         a_x2 += map_domain(a_x2_patch, extend, patch2)
 
     if (base.boundary_post != 0).any():
@@ -107,24 +109,24 @@ def test_forward_iteration(n, n_domains):
 
     rel_err = relative_error(a_x2, a_x)
     mae = max_abs_error(a_x2, a_x)
+    print(f'Relative error ({rel_err:.2e})')
+    print(f'Max absolute error (Normalized) ({mae:.2e})')
     threshold = 1.e-3
     assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
     assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'
 
 
-@pytest.mark.parametrize("n",
-                         [np.ones(256),
-                          np.ones((40, 42)),
-                          np.ones((10, 10, 10))])
+@pytest.mark.parametrize("n_size", param_n)
 @pytest.mark.parametrize("n_domains", [2])
-def test_precon_iteration(n, n_domains):
-    iterations = 5000
+def test_precon_iteration(n_size, n_domains):
+    iterations = 1000
+    n = np.ones(n_size, dtype=np.complex64)
     source = np.zeros_like(n, dtype=np.complex64)
     source[0] = 1.
 
     # 1 domain problem
     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction=None)
-    u = (torch.rand(*base.s.shape) + 1j * torch.rand(*base.s.shape)).to(base.device)
+    u = rand(*base.s.shape, dtype=complex64, device=base.device)
 
     _, extend = domain_decomp_operators(base)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
@@ -145,7 +147,7 @@ def test_precon_iteration(n, n_domains):
 
     # n_domains
     base2 = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr')
-    u2 = pad_boundaries_torch(u, (0, 0, 0), tuple(np.array(base2.s.shape) - np.array(base.s.shape)),
+    u2 = pad_boundaries_torch(u, (0, 0, 0), tuple(np.array(base2.s.shape)-np.array(base.s.shape)),
                               mode="constant")
     restrict2, extend2 = domain_decomp_operators(base2)
     s_dict2 = defaultdict(list)
@@ -164,15 +166,17 @@ def test_precon_iteration(n, n_domains):
         t2_patch = np.sqrt(base2.scaling[patch2]) * u_dict2[patch2]
         t2 += map_domain(t2_patch, extend2, patch2)
 
-    t1 = squeeze_(t1.cpu().numpy())
-    t2 = squeeze_(t2.cpu().numpy())
     if (base2.boundary_post != 0).any():
         t2 = t2[base2.crop2roi]
     if (base.boundary_post != 0).any():
         t1 = t1[base.crop2roi]
+    t1 = squeeze_(t1.cpu().numpy())
+    t2 = squeeze_(t2.cpu().numpy())
 
     rel_err = relative_error(t2, t1)
     mae = max_abs_error(t2, t1)
+    print(f'Relative error ({rel_err:.2e})')
+    print(f'Max absolute error (Normalized) ({mae:.2e})')
     threshold = 1.e-3
     assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
     assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'

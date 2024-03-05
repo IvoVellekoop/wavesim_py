@@ -1,11 +1,10 @@
 import numpy as np
-# from numpy.fft import fftfreq
-# from scipy.sparse import dok_matrix
 import os
 import torch
 from torch.fft import fftfreq
 from itertools import chain
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")

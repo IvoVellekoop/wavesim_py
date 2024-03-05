@@ -25,7 +25,7 @@ def compare(base: HelmholtzBase, u_computed, u_reference, threshold=1.e-3):
     print(f'Relative error ({rel_err:.2e})')
     print(f'Max absolute error (Normalized) ({mae:.2e})')
     assert rel_err <= threshold, f'Relative error ({rel_err:.2e}) > {threshold:.2e}'
-    # assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'
+    assert mae <= threshold, f'Max absolute error (Normalized) ({mae:.2e}) > {threshold:.2e}'
 
 
 def u_ref_1d_h(n):
@@ -125,9 +125,8 @@ def test_2d_low_contrast(n_domains, wrap_correction):
 # @pytest.mark.parametrize("boundary_widths", [np.array([24, 24, 24]), np.array([20, 24, 32])])
 # @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr'])
 # def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
-# @pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'),
-#                                                         (2, 'wrap_corr'), (3, 'wrap_corr')])
-@pytest.mark.parametrize("n_domains, wrap_correction", [(2, 'wrap_corr'), (3, 'wrap_corr')])
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'),
+                                                        (2, 'wrap_corr'), (3, 'wrap_corr')])
 def test_3d_homogeneous(n_domains, wrap_correction):
     """ Test for propagation in a 3D homogeneous medium. Compare with reference solution (matlab repo result).
         Testing with same and varying sizes and boundary widths in each dimension. """

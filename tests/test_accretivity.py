@@ -37,8 +37,8 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
     return acc
 
 
-param_n_boundaries = [(236, 0), (236, 10), 
-                      ((30, 32), 0), ((30, 32), 10), 
+param_n_boundaries = [(236, 0), (236, 10),
+                      ((30, 32), 0), ((30, 32), 10),
                       ((5, 6, 7), 0), ((5, 6, 7), 1)]
 
 

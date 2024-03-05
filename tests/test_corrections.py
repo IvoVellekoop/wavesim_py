@@ -7,7 +7,7 @@ from utilities import full_matrix, max_abs_error, pad_boundaries_torch, relative
 from torch import rand, complex64, zeros_like
 
 
-@pytest.mark.parametrize("n_size, boundary_widths", [(236, 0), (236, 10),
+@pytest.mark.parametrize("n_size, boundary_widths", [(512, 0), (512, 10),
                                                      ((90, 100), 0), ((90, 100), 10),
                                                      ((30, 26, 29), 0), ((30, 26, 29), 10)])
 def test_compare_a(n_size, boundary_widths):

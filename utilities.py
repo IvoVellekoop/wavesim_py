@@ -67,18 +67,18 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
     k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
     v_raw = (k0 ** 2) * (n ** 2)
-    v_raw = pad_boundaries(v_raw, boundary_pre, boundary_post, mode="edge")  # pad v_raw using edge values
+    # v_raw = pad_boundaries(v_raw, boundary_pre, boundary_post, mode="edge")  # pad v_raw using edge values
 
     # compute tiny non-zero minimum value to prevent division by zero in homogeneous media
     pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
     mu_min = ((10.0 / (boundary_widths[:n_dims] * pixel_size)) if (
             boundary_widths != 0).any() else check_input_len(0, 0, n_dims)).astype(np.float32)
-    mu_min = max(np.max(mu_min), np.max(1.e+0 / (np.array(v_raw.shape[:n_dims]) * pixel_size)))
-    v_min = np.imag((k0 + 1j * np.max(mu_min)) ** 2)
+    mu_min = max(np.max(mu_min), np.max(1.e-3 / (n_ext[:n_dims] * pixel_size)))
+    v_min = 0.5 * np.imag((k0 + 1j * np.max(mu_min)) ** 2)
 
     source = check_input_dims(source)  # Ensure source term is a 3-d array
     if source.shape != n.shape:
-        source = pad_boundaries(source, (0, 0, 0), tuple(np.array(n.shape) - np.array(source.shape)),
+        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
                                 mode="constant")
     source = torch.tensor(source, dtype=torch.complex64, device=device)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
@@ -118,42 +118,15 @@ def check_input_len(x, e, n_dims):
     return np.array(x)
 
 
-def dft_matrix(n):
-    """ Create a discrete Fourier transform matrix of size n x n. Faster than scipy dft function """
-    r = np.arange(n)
-    omega = np.exp((-2 * np.pi * 1j) / n)  # remove the '-' for inverse fourier
-    return np.vander(omega ** r, increasing=True).astype(np.complex64)  # faster than meshgrid
-
-
 def full_matrix(operator, d):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) """
     nf = np.prod(d)
-    # m = dok_matrix((nf, nf), dtype=np.complex64)
     m = torch.zeros(*(nf, nf), dtype=torch.complex64, device=device)
-
-    b = np.zeros(d, dtype=np.complex64)
-    b.flat[0] = 1
-    b = torch.tensor(b, device=device)
+    b = torch.zeros(tuple(d), dtype=torch.complex64, device=device)
+    b.view(-1)[0] = 1
     for i in range(nf):
-        # m[:, i] = operator(np.roll(b, i)).ravel()
         m[:, i] = torch.ravel(operator(torch.roll(b, i)))
     return m.cpu().numpy()
-
-
-# def full_matrix(operator, d):
-#     """ Converts operator to an 2D square matrix of size d.
-#     (operator should be a function taking a single column vector as input?) """
-#     shape = list(d)
-#     nf = np.prod(d)
-#     m = dok_matrix((nf, nf), dtype=np.complex64)
-#     # b = csr_matrix(([1], ([0],[0])), shape=(nf, 1), dtype=np.complex64)
-#     b = np.zeros((nf, 1), dtype=np.complex64)
-#     b[0] = 1
-#     for i in range(nf):
-#         m[:, i] = np.reshape(operator(np.reshape(b, shape)), (-1,))
-#         # b.indices = (b.indices+1)%b.shape[0]
-#         b = np.roll(b, (1, 0), axis=(0, 1))
-#     return m
 
 
 def get_dims(n):
@@ -195,14 +168,16 @@ def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
 
 
 def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
+    """ Pad and then Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
+    m = pad_boundaries(m, boundary_pre, boundary_post, mode="edge")  # pad m using edge values
     for i in range(n_dims):
         left_boundary = boundary_(boundary_pre[i])
         right_boundary = np.flip(boundary_(boundary_post[i]))
         full_filter = np.concatenate((left_boundary, np.ones(n_roi[i]), right_boundary))
         m = np.moveaxis(m, i, -1) * full_filter  # transpose m to multiply last axis with full_filter
         m = np.moveaxis(m, -1, i)  # transpose back
-    return m.astype(np.complex64)
+    # return m.astype(np.complex64)
+    return torch.tensor(m, dtype=torch.complex64).to(device)
 
 
 def max_abs_error(e, e_true):

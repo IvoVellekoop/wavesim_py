@@ -15,19 +15,35 @@ class HelmholtzBase:
      and setting up wrapping and transfer corrections """
 
     def __init__(self,
-                 n=np.ones((1, 1, 1)),  # Refractive index distribution
-                 source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
-                 wavelength=1.,  # Wavelength in um (micron)
-                 ppw=4,  # points per wavelength
-                 boundary_widths=10,  # Width of absorbing boundaries
-                 n_domains=1,  # Number of subdomains to decompose into, in each dimension
-                 wrap_correction=None,  # Wrap-around correction. None or 'wrap_corr' or 'L_omega'
-                 omega=10,  # compute the fft over omega times the domain size
-                 n_correction=8,  # number of points used in the wrapping correction
-                 scaling=None,  # If you want to set custom scaling
-                 max_iterations=int(1.e+4),  # Maximum number of iterations
-                 setup_operators=True):  # Set up Medium (+corrections) and Propagator operators, and scaling
+                 n=np.ones((1, 1, 1)),
+                 source=np.zeros((1, 1, 1)),
+                 wavelength=1.,
+                 ppw=4,
+                 boundary_widths=10,
+                 n_domains=1,
+                 wrap_correction=None,
+                 omega=10,
+                 n_correction=8,
+                 scaling=None,
+                 max_iterations=int(1.e+4),
+                 setup_operators=True):
+        """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
+        :param n: Refractive index distribution
+        :param source: Source term. Same size as n.
+        :param wavelength: Wavelength in um (micron)
+        :param ppw: Points per wavelength
+        :param boundary_widths: Width of absorbing boundaries
+        :param n_domains: Number of subdomains to decompose into, in each dimension
+        :param wrap_correction: Wrap-around correction. None or 'wrap_corr' or 'L_omega'
+        :param omega: Compute the fft over omega times the domain size
+        :param n_correction: Number of points used in the wrapping correction
+        :param scaling: None or float for custom scaling
+        :param max_iterations: Maximum number of iterations
+        :param setup_operators: Bool, set up Medium (+corrections) and Propagator operators, and scaling
+        """
 
+        # Takes the input parameters and returns these in the appropriate format, with more parameters for setting up
+        # the Medium (+corrections) and Propagator operators, and scaling
         (self.n_roi, self.s, self.n_dims, self.boundary_widths, self.boundary_pre, self.boundary_post,
          self.n_domains, self.domain_size, self.omega, self.v_min, self.v_raw, self.device) = (
             preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega))
@@ -38,8 +54,6 @@ class HelmholtzBase:
 
         self.pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
 
-        self.v = None
-        self.l_p = None
         self.scaling = scaling
 
         self.total_domains = np.prod(self.n_domains).astype(int)  # total number of domains across all dimensions
@@ -97,9 +111,11 @@ class HelmholtzBase:
         the wrapping correction and wrapping transfer operators.
         :return: medium_operators, propagator, scaling"""
         # Make v
-        v0 = (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw))) / 2
-        # v0 = v0 + 1j * self.v_min
-        self.v = -1j * (self.v_raw - v0)  # shift v_raw
+        v0 = 0.5 * (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw)))
+        v = -1j * (self.v_raw - v0)  # shift v_raw
+        if (v == 0).all():
+            v = v - self.v_min
+            v0 = v0 + 1j * self.v_min
 
         # Make the wrap_corr operator (If wrap_correction=True)
         if self.wrap_correction == 'L_omega':
@@ -109,17 +125,7 @@ class HelmholtzBase:
 
         l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr':
-            # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
-            side = torch.zeros(*self.domain_size, device=self.device)
-            side[-1, ...] = 1.0
-            k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
-
-            # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-            self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction),
-                                           dtype=torch.complex64, device=self.device)
-            for r in range(self.n_correction):
-                size = r + 1
-                self.wrap_matrix[r, :] = k_wrap[self.n_correction - size:2 * self.n_correction - size]
+            self.make_wrap_matrix(l_p)
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -127,29 +133,28 @@ class HelmholtzBase:
             for patch in self.domains_iterator:
                 scaling[patch] = self.scaling
                 patch_slice = self.patch_slice(patch)
-                self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
+                v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
         else:
             # multiplier for v_norm computation. m=2 for wrapping + transfer correction when n_domain > 1
             m = 2 if self.total_domains > 1 else 1
             # Scaling option 1. Compute one scaling for entire domain
-            v_norm = np.max(np.abs(self.v))
+            v_norm = np.max(np.abs(v))
             if self.wrap_correction == 'wrap_corr':
                 v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix.cpu(), 2)
             v_norm = np.maximum(v_norm, self.v_min)
             for patch in self.domains_iterator:
                 patch_slice = self.patch_slice(patch)
                 # # Scaling option 2. Compute scaling patch/subdomain-wise
-                # v_norm = np.max(np.abs(self.v[patch_slice]))
+                # v_norm = np.max(np.abs(v[patch_slice]))
                 # if self.wrap_correction == 'wrap_corr':
                 #     v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix.cpu(), 2)
                 # v_norm = np.maximum(v_norm, self.v_min)
                 scaling[patch] = 0.95 / v_norm
-                self.v[patch_slice] = scaling[patch] * self.v[patch_slice]  # Scale v patch/subdomain-wise
+                v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
-        b = 1 - self.v
+        b = 1 - v
         b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
-        b = torch.tensor(b).to(self.device)
 
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
@@ -159,23 +164,40 @@ class HelmholtzBase:
             medium_operators[patch] = Lambda(lambda x, b_=b_patch: b_ * x)
 
         # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
-        self.l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
+        l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
+        l_p_dict = {}
+        for patch in self.domains_iterator:
+            # precompute 1/(scaling.L+1)
+            l_p_dict[patch] = 1 / (scaling[patch] * l_p + 1)
         propagator_operators = {}
         l_plus1_operators = {}
         if self.wrap_correction == 'L_omega':
             # map from padded to original domain
             self.crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])
             for patch in self.domains_iterator:
-                propagator_operators[patch] = Lambda(lambda x: (ifftn((1 / (scaling[patch] * self.l_p + 1)) *
+                propagator_operators[patch] = Lambda(lambda x: (ifftn(l_p_dict[patch] *
                                                                       fftn(x, tuple(n_fft))))[self.crop2domain])
-                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * self.l_p + 1) *
+                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * l_p + 1) *
                                                                    fftn(x, tuple(n_fft)))))
         else:
             for patch in self.domains_iterator:
-                propagator_operators[patch] = Lambda(lambda x: ifftn((1 / (scaling[patch] * self.l_p + 1)) * fftn(x)))
-                l_plus1_operators[patch] = Lambda(lambda x: ifftn((scaling[patch] * self.l_p + 1) * fftn(x)))
+                propagator_operators[patch] = Lambda(lambda x: ifftn(l_p_dict[patch] * fftn(x)))
+                l_plus1_operators[patch] = Lambda(lambda x: ifftn((scaling[patch] * l_p + 1) * fftn(x)))
 
         return medium_operators, propagator_operators, l_plus1_operators, scaling
+
+    def make_wrap_matrix(self, l_p):
+        # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
+        side = torch.zeros(*self.domain_size, device=self.device)
+        side[-1, ...] = 1.0
+        k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
+
+        # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
+        self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction),
+                                       dtype=torch.complex64, device=self.device)
+        for r in range(self.n_correction):
+            size = r + 1
+            self.wrap_matrix[r, :] = k_wrap[self.n_correction - size:2 * self.n_correction - size]
 
     def patch_slice(self, patch):
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
@@ -225,7 +247,7 @@ class HelmholtzBase:
 
     @staticmethod
     def compute_corrections(x, wrap_matrix):
-        """ Function to compute the transfer corrections in 3 dimensions. Corrections computed as six separate arrays
+        """ Function to compute the wrapping/transfer corrections in 3 dimensions as six separate arrays
         for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
@@ -243,9 +265,9 @@ class HelmholtzBase:
 
                 # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of wrap matrix
                 # (of size n_correction) is always at axis=0. It should be at axis=dim, and torch.moveaxis() does this
-                corr_dict[(dim, -1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[left[dim]], ([1,], [dim,])),
+                corr_dict[(dim, -1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[left[dim]], ([1, ], [dim, ])),
                                                       0, dim)
-                corr_dict[(dim, +1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[right[dim]], ([0,], [dim,])),
+                corr_dict[(dim, +1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[right[dim]], ([0, ], [dim, ])),
                                                       0, dim)
             else:  # no correction if dim doesn't exist
                 corr_dict[(dim, -1)] = 0.0
@@ -253,7 +275,7 @@ class HelmholtzBase:
         return corr_dict
 
     def apply_corrections(self, f, t, corr_type, im=True):
-        """ 
+        """ Function to apply the wrapping/transfer corrections computed from compute_corrections()
         :param f: Dict of List of arrays for which correction is computed
         :param t: Dict of List of arrays to which correction is to be applied
         :param corr_type: Type of correction: 'wrapping' or 'transfer'

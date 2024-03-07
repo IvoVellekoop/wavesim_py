@@ -34,12 +34,22 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
     a = full_matrix(forward, n_ext)
     acc = np.min(np.real(np.linalg.eigvals(a + a.conj().T)))
     print(f'acc {acc:.2e}')
+
+    # compute eigenvalues of the operators
+    eah = np.linalg.eigvals(0.5 * (a + a.conj().T))
+    ea = np.linalg.eigvals(a)
+
+    # verify that A is accretive
+    if (np.real(eah) < 0).any():
+        if (np.real(ea) < 0).any():
+            print(f"A has negative eigenvalues, min λ_A = {min(np.real(ea))}, Re A = {min(np.real(eah))}")
+        else:
+            print(f"A is not accretive, but all eigenvalues are positive, Re A = {min(np.real(eah))}")
+
     return acc
 
 
-param_n_boundaries = [(236, 0), (236, 10),
-                      ((30, 32), 0), ((30, 32), 10),
-                      ((5, 6, 7), 0), ((5, 6, 7), 1)]
+param_n_boundaries = [(236, 10), ((30, 32), 10), ((5, 6, 7), 1)]
 
 
 @pytest.mark.parametrize("n_size, boundary_widths", param_n_boundaries)

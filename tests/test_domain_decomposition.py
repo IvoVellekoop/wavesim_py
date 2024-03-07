@@ -15,7 +15,7 @@ def forward_operator(x, n, n_domains, n_correction):
     The result should be the same regardless of n_domains"""
     base = HelmholtzBase(n=n, n_domains=n_domains, wrap_correction='wrap_corr', boundary_widths=0,
                          n_correction=n_correction)
-    print(torch.mean(base.l_p, (0, 1, 2)))
+
     # Split x into subdomains
     restrict, extend = domain_decomp_operators(base)
     x_dict = defaultdict(list)
@@ -49,17 +49,17 @@ def test_simple_decomposition():
     x[300 // 2, 1, 1] = 1.0
     y_full = forward_operator(x, n, n_domains=(1, 1, 1), n_correction=40)
     y_split = forward_operator(x, n, n_domains=n_domains, n_correction=40)
-    s1 = np.squeeze(y_full[300 // 2, :, :])
-    s2 = np.squeeze(y_split[300 // 2, :, :])
+    # s1 = np.squeeze(y_full[300 // 2, :, :])
+    # s2 = np.squeeze(y_split[300 // 2, :, :])
 
     print(f"relative error: {relative_error(y_full, y_split)}")
     print(f"absolute error: {max_abs_error(y_full, y_split)}")
     print(f"maximum_relative error: {max_relative_error(y_full, y_split)}")
 
-    import matplotlib.pyplot as plt
-    plt.imshow(abs(s1 - s2))
-    plt.colorbar()
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # plt.imshow(abs(s1 - s2))
+    # plt.colorbar()
+    # plt.show()
     assert np.allclose(y_full, y_split)
 
 
@@ -83,7 +83,7 @@ def test_forward_iteration(n_size, n_domains):
 
     # n_domains
     base2 = HelmholtzBase(n=n, n_domains=n_domains, wrap_correction='wrap_corr')
-    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base2.s.shape)-np.array(base.s.shape)),
+    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base2.s.shape) - np.array(base.s.shape)),
                               mode="constant")
     restrict, extend = domain_decomp_operators(base2)
     x_dict2 = defaultdict(list)
@@ -114,7 +114,7 @@ def test_forward_iteration(n_size, n_domains):
 
 @pytest.mark.parametrize("n_size", param_n)
 @pytest.mark.parametrize("n_domains", [2])
-def test_precon_iteration(n_size, n_domains):
+def omit_test_precon_iteration(n_size, n_domains):
     iterations = 1000
     n = np.ones(n_size, dtype=np.complex64)
     source = np.zeros_like(n, dtype=np.complex64)

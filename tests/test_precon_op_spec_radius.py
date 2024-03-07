@@ -12,9 +12,10 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
         i.e., the operator norm || Op || < 1 
         and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
     n = np.ones(n_size, dtype=np.complex64)
+    # n[10:20,10:20] = 1.5
     base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
-    
+
     # function that evaluates one preconditioned iteration
     # both input and output are arrays, so it can be evaluated by full_matrix() as an operator
     def op_(x):
@@ -30,6 +31,7 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
 
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post
     mat_ = np.eye(np.prod(n_ext), dtype=np.complex64) - base.alpha * full_matrix(op_, n_ext)
+
     norm_ = np.linalg.norm(mat_, 2)
     spec_radius = np.max(np.abs(np.linalg.eigvals(mat_)))
     print(f'Norm ({norm_:.4e})')

@@ -95,7 +95,7 @@ def boundary_(x):
     """ Anti-reflection boundary layer (ARL). Linear window function
     :param x: Size of the ARL
     :return boundary_: Boundary"""
-    return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007])
+    return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]).astype(np.float32)
 
 
 def check_input_dims(x):
@@ -173,7 +173,7 @@ def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
     for i in range(n_dims):
         left_boundary = boundary_(boundary_pre[i])
         right_boundary = np.flip(boundary_(boundary_post[i]))
-        full_filter = np.concatenate((left_boundary, np.ones(n_roi[i]), right_boundary))
+        full_filter = np.concatenate((left_boundary, np.ones(n_roi[i], dtype=np.float32), right_boundary))
         m = np.moveaxis(m, i, -1) * full_filter  # transpose m to multiply last axis with full_filter
         m = np.moveaxis(m, -1, i)  # transpose back
     # return m.astype(np.complex64)

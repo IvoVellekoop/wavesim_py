@@ -123,9 +123,9 @@ class HelmholtzBase:
         else:
             n_fft = self.domain_size.copy()
 
-        l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
+        # l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr':
-            self.make_wrap_matrix(l_p)
+            self.make_wrap_matrix(n_fft)
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -163,34 +163,35 @@ class HelmholtzBase:
             b_patch = b[patch_slice]
             medium_operators[patch] = Lambda(lambda x, b_=b_patch: b_ * x)
 
-        # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
-        l_p = 1j * (l_p - v0)  # Shift l_p and multiply with 1j (Scaling incorporated inside propagator operator)
-        l_p_dict = {}
-        for patch in self.domains_iterator:
-            # precompute 1/(scaling.L+1)
-            l_p_dict[patch] = 1 / (scaling[patch] * l_p + 1)
+        # # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         propagator_operators = {}
         l_plus1_operators = {}
         if self.wrap_correction == 'L_omega':
             # map from padded to original domain
             self.crop2domain = tuple([slice(0, self.domain_size[i]) for i in range(3)])
             for patch in self.domains_iterator:
-                propagator_operators[patch] = Lambda(lambda x: (ifftn(l_p_dict[patch] *
-                                                                      fftn(x, tuple(n_fft))))[self.crop2domain])
-                l_plus1_operators[patch] = Lambda(lambda x: (ifftn((scaling[patch] * l_p + 1) *
-                                                                   fftn(x, tuple(n_fft)))))
+                propagator_operators[patch] = Lambda(lambda x: (
+                    ifftn(1 / (1j * scaling[patch] * (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size) - v0) + 1) *
+                          fftn(x, tuple(n_fft))))[self.crop2domain])
+                l_plus1_operators[patch] = Lambda(lambda x: (
+                    ifftn((1j * scaling[patch] * (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size) - v0) + 1) *
+                          fftn(x, tuple(n_fft)))))
         else:
             for patch in self.domains_iterator:
-                propagator_operators[patch] = Lambda(lambda x: ifftn(l_p_dict[patch] * fftn(x)))
-                l_plus1_operators[patch] = Lambda(lambda x: ifftn((scaling[patch] * l_p + 1) * fftn(x)))
+                propagator_operators[patch] = Lambda(lambda x: ifftn(
+                    1 / (1j * scaling[patch] * (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size) - v0) + 1) * fftn(
+                        x)))
+                l_plus1_operators[patch] = Lambda(lambda x: ifftn(
+                    (1j * scaling[patch] * (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size) - v0) + 1) * fftn(x)))
 
         return medium_operators, propagator_operators, l_plus1_operators, scaling
 
-    def make_wrap_matrix(self, l_p):
+    def make_wrap_matrix(self, n_fft):
         # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
         side = torch.zeros(*self.domain_size, device=self.device)
         side[-1, ...] = 1.0
-        k_wrap = np.real(ifftn(l_p * fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
+        k_wrap = np.real(ifftn(laplacian_sq_f(self.n_dims, n_fft, self.pixel_size) * fftn(side))[:, 0,
+                         0])  # discard tiny imaginary part due to numerical errors
 
         # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
         self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction),

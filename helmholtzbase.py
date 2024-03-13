@@ -112,10 +112,9 @@ class HelmholtzBase:
         :return: medium_operators, propagator, scaling"""
         # Make v
         v0 = 0.5 * (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw)))
-        v = -1j * (self.v_raw - v0)  # shift v_raw
-        if (v == 0).all():
-            v = v - self.v_min
+        if (self.v_raw - v0 == 0).all():
             v0 = v0 + 1j * self.v_min
+        v = -1j * (self.v_raw - v0)  # shift v_raw
 
         # Make the wrap_corr operator (If wrap_correction=True)
         if self.wrap_correction == 'L_omega':
@@ -141,14 +140,14 @@ class HelmholtzBase:
             v_norm = np.max(np.abs(v))
             if self.wrap_correction == 'wrap_corr':
                 v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix.cpu(), 2)
-            v_norm = np.maximum(v_norm, self.v_min)
+            v_norm = np.maximum(v_norm, self.v_min)  # minimum scaling if medium empty
             for patch in self.domains_iterator:
                 patch_slice = self.patch_slice(patch)
                 # # Scaling option 2. Compute scaling patch/subdomain-wise
                 # v_norm = np.max(np.abs(v[patch_slice]))
                 # if self.wrap_correction == 'wrap_corr':
                 #     v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix.cpu(), 2)
-                # v_norm = np.maximum(v_norm, self.v_min)
+                # v_norm = np.maximum(v_norm, self.v_min)  # minimum scaling if medium empty
                 scaling[patch] = 0.95 / v_norm
                 v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 

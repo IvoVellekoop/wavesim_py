@@ -12,6 +12,7 @@ def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
     """ Check that V is a contraction, i.e., the operator norm || V || < 1 
         and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
     n = np.ones(n_size, dtype=np.complex64)
+    # n[tuple(i//2 for i in n_size)] = 1.5
     base = HelmholtzBase(n=n, boundary_widths=boundary_widths,
                          n_domains=n_domains, wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
@@ -50,7 +51,7 @@ def check_assertions(norm_, spec_radius):
     assert not errors, "errors occurred:\n{}".format("\n".join(errors))
 
 
-param_n_boundaries = [(236, 0), (236, 10),
+param_n_boundaries = [((236,), 0), ((236,), 10),
                       ((30, 32), 0), ((30, 32), 10),
                       ((5, 6, 7), 0), ((5, 6, 7), 1)]
 

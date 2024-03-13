@@ -12,7 +12,7 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
         i.e., the operator norm || Op || < 1 
         and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
     n = np.ones(n_size, dtype=np.complex64)
-    # n[10:20,10:20] = 1.5
+    # n[tuple(i//2 for i in n_size)] = 1.5
     base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 
@@ -39,7 +39,7 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
     return norm_, spec_radius
 
 
-param_n_boundaries = [(236, 0), (236, 10),
+param_n_boundaries = [((236,), 0), ((236,), 10),
                       ((30, 32), 0), ((30, 32), 10),
                       ((5, 6, 7), 0), ((5, 6, 7), 1)]
 

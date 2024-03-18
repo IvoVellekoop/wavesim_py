@@ -112,8 +112,6 @@ class HelmholtzBase:
         :return: medium_operators, propagator, scaling"""
         # Make v
         v0 = 0.5 * (np.max(np.real(self.v_raw)) + np.min(np.real(self.v_raw)))
-        if (self.v_raw - v0 == 0).all():
-            v0 = v0 + 1j * self.v_min
         v = -1j * (self.v_raw - v0)  # shift v_raw
 
         # Make the wrap_corr operator (If wrap_correction=True)
@@ -122,7 +120,6 @@ class HelmholtzBase:
         else:
             n_fft = self.domain_size.copy()
 
-        # l_p = laplacian_sq_f(self.n_dims, n_fft, self.pixel_size)  # Fourier coordinates in n_dims
         if self.wrap_correction == 'wrap_corr':
             self.make_wrap_matrix(n_fft)
 
@@ -152,8 +149,7 @@ class HelmholtzBase:
                 v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b and apply ARL
-        b = 1 - v
-        b = pad_func(b, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
+        b = pad_func(1 - v, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
 
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
@@ -214,10 +210,11 @@ class HelmholtzBase:
         t = defaultdict(list)
         for patch in self.domains_iterator:
             t[patch] = self.medium_operators[patch](x[patch])
-            if y is not None:
-                t[patch] += y[patch]
         t = self.apply_corrections(x, t, 'wrapping')
         t = self.apply_corrections(x, t, 'transfer')
+        if y:
+            for patch in self.domains_iterator:
+                t[patch] += y[patch]
         return t
 
     def l_plus1(self, x, crop=True):

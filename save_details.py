@@ -13,7 +13,7 @@ font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial',
         'size': 10}  # 8-10 pt
 rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
-plt.rcParams['text.usetex'] = True
+# plt.rcParams['text.usetex'] = True
 
 
 class LogPlot:

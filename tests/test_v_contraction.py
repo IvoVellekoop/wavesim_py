@@ -11,7 +11,8 @@ from utilities import full_matrix
 def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
     """ Check that V is a contraction, i.e., the operator norm || V || < 1 
         and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
-    n = np.ones(n_size, dtype=np.complex64)
+    # n = np.ones(n_size, dtype=np.complex64)
+    n = np.random.rand(*n_size).astype(np.float32)
     # n[tuple(i//2 for i in n_size)] = 1.5
     base = HelmholtzBase(n=n, boundary_widths=boundary_widths,
                          n_domains=n_domains, wrap_correction=wrap_correction)

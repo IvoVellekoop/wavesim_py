@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import chain, product
 from collections import defaultdict
-from utilities import laplacian_sq_f, pad_func, preprocess
+from utilities import laplacian_sq_f, preprocess
 
 import torch
 from torch.fft import fftn, ifftn
@@ -148,8 +148,10 @@ class HelmholtzBase:
                 scaling[patch] = 0.95 / v_norm
                 v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 
-        # Make b and apply ARL
-        b = pad_func(1 - v, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
+        # # Make b and apply ARL
+        # b = pad_func(1 - v, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
+        # Make b
+        b = torch.tensor(1 - v, dtype=torch.complex64, device=self.device)
 
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}

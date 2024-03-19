@@ -49,7 +49,7 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
         # Increase boundary_post in dimension(s) to satisfy n_domains and domain_size conditions
         # Difference between original n_ext and new n_ext based on modified domain_size
-        boundary_add = n_domains[:n_dims]*domain_size[np.argmin(n_ext[:n_dims])] - n_ext[:n_dims]
+        boundary_add = n_domains[:n_dims] * domain_size[np.argmin(n_ext[:n_dims])] - n_ext[:n_dims]
         boundary_add = boundary_add - np.min(boundary_add)  # Shift all elements of boundary_add to non-negative values
         boundary_post[:n_dims] += boundary_add  # Increase boundary_post
         n_ext = n_roi + boundary_pre + boundary_post  # Update n_ext
@@ -73,8 +73,17 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
     n_domains = n_domains.astype(int)
     domain_size = domain_size.astype(int)
 
+    # Pad source to the size of n_ext = n_roi + boundary_pre + boundary_post
+    source = check_input_dims(source)  # Ensure source term is a 3-d array
+    if source.shape != n.shape:  # If source term is not given, pad to the size of
+        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
+                                mode='constant')
+    source = torch.tensor(source, dtype=torch.complex64, device=device)
+    source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode='constant')  # pad source term (scale later)
+
     k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
-    v_raw = (k0 ** 2) * (n ** 2)
+    n_sq = add_absorption(n ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to n^2
+    v_raw = (k0 ** 2) * n_sq  # raw potential v = k^2 * n^2
 
     # compute tiny non-zero minimum value to prevent division by zero in homogeneous media
     pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
@@ -82,13 +91,6 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
             boundary_widths != 0).any() else check_input_len(0, 0, n_dims)).astype(np.float32)
     mu_min = max(np.max(mu_min), np.max(1.e-3 / (n_ext[:n_dims] * pixel_size)))
     v_min = 0.5 * np.imag((k0 + 1j * np.max(mu_min)) ** 2)
-
-    source = check_input_dims(source)  # Ensure source term is a 3-d array
-    if source.shape != n.shape:
-        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
-                                mode="constant")
-    source = torch.tensor(source, dtype=torch.complex64, device=device)
-    source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode="constant")  # pad source term (scale later)
 
     # compute the fft over omega times the domain size
     omega = check_input_len(omega, 1, n_dims)  # Ensure omega is a 3-element array with 1s after n_dims
@@ -131,37 +133,22 @@ def squeeze_(n):
     return n
 
 
-# Laplacian
-def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
-    """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
-    :param n_dims: number of dimensions
-    :param n_fft: window length
-    :param pixel_size: sample spacing
-    :return Laplacian squared in Fourier coordinates"""
-    l_p = coordinates_f(n_fft[0], pixel_size) ** 2
-    for d in range(1, n_dims):
-        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size) ** 2, 0)
-
-    for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
-        l_p = torch.unsqueeze(l_p, -1)
-    return l_p
-
-
-def coordinates_f(n_, pixel_size=1.):
-    return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
-
-
-# Padding and anti-reflection boundary layer (ARL)
-def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Pad and then Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
-    m = pad_boundaries(m, boundary_pre, boundary_post, mode="edge")  # pad m using edge values
-    m = torch.tensor(m, dtype=torch.complex64, device=device)
+# Add absorption to the refractive index squared
+def add_absorption(m, boundary_pre, boundary_post, n_roi, n_dims):
+    """ Add (weighted) absorption to the refractive index squared"""
+    w = np.ones_like(m)  # Weighting function (1 everywhere)
+    w = pad_boundaries(w, boundary_pre, boundary_post, mode='linear_ramp')  # pad w using linear_ramp
+    a = 1 - w  # for absorption, inverse weighting 1 - w
     for i in range(n_dims):
-        left_boundary = boundary_(boundary_pre[i])
-        right_boundary = boundary_(boundary_post[i]).flipud()
-        full_filter = torch.cat((left_boundary, torch.ones(n_roi[i], device=device), right_boundary))
-        m = torch.moveaxis(m, i, -1) * full_filter  # transpose m to multiply last axis with full_filter
-        m = torch.moveaxis(m, -1, i)  # transpose back
+        left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
+        right_boundary = np.flip(boundary_(boundary_post[i]))  # flip is a vertical flip
+        full_filter = np.concatenate((left_boundary, np.ones(n_roi[i], dtype=np.float32), right_boundary))
+        a = np.moveaxis(a, i, -1) * full_filter  # transpose to last dimension, apply filter
+        a = np.moveaxis(a, -1, i)  # transpose back to original position
+    a = 1j * a  # absorption is imaginary
+
+    m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
+    m = w * m + a  # add absorption to m
     return m
 
 
@@ -182,8 +169,43 @@ def boundary_(x):
     """ Anti-reflection boundary layer (ARL). Linear window function
     :param x: Size of the ARL
     :return boundary_: Boundary"""
-    return torch.tensor(np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]),
-                        dtype=torch.float32, device=device)
+    return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]).astype(np.float32)
+    # return torch.tensor(np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]),
+    #                     dtype=torch.float32, device=device)
+
+
+# Laplacian
+def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
+    """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
+    :param n_dims: number of dimensions
+    :param n_fft: window length
+    :param pixel_size: sample spacing
+    :return Laplacian squared in Fourier coordinates"""
+    l_p = coordinates_f(n_fft[0], pixel_size) ** 2
+    for d in range(1, n_dims):
+        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size) ** 2, 0)
+
+    for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
+        l_p = torch.unsqueeze(l_p, -1)
+    return l_p
+
+
+def coordinates_f(n_, pixel_size=1.):
+    return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
+
+
+# # Padding and anti-reflection boundary layer (ARL)
+# def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
+#     """ Pad and then Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
+#     m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
+#     m = torch.tensor(m, dtype=torch.complex64, device=device)
+#     for i in range(n_dims):
+#         left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
+#         right_boundary = boundary_(boundary_post[i]).flipud()  # flipud is a vertical flip
+#         full_filter = torch.cat((left_boundary, torch.ones(n_roi[i], device=device), right_boundary))
+#         m = torch.moveaxis(m, i, -1) * full_filter  # transpose to last dimension, apply filter
+#         m = torch.moveaxis(m, -1, i)  # transpose back to original position
+#     return m
 
 
 # Used in tests

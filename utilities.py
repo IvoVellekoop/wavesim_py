@@ -1,27 +1,30 @@
 import numpy as np
-import os
 import torch
 from torch.fft import fftfreq
 from itertools import chain
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
 torch.set_default_dtype(torch.float32)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
-               source=np.zeros((1, 1, 1)),  # Direct source term instead of amplitude and location
-               wavelength=1.,  # Wavelength in um (micron)
-               ppw=4,  # points per wavelength
-               boundary_widths=(20, 20, 20),  # Width of absorbing boundaries
-               n_domains=(1, 1, 1),  # Number of subdomains to decompose into, in each dimension
-               omega=10):  # compute the fft over omega times the domain size
-    """ Set up and preprocess parameters to pass to HelmholtzBase """
-
+def preprocess(n=np.ones((1, 1, 1)),
+               source=np.zeros((1, 1, 1)),
+               wavelength=1.,
+               ppw=4,
+               boundary_widths=(20, 20, 20),
+               n_domains=(1, 1, 1),
+               omega=10):
+    """ Preprocess the input parameters for the simulation
+    :param n: Refractive index distribution 
+    :param source: Direct source term instead of amplitude and location
+    :param wavelength: Wavelength in um (micron)
+    :param ppw: Points per wavelength
+    :param boundary_widths: Width of absorbing boundaries
+    :param n_domains: Number of subdomains to decompose into, in each dimension
+    :param omega: Compute the fft over omega times the domain size
+    :return: Preprocessed parameters """
     n = check_input_dims(n)  # Ensure n is a 3-d array
-    n_dims = get_dims(n)  # Number of dimensions in problem
+    n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
     boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
@@ -101,33 +104,43 @@ def preprocess(n=np.ones((1, 1, 1)),  # Refractive index distribution
 
 
 def check_input_dims(x):
-    """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source) """
+    """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source)
+    :param x: Input array
+    :return: Array with 3 dimensions """
     for _ in range(3 - x.ndim):
-        x = np.expand_dims(x, axis=-1)
+        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 3
     return x
 
 
 def check_input_len(x, e, n_dims):
-    """ Convert 'x' to a 3-element numpy array, appropriately, i.e., either repeat, or add 'e'. """
-    if isinstance(x, int) or isinstance(x, float):
-        x = n_dims * tuple((x,)) + (3 - n_dims) * (e,)
-    elif len(x) == 1:
-        x = n_dims * tuple(x) + (3 - n_dims) * (e,)
-    elif isinstance(x, list) or isinstance(x, tuple):
-        x += (3 - len(x)) * (e,)
-    if isinstance(x, np.ndarray):
-        x = np.concatenate((x, np.zeros(3 - len(x))))
+    """ Check the length of input arrays and expand them to 3 elements if necessary. Either repeat or add 'e'
+    :param x: Input array
+    :param e: Element to add
+    :param n_dims: Number of dimensions
+    :return: Array with 3 elements """
+    if isinstance(x, int) or isinstance(x, float):  # If x is a single number
+        x = n_dims * tuple((x,)) + (3 - n_dims) * (e,)  # Repeat the number n_dims times, and add (3-n_dims) e's
+    elif len(x) == 1:  # If x is a single element list or tuple
+        x = n_dims * tuple(x) + (3 - n_dims) * (e,)  # Repeat the element n_dims times, and add (3-n_dims) e's
+    elif isinstance(x, list) or isinstance(x, tuple):  # If x is a list or tuple
+        x += (3 - len(x)) * (e,)  # Add (3-len(x)) e's
+    if isinstance(x, np.ndarray):  # If x is a numpy array
+        x = np.concatenate((x, np.zeros(3 - len(x))))  # Concatenate with (3-len(x)) zeros
     return np.array(x)
 
 
 def get_dims(n):
-    """ Return dimensions after applying the custom squeeze function """
-    n = squeeze_(n)
-    return n.ndim
+    """ Get the number of dimensions of 'n' 
+    :param n: Input array
+    :return: Number of dimensions """
+    n = squeeze_(n)  # Squeeze the last dimension if it is 1
+    return n.ndim  # Number of dimensions
 
 
 def squeeze_(n):
-    """ Custom squeeze function that only squeezes the last dimension(s) if they are of size 1 """
+    """ Squeeze the last dimension of 'n' if it is 1 
+    :param n: Input array
+    :return: Squeezed array """
     while n.shape[-1] == 1:
         n = np.squeeze(n, axis=-1)
     return n
@@ -135,7 +148,13 @@ def squeeze_(n):
 
 # Add absorption to the refractive index squared
 def add_absorption(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Add (weighted) absorption to the refractive index squared"""
+    """ Add (weighted) absorption to the refractive index squared 
+    :param m: array (Refractive index squared)
+    :param boundary_pre: Boundary before
+    :param boundary_post: Boundary after
+    :param n_roi: Number of points in the region of interest
+    :param n_dims: Number of dimensions
+    :return: m with absorption """
     w = np.ones_like(m)  # Weighting function (1 everywhere)
     w = pad_boundaries(w, boundary_pre, boundary_post, mode='linear_ramp')  # pad w using linear_ramp
     a = 1 - w  # for absorption, inverse weighting 1 - w
@@ -153,13 +172,23 @@ def add_absorption(m, boundary_pre, boundary_post, n_roi, n_dims):
 
 
 def pad_boundaries(x, boundary_pre, boundary_post, mode):
-    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
+    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions using numpy pad
+    :param x: Input array
+    :param boundary_pre: Boundary before
+    :param boundary_post: Boundary after
+    :param mode: Padding mode
+    :return: Padded array """
     pad_width = tuple(zip(boundary_pre, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
     return np.pad(x, pad_width, mode)
 
 
 def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
-    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions """
+    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions using PyTorch functional.pad
+    :param x: Input tensor
+    :param boundary_pre: Boundary before
+    :param boundary_post: Boundary after
+    :param mode: Padding mode
+    :return: Padded tensor """
     t = zip(boundary_pre[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
     pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
     return torch.nn.functional.pad(x, pad_width, mode)
@@ -169,9 +198,28 @@ def boundary_(x):
     """ Anti-reflection boundary layer (ARL). Linear window function
     :param x: Size of the ARL
     :return boundary_: Boundary"""
-    return np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]).astype(np.float32)
-    # return torch.tensor(np.interp(np.arange(x), [0, x - 1], [0.04981993, 0.95018007]),
-    #                     dtype=torch.float32, device=device)
+    return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
+
+
+# Padding and anti-reflection boundary layer (ARL)
+def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
+    """ Pad 'm' with boundary_pre (before) and boundary_post (after) in all dimensions
+        using anti-reflection boundary layer
+    :param m: Input array
+    :param boundary_pre: Boundary before
+    :param boundary_post: Boundary after
+    :param n_roi: Number of points in the region of interest
+    :param n_dims: Number of dimensions
+    :return: Padded array """
+    m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
+    m = torch.tensor(m, dtype=torch.complex64, device=device)
+    for i in range(n_dims):
+        left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
+        right_boundary = boundary_(boundary_post[i]).flipud()  # flipud is a vertical flip
+        full_filter = torch.cat((left_boundary, torch.ones(n_roi[i], device=device), right_boundary))
+        m = torch.moveaxis(m, i, -1) * full_filter  # transpose to last dimension, apply filter
+        m = torch.moveaxis(m, -1, i)  # transpose back to original position
+    return m
 
 
 # Laplacian
@@ -191,26 +239,19 @@ def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
 
 
 def coordinates_f(n_, pixel_size=1.):
+    """ Calculate the coordinates in the frequency domain
+    :param n_: Number of points
+    :param pixel_size: Pixel size. Defaults to 1.
+    :return: Tensor containing the coordinates in the frequency domain """
     return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
-
-
-# # Padding and anti-reflection boundary layer (ARL)
-# def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
-#     """ Pad and then Apply Anti-reflection boundary layer (ARL) filter on the boundaries """
-#     m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
-#     m = torch.tensor(m, dtype=torch.complex64, device=device)
-#     for i in range(n_dims):
-#         left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
-#         right_boundary = boundary_(boundary_post[i]).flipud()  # flipud is a vertical flip
-#         full_filter = torch.cat((left_boundary, torch.ones(n_roi[i], device=device), right_boundary))
-#         m = torch.moveaxis(m, i, -1) * full_filter  # transpose to last dimension, apply filter
-#         m = torch.moveaxis(m, -1, i)  # transpose back to original position
-#     return m
 
 
 # Used in tests
 def full_matrix(operator, d):
-    """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) """
+    """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) 
+    :param operator: Operator to convert to a matrix
+    :param d: Dimensions of the operator
+    :return: Matrix representation of the operator """
     nf = np.prod(d)
     m = torch.zeros(*(nf, nf), dtype=torch.complex64, device=device)
     b = torch.zeros(tuple(d), dtype=torch.complex64, device=device)
@@ -222,15 +263,24 @@ def full_matrix(operator, d):
 
 # Metrics
 def max_abs_error(e, e_true):
-    """ (Normalized) Maximum Absolute Error (MAE) ||e-e_true||_{inf} / ||e_true|| """
+    """ (Normalized) Maximum Absolute Error (MAE) ||e-e_true||_{inf} / ||e_true|| 
+    :param e: Computed field
+    :param e_true: True field
+    :return: (Normalized) MAE """
     return np.max(np.abs(e - e_true)) / np.linalg.norm(e_true)
 
 
 def max_relative_error(e, e_true):
-    """Computes the maximum error, normalized by the rms of the true field."""
+    """Computes the maximum error, normalized by the rms of the true field 
+    :param e: Computed field
+    :param e_true: True field
+    :return: (Normalized) Maximum Relative Error """
     return np.max(np.abs(e - e_true)) / np.sqrt(np.mean(np.abs(e_true) ** 2))
 
 
 def relative_error(e, e_true):
-    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ """
+    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ 
+    :param e: Computed field
+    :param e_true: True field
+    :return: Relative Error """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)

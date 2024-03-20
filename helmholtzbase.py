@@ -2,11 +2,9 @@ import numpy as np
 from itertools import chain, product
 from collections import defaultdict
 from utilities import laplacian_sq_f, preprocess
-
 import torch
 from torch.fft import fftn, ifftn
 from torchvision.transforms import Lambda
-
 torch.set_default_dtype(torch.float32)
 
 

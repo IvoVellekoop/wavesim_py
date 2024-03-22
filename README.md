@@ -6,13 +6,13 @@ test/test_examples.py contains 2 examples each of 1D, 2D, and 3D problems. The m
 
         import numpy as np
         from helmholtzbase import HelmholtzBase  # to set up medium, propagation operators, and scaling
-        from anysim import iterate  # to run the anysim iteration
+        from anysim import run_algorithm  # to run the anysim iteration
 
         n = np.ones((256, 1, 1))        # Refractive index distribution
         source = np.zeros_like(n)       # Source term
         source[0] = 1.                  # Amplitude 1. at location [0]
         base = HelmholtzBase(n, source) # to set up medium and propagation operators, and scaling
-        u, state = iterate(base)        # Field u and state object with information about the run
+        u, state = run_algorithm(base)  # Field u and state object with information about the run
 
 All other parameters have defaults. Details about n, source, and the other parameters are given below, with the default values defined given in the headers:
 

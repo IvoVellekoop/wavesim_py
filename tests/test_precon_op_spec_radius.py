@@ -21,12 +21,12 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
     def op_(x):
         u_dict = defaultdict(list)
         ut_dict = u_dict.copy()
-        for patch in base.domains_iterator:
-            u_dict[patch] = map_domain(x, restrict, patch)
+        for patch_ in base.domains_iterator:
+            u_dict[patch_] = map_domain(x.to(base.devices[patch_]), restrict, patch_)
         t_dict = precon_iteration(base, u_dict, ut_dict)
         t = 0.
         for patch in base.domains_iterator:
-            t += map_domain(t_dict[patch], extend, patch)
+            t += map_domain(t_dict[patch], extend, patch).cpu()
         return t
 
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post

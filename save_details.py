@@ -7,13 +7,12 @@ import numpy as np
 from datetime import date
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib import rc
+from matplotlib import rc, colors
 
 font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial', 'Cambria', or 'Symbol'
         'size': 10}  # 8-10 pt
 rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
-# plt.rcParams['text.usetex'] = True
 
 
 class LogPlot:
@@ -65,12 +64,12 @@ class LogPlot:
             # self.u_iter = self.state.u_iter.copy()
             self.u_iter = self.state.u_iter.cpu().numpy()
             self.plot_iter_step = 1
-            if self.state.iterations*self.base.total_domains > 100:
-                self.plot_iter_step = int(np.ceil((self.state.iterations*self.base.total_domains)/100))
+            if self.state.iterations * self.base.total_domains > 100:
+                self.plot_iter_step = int(np.ceil((self.state.iterations * self.base.total_domains) / 100))
                 self.truncate_iterations = True
                 for i in self.base.domains_iterator:
                     self.u_iter[i] = self.u_iter[i][::self.plot_iter_step]
-            self.u_iter = np.array(list(map(list, self.u_iter.values())))   # convert dict of lists to array
+            self.u_iter = np.array(list(map(list, self.u_iter.values())))  # convert dict of lists to array
 
     def compare(self):
         """ Compute relative error between computed and reference field """
@@ -94,7 +93,7 @@ class LogPlot:
         if self.base.total_domains > 1:
             save_string += f'; n_transfer {self.base.n_correction}'
         save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iterations; '
-                        + f'final residual {self.state.full_residuals[self.state.iterations-1]:>2.2e}')
+                        + f'final residual {self.state.full_residuals[self.state.iterations - 1]:>2.2e}')
         if self.rel_err:
             save_string += f'; relative error {self.rel_err:>2.2e}'
         if self.mae:
@@ -127,18 +126,18 @@ class LogPlot:
     def plot_common_things(self, plt_common):
         """ Plot things common to all """
         if self.base.total_domains > 1:
-            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size, 
+            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size,
                                c='b', ls='dashdot', lw=1.5)
-            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size, 
+            plt_common.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size,
                                c='b', ls='dashdot', lw=1.5, label='Subdomain boundaries')
             for i in range(1, self.base.total_domains - 1):
-                plt_common.axvline(x=(i * self.base.domain_size[0] + self.base.domain_size[0] 
-                                      - self.base.boundary_widths[0]) * self.base.pixel_size, 
+                plt_common.axvline(x=(i * self.base.domain_size[0] + self.base.domain_size[0]
+                                      - self.base.boundary_widths[0]) * self.base.pixel_size,
                                    c='b', ls='dashdot', lw=1.5)
         if hasattr(self, 'u_reference'):
             plt_common.plot(self.x, np.real(self.u_reference), 'k', lw=2., label=self.label)
         plt_common.set_ylabel('Amplitude')
-        plt_common.set_xlabel("$x~[\lambda]$")
+        plt_common.set_xlabel("$x~(\lambda)$")
         plt_common.set_xlim([self.x[0] - self.x[1] * 2, self.x[-1] + self.x[1] * 2])
         plt_common.grid()
 
@@ -151,18 +150,18 @@ class LogPlot:
         ax[0].plot(self.x, np.real(self.u_computed), 'r', lw=1., label='AnySim')
         title = 'Field'
         if hasattr(self, 'u_reference'):
-            ax[0].plot(self.x, np.abs(self.u_reference - self.u_computed)*10, 'g', lw=1., label='Error*10')
+            ax[0].plot(self.x, np.abs(self.u_reference - self.u_computed) * 10, 'g', lw=1., label='Error*10')
             title += f' (Rel Err = {self.rel_err:.2e}, MAE = {self.mae:.2e})'
         # ax[0].axvspan(0*self.base.pixel_size, 99*self.base.pixel_size, facecolor='lightgrey', alpha=0.5, label='n=1')
         ax[0].set_title(title)
         ax[0].legend(ncols=2, framealpha=0.8)
 
-        res_plots = ax[1].loglog(np.arange(1, self.state.iterations+1),
+        res_plots = ax[1].loglog(np.arange(1, self.state.iterations + 1),
                                  self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
-        ax[1].loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
+                         title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
+        ax[1].loglog(np.arange(1, self.state.iterations + 1), self.state.full_residuals, lw=3., c='k',
                      ls='dashed', label='Full Residual')
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
@@ -195,13 +194,13 @@ class LogPlot:
         self.plot_common_things(plt)
         plot_data, = plt.plot([], [], 'r', lw=2., animated=True, label='AnySim')
         plot_data.set_xdata(self.x)
-        plt.legend(ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
+        plt.legend(ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
         title = plt.title('')
 
         # Plot 100 or fewer frames. Takes much longer for any more frames.
-        if self.state.iterations*self.base.total_domains > 100:
-            plot_iters = int(self.state.iterations*self.base.total_domains/10)
-            iters_trunc = np.linspace(0, self.state.iterations*self.base.total_domains - 1, plot_iters).astype(int)
+        if self.state.iterations * self.base.total_domains > 100:
+            plot_iters = int(self.state.iterations * self.base.total_domains / 10)
+            iters_trunc = np.linspace(0, self.state.iterations * self.base.total_domains - 1, plot_iters).astype(int)
             domains_trunc = self.base.domains_iterator * plot_iters
             u_iter_trunc = u_iter[iters_trunc]
         else:
@@ -212,7 +211,7 @@ class LogPlot:
 
         def animate(i):
             plot_data.set_ydata(u_iter_trunc[i])  # update the data.
-            title_text = f'Iteration {iters_trunc[i//self.base.total_domains] + 1}, Subdomain {domains_trunc[i]}. '
+            title_text = f'Iteration {iters_trunc[i // self.base.total_domains] + 1}, Subdomain {domains_trunc[i]}. '
             title.set_text(title_text)
             return plot_data, title,
 
@@ -234,7 +233,7 @@ class LogPlot:
         plt.subplot(2, 1, 1)
         self.plot_common_things(ax[0])
         ax[0].plot([], [], 'r', lw=2., animated=True, label='AnySim')
-        ax[0].legend(ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
+        ax[0].legend(ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
 
         if self.truncate_iterations:
             plot_iters = len(u_iter)
@@ -253,15 +252,15 @@ class LogPlot:
         frames = []
         for i in range(plot_iters):
             line0, = ax[0].plot(self.x, u_iter[i], 'r', lw=2., animated=True)
-            text0 = ax[0].text(0.35, 1.01,
-                               f'Iteration {iters_trunc[i//self.base.total_domains]+1}, Subdomain {domains_trunc[i]}.',
+            text0 = ax[0].text(0.35, 1.01, f'Iteration {iters_trunc[i // self.base.total_domains] + 1}, '
+                                           f'Subdomain {domains_trunc[i]}.',
                                ha="left", va="bottom", transform=ax[0].transAxes)
 
-            line1, = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
-                                  residuals[:i//self.base.total_domains+1], lw=2., c='k', label='Full Residual')
+            line1, = ax[1].loglog(iters_trunc[:i // self.base.total_domains + 1] + 1,
+                                  residuals[:i // self.base.total_domains + 1], lw=2., c='k', label='Full Residual')
             if self.base.total_domains > 1:
-                lines2 = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
-                                      subdomain_residuals[:i//self.base.total_domains+1, :], lw=1.5)
+                lines2 = ax[1].loglog(iters_trunc[:i // self.base.total_domains + 1] + 1,
+                                      subdomain_residuals[:i // self.base.total_domains + 1, :], lw=1.5)
             else:
                 lines2 = []
 
@@ -269,7 +268,7 @@ class LogPlot:
 
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
@@ -291,62 +290,75 @@ class LogPlot:
     def image_field_n_residual(self, z_slice=0):  # png
         """ Plot the (2D) final field (or 3D slice) and residual wrt iterations and save as png """
         if self.base.n_dims == 3:
+            plot_roi = self.base.n_roi[:2]
+            extent = np.array([0, plot_roi[0], plot_roi[1], 0]) * self.base.pixel_size
             u = np.abs(self.u_computed[:, :, z_slice])
             if hasattr(self, 'u_reference'):
                 u_reference = np.abs(self.u_reference[:, :, z_slice])
         else:
+            plot_roi = self.base.n_roi
+            extent = np.array([0, plot_roi[0], plot_roi[1], 0]) * self.base.pixel_size
             u = np.abs(self.u_computed)
             if hasattr(self, 'u_reference'):
                 u_reference = np.abs(self.u_reference)
 
         if hasattr(self, 'u_reference'):
             n_rows = 2
-            v_lim = np.maximum(np.max(u_reference), np.max(u_reference))
+            vmax = np.maximum(np.max(u_reference), np.max(u_reference))
+            vmin = np.minimum(np.min(u_reference), np.min(u_reference))
         else:
             n_rows = 1
-            v_lim = np.maximum(np.max(u), np.max(u))
-        plt.subplots(figsize=figsize, ncols=2, nrows=n_rows)
+            vmax = np.maximum(np.max(u), np.max(u))
+            vmin = np.minimum(np.min(u), np.min(u))
+        plt.subplots(figsize=(figsize[0], figsize[1] * n_rows / 2), ncols=2, nrows=n_rows)
         pad = 0.03
         shrink = 0.65
 
-        plt.subplot(2, 2, 1)
-        plt.imshow(u, cmap='seismic', vmin=-v_lim, vmax=v_lim)
+        plt.subplot(n_rows, 2, 1)
+        plt.imshow(u, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
         plt.colorbar(shrink=shrink, pad=pad)
+        plt.xlabel("$x~(\lambda)$")
+        plt.ylabel("$y~(\lambda)$")
         plt.title('AnySim')
 
-        plt.subplot(2, 2, 2)
-        res_plots = plt.loglog(np.arange(1, self.state.iterations+1),
+        plt.subplot(n_rows, 2, 2)
+        res_plots = plt.loglog(np.arange(1, self.state.iterations + 1),
                                self.state.subdomain_residuals.cpu().numpy(), lw=1.5)
         if self.base.total_domains > 1:
             plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                       title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
-        plt.loglog(np.arange(1, self.state.iterations+1), self.state.full_residuals, lw=3., c='k',
+                       title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
+        plt.loglog(np.arange(1, self.state.iterations + 1), self.state.full_residuals, lw=3., c='k',
                    ls='dashed')
         plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
         plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
         y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
         plt.ylim([y_min, y_max])
-        plt.title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations {self.state.iterations:.2e}')
+        plt.title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations {self.state.iterations}')
         plt.ylabel('Residual')
         plt.xlabel('Iterations')
         plt.grid()
 
         if hasattr(self, 'u_reference'):
-            plt.subplot(2, 2, 3)
-            im3 = plt.imshow(u_reference, cmap='seismic', vmin=-v_lim, vmax=v_lim)
+            plt.subplot(n_rows, 2, 3)
+            im3 = plt.imshow(u_reference, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
             plt.colorbar(mappable=im3, shrink=shrink, pad=pad)
+            plt.xlabel("$x~(\lambda)$")
+            plt.ylabel("$y~(\lambda)$")
             plt.title(self.label)
 
-            plt.subplot(2, 2, 4)
-            im4 = plt.imshow(u_reference - u, cmap='seismic')
+            plt.subplot(n_rows, 2, 4)
+            im4 = plt.imshow(u_reference - u, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
             plt.colorbar(mappable=im4, shrink=shrink, pad=pad)
+            plt.xlabel("$x~(\lambda)$")
+            plt.ylabel("$y~(\lambda)$")
             plt.title(f'Difference. Rel Err {self.rel_err:.2e}. MAE {self.mae:.2e}')
 
         plt.tight_layout()
 
-        title_text = ''
-        title_text = f'{title_text} Absorbing boundaries {self.base.boundary_widths}. '
+        title_text = f'N {tuple(self.base.n_roi[:self.base.n_dims])}. '
+        if self.base.total_domains > 1:
+            title_text = f'{title_text} N_domains {tuple(self.base.n_domains[:self.base.n_dims])}. '
         if self.base.wrap_correction:
             title_text = f'{title_text} {self.base.wrap_correction}. '
         plt.suptitle(title_text)
@@ -371,10 +383,12 @@ class LogPlot:
             else:
                 u_reference = np.abs(self.u_reference)
             n_rows = 2
-            v_lim = np.maximum(np.max(u_reference), np.max(u_reference))
+            vmax = np.maximum(np.max(u_reference), np.max(u_reference))
+            vmin = np.minimum(np.min(u_reference), np.min(u_reference))
         else:
             n_rows = 1
-            v_lim = np.maximum(np.max(u_iter), np.max(u_iter))
+            vmax = np.maximum(np.max(u_iter), np.max(u_iter))
+            vmin = np.minimum(np.min(u_iter), np.min(u_iter))
 
         fig, ax = plt.subplots(figsize=figsize, ncols=2, nrows=n_rows)
         ax = ax.flatten()
@@ -397,21 +411,22 @@ class LogPlot:
 
         frames = []
         for i in range(plot_iters):
-            im0 = ax[0].imshow(u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
-            text0 = ax[0].text(0.1, 1.01,
-                               f'Iteration {iters_trunc[i//self.base.total_domains]+1}, Subdomain {domains_trunc[i]}.',
+            im0 = ax[0].imshow(u_iter[i], cmap='hot_r', animated=True, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
+            text0 = ax[0].text(0.1, 1.01, f'Iteration {iters_trunc[i // self.base.total_domains] + 1}, '
+                                          f'Subdomain {domains_trunc[i]}.',
                                ha="left", va="bottom", transform=ax[0].transAxes)
 
-            line1, = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
-                                  residuals[:i//self.base.total_domains+1], lw=2., c='k', label='Full Residual')
+            line1, = ax[1].loglog(iters_trunc[:i // self.base.total_domains + 1] + 1,
+                                  residuals[:i // self.base.total_domains + 1], lw=2., c='k', label='Full Residual')
             if self.base.total_domains > 1:
-                lines2 = ax[1].loglog(iters_trunc[:i//self.base.total_domains+1]+1,
-                                      subdomain_residuals[:i//self.base.total_domains+1, :], lw=1.5)
+                lines2 = ax[1].loglog(iters_trunc[:i // self.base.total_domains + 1] + 1,
+                                      subdomain_residuals[:i // self.base.total_domains + 1, :], lw=1.5)
             else:
                 lines2 = []
 
             if hasattr(self, 'u_reference'):
-                im3 = ax[3].imshow(u_reference - u_iter[i], cmap='seismic', vmin=-v_lim, vmax=v_lim, animated=True)
+                im3 = ax[3].imshow(u_reference - u_iter[i], cmap='hot_r', animated=True,
+                                   norm=colors.LogNorm(vmin=vmin, vmax=vmax))
                 frames.append([im0, text0, line1, im3] + lines2)
             else:
                 frames.append([im0, text0, line1] + lines2)
@@ -419,7 +434,7 @@ class LogPlot:
         plt.colorbar(mappable=im0, ax=ax[0], shrink=shrink, pad=pad)
         if self.base.total_domains > 1:
             ax[1].legend(handles=iter(lines2), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                         title='Subdomains', ncols=int(self.base.total_domains/4)+1, framealpha=0.5)
+                         title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
         ax[1].axhline(y=self.base.threshold_residual, c='k', ls=':')
         ax[1].set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
@@ -430,7 +445,7 @@ class LogPlot:
         ax[1].set_xlabel('Iterations')
         ax[1].grid()
         if hasattr(self, 'u_reference'):
-            im2 = ax[2].imshow(u_reference, cmap='seismic', vmin=-v_lim, vmax=v_lim)
+            im2 = ax[2].imshow(u_reference, cmap='hot_r', norm=colors.LogNorm(vmin=vmin, vmax=vmax))
             plt.colorbar(mappable=im2, ax=ax[2], shrink=shrink, pad=pad)
             ax[2].set_title(self.label)
             plt.colorbar(mappable=im3, ax=ax[3], shrink=shrink, pad=pad)

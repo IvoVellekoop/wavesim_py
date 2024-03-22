@@ -6,7 +6,6 @@ from anysim import domain_decomp_operators, map_domain, precon_iteration
 from utilities import pad_boundaries_torch, max_abs_error, relative_error, squeeze_, max_relative_error
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_dtype(torch.float32)
 
 
@@ -30,7 +29,7 @@ def forward_operator(x, n, n_domains, n_correction):
     y = torch.zeros_like(x)
     for patch in base.domains_iterator:
         y_domain = x_l_plus1[patch] - x_medium[patch]
-        y += map_domain(y_domain / base.scaling[patch], extend, patch)
+        y += map_domain(y_domain / base.scaling[patch], extend, patch).cpu()
 
     return y.cpu().numpy()
 
@@ -43,7 +42,7 @@ def test_simple_decomposition():
     n_domains = (3, 3, 3)
 
     n = torch.ones(size=shape)  # refractive index
-    x = torch.zeros(size=shape, dtype=torch.complex64, device=device)
+    x = torch.zeros(size=shape, dtype=torch.complex64)
     x[0, 0, 0] = 1.0
     x[300 // 2, 300 // 2, 300 // 2] = 1.0
     x[300 // 2, 1, 1] = 1.0
@@ -73,7 +72,7 @@ def test_forward_iteration(n_size, n_domains):
 
     # 1 domain problem
     base = HelmholtzBase(n=n, n_domains=1, wrap_correction='wrap_corr')
-    x = torch.rand(*base.s.shape, dtype=torch.complex64, device=base.device)
+    x = torch.rand(*base.s.shape, dtype=torch.complex64)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
     x_dict = defaultdict(list)
     x_dict[patch] = x
@@ -94,7 +93,7 @@ def test_forward_iteration(n_size, n_domains):
     a_x2 = 0.
     for patch2 in base2.domains_iterator:
         a_x2_patch = (l_plus1_x2[patch2] - b_x2[patch2]) / base2.scaling[patch2]
-        a_x2 += map_domain(a_x2_patch, extend, patch2)
+        a_x2 += map_domain(a_x2_patch, extend, patch2).cpu()
 
     if (base.boundary_post != 0).any():
         a_x = a_x[base.crop2roi]
@@ -114,7 +113,7 @@ def test_forward_iteration(n_size, n_domains):
 
 @pytest.mark.parametrize("n_size", param_n)
 @pytest.mark.parametrize("n_domains", [2])
-def omit_test_precon_iteration(n_size, n_domains):
+def test_precon_iteration(n_size, n_domains):
     iterations = 1000
     n = np.ones(n_size, dtype=np.complex64)
     source = np.zeros_like(n, dtype=np.complex64)
@@ -122,15 +121,15 @@ def omit_test_precon_iteration(n_size, n_domains):
 
     # 1 domain problem
     base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction=None)
-    u = torch.rand(*base.s.shape, dtype=torch.complex64, device=base.device)
+    u = torch.rand(*base.s.shape, dtype=torch.complex64)
 
     _, extend = domain_decomp_operators(base)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
     s_dict = defaultdict(list)
     u_dict = s_dict.copy()
     ut_dict = s_dict.copy()
-    s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * base.s
-    u_dict[patch] = u
+    s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * base.s.to(base.devices[patch])
+    u_dict[patch] = u.to(base.devices[patch])
 
     for _ in range(iterations):
         t_dict = precon_iteration(base, u_dict, ut_dict, s_dict)
@@ -139,7 +138,7 @@ def omit_test_precon_iteration(n_size, n_domains):
     t1 = 0.
     for patch in base.domains_iterator:
         t1_patch = np.sqrt(base.scaling[patch]) * u_dict[patch]
-        t1 += map_domain(t1_patch, extend, patch)
+        t1 += map_domain(t1_patch, extend, patch).cpu()
 
     # n_domains
     base2 = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr')
@@ -150,8 +149,8 @@ def omit_test_precon_iteration(n_size, n_domains):
     u_dict2 = s_dict2.copy()
     ut_dict2 = s_dict2.copy()
     for patch2 in base2.domains_iterator:
-        s_dict2[patch2] = 1j * np.sqrt(base2.scaling[patch2]) * map_domain(base2.s, restrict2, patch2)
-        u_dict2[patch2] = map_domain(u2, restrict2, patch2)
+        s_dict2[patch2] = 1j * np.sqrt(base2.scaling[patch2]) * map_domain(base2.s.to(base2.devices[patch2]), restrict2, patch2)
+        u_dict2[patch2] = map_domain(u2.to(base2.devices[patch2]), restrict2, patch2)
 
     for _ in range(iterations):
         t_dict2 = precon_iteration(base2, u_dict2, ut_dict2, s_dict2)
@@ -160,7 +159,7 @@ def omit_test_precon_iteration(n_size, n_domains):
     t2 = 0.
     for patch2 in base2.domains_iterator:
         t2_patch = np.sqrt(base2.scaling[patch2]) * u_dict2[patch2]
-        t2 += map_domain(t2_patch, extend2, patch2)
+        t2 += map_domain(t2_patch, extend2, patch2).cpu()
 
     if (base2.boundary_post != 0).any():
         t2 = t2[base2.crop2roi]

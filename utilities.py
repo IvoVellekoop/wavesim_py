@@ -4,16 +4,9 @@ from torch.fft import fftfreq
 from itertools import chain
 
 torch.set_default_dtype(torch.float32)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def preprocess(n=np.ones((1, 1, 1)),
-               source=np.zeros((1, 1, 1)),
-               wavelength=1.,
-               ppw=4,
-               boundary_widths=(20, 20, 20),
-               n_domains=(1, 1, 1),
-               omega=10):
+def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):
     """ Preprocess the input parameters for the simulation
     :param n: Refractive index distribution 
     :param source: Direct source term instead of amplitude and location
@@ -40,9 +33,9 @@ def preprocess(n=np.ones((1, 1, 1)),
     if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
         domain_size = n_ext.copy()
     else:  # Else, domain decomposition
-        # To set maximum domain_size based on n_dims
-        # max_domain_size = np.array([10000, 1000, 200])
-        # if min(n_ext) < max_domain_size[n_dims-1]:
+        # # To set maximum domain_size based on n_dims
+        # max_domain_size = np.array([100000, 100000, 200])
+        # if min(n_ext) <= max_domain_size[n_dims - 1]:
         #     n_domains = np.array([1., 1., 1.])
 
         # Modify n_domains and domain_size to optimum values. Enables different number of domains in each dimension
@@ -81,7 +74,7 @@ def preprocess(n=np.ones((1, 1, 1)),
     if source.shape != n.shape:  # If source term is not given, pad to the size of
         source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
                                 mode='constant')
-    source = torch.tensor(source, dtype=torch.complex64, device=device)
+    source = torch.tensor(source, dtype=torch.complex64)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode='constant')  # pad source term (scale later)
 
     k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
@@ -99,7 +92,7 @@ def preprocess(n=np.ones((1, 1, 1)),
     omega = check_input_len(omega, 1, n_dims)  # Ensure omega is a 3-element array with 1s after n_dims
 
     return (n_roi, source, n_dims, boundary_widths, boundary_pre, boundary_post,
-            n_domains, domain_size, omega, v_min, v_raw, device)
+            n_domains, domain_size, omega, v_min, v_raw)
     # return locals()
 
 
@@ -201,49 +194,30 @@ def boundary_(x):
     return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
 
 
-# Padding and anti-reflection boundary layer (ARL)
-def pad_func(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Pad 'm' with boundary_pre (before) and boundary_post (after) in all dimensions
-        using anti-reflection boundary layer
-    :param m: Input array
-    :param boundary_pre: Boundary before
-    :param boundary_post: Boundary after
-    :param n_roi: Number of points in the region of interest
-    :param n_dims: Number of dimensions
-    :return: Padded array """
-    m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
-    m = torch.tensor(m, dtype=torch.complex64, device=device)
-    for i in range(n_dims):
-        left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
-        right_boundary = boundary_(boundary_post[i]).flipud()  # flipud is a vertical flip
-        full_filter = torch.cat((left_boundary, torch.ones(n_roi[i], device=device), right_boundary))
-        m = torch.moveaxis(m, i, -1) * full_filter  # transpose to last dimension, apply filter
-        m = torch.moveaxis(m, -1, i)  # transpose back to original position
-    return m
-
-
 # Laplacian
-def laplacian_sq_f(n_dims, n_fft, pixel_size=1.):
+def laplacian_sq_f(n_dims, n_fft, pixel_size=1., device='cpu'):
     """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
     :param n_dims: number of dimensions
     :param n_fft: window length
     :param pixel_size: sample spacing
-    :return Laplacian squared in Fourier coordinates"""
-    l_p = coordinates_f(n_fft[0], pixel_size) ** 2
+    :param device: device to perform computations on (default: 'cpu')
+    :return: Laplacian squared in Fourier coordinates"""
+    l_p = coordinates_f(n_fft[0], pixel_size, device) ** 2
     for d in range(1, n_dims):
-        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size) ** 2, 0)
+        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size, device) ** 2, 0)
 
     for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
         l_p = torch.unsqueeze(l_p, -1)
     return l_p
 
 
-def coordinates_f(n_, pixel_size=1.):
+def coordinates_f(n_, pixel_size=1., device='cpu'):
     """ Calculate the coordinates in the frequency domain
     :param n_: Number of points
     :param pixel_size: Pixel size. Defaults to 1.
+    :param device: device to perform computations on (default: 'cpu')
     :return: Tensor containing the coordinates in the frequency domain """
-    return (2 * torch.pi * fftfreq(n_, pixel_size)).to(device)
+    return 2 * torch.pi * fftfreq(n_, pixel_size, device=device)
 
 
 # Used in tests
@@ -253,11 +227,12 @@ def full_matrix(operator, d):
     :param d: Dimensions of the operator
     :return: Matrix representation of the operator """
     nf = np.prod(d)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     m = torch.zeros(*(nf, nf), dtype=torch.complex64, device=device)
     b = torch.zeros(tuple(d), dtype=torch.complex64, device=device)
     b.view(-1)[0] = 1
     for i in range(nf):
-        m[:, i] = torch.ravel(operator(torch.roll(b, i)))
+        m[:, i] = torch.ravel(operator(torch.roll(b, i)).to(device))
     return m.cpu().numpy()
 
 

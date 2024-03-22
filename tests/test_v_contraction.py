@@ -23,11 +23,11 @@ def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
     def b_(x):
         u_dict = defaultdict(list)
         for patch_ in base.domains_iterator:
-            u_dict[patch_] = map_domain(x, restrict, patch_)
+            u_dict[patch_] = map_domain(x.to(base.devices[patch_]), restrict, patch_)
         b_dict = base.medium(u_dict)
         b = 0.
         for patch_ in base.domains_iterator:
-            b += map_domain(b_dict[patch_], extend, patch_)
+            b += map_domain(b_dict[patch_], extend, patch_).cpu()
         return b
 
     # compute full_matrix(B) and then V = 1 - B

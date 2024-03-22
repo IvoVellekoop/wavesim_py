@@ -20,7 +20,7 @@ class State(object):
 
     def log_subdomain_residual(self, residual_s, patch):
         """ Normalize subdomain residual wrt preconditioned source """
-        self.subdomain_residuals[patch].append((residual_s/self.init_norm))  # .astype(np.float32))
+        self.subdomain_residuals[patch].append((residual_s / self.init_norm))
 
     def log_full_residual(self, residual_f):
         """ Normalize full domain residual wrt preconditioned source """
@@ -38,7 +38,7 @@ class State(object):
         elif self.base.n_dims == 2:
             self.u_iter[patch].append(torch.abs(u))
         elif self.base.n_dims == 3:
-            self.u_iter[patch].append(np.abs(u[..., np.array([0, u.shape[-1]//2, -1])]))
+            self.u_iter[patch].append(np.abs(u[..., np.array([0, u.shape[-1] // 2, -1])]))
 
     def next(self, i):
         """ Check termination conditions and to proceed to next iteration or not """
@@ -48,14 +48,14 @@ class State(object):
             print(f'Residual {self.full_residuals[i]:.2e}. '
                   f'Stopping at iteration {i + 1} ')
             self.should_terminate = True
-            self.iterations = i+1
+            self.iterations = i + 1
             self.sim_time = time.time() - self.start_time
             print('Simulation done (Time {} s)'.format(np.round(self.sim_time, 2)))
 
     def finalize(self, u):
         """ Rescale u and crop to ROI, and convert residual lists to arrays """
         for patch in self.base.domains_iterator:  # patch gives 3-element position tuple of subdomain (e.g., (0,0,0))
-            current_patch = tuple([slice(patch[j] * self.base.domain_size[j], 
+            current_patch = tuple([slice(patch[j] * self.base.domain_size[j],
                                          patch[j] * self.base.domain_size[j] + self.base.domain_size[j])
                                    for j in range(self.base.n_dims)])
             u[current_patch] = np.sqrt(self.base.scaling[patch]) * u[current_patch]  # rescale u

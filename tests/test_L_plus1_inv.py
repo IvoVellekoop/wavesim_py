@@ -24,10 +24,10 @@ def check_l_plus1_inv(n_size, boundary_widths, n_domains, wrap_correction):
         l_dict = base.propagator(l_dict)
         x_ = 0.
         for patch in base.domains_iterator:
-            x_ += map_domain(l_dict[patch], extend, patch)
+            x_ += map_domain(l_dict[patch], extend, patch).cpu()
         return x_
     
-    x_in = rand(*base.s.shape, dtype=complex64, device=base.device)
+    x_in = rand(*base.s.shape, dtype=complex64)
     x_out = l_inv_l(x_in)
 
     if boundary_widths != 0:

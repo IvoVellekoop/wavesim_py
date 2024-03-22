@@ -4,7 +4,7 @@ from collections import defaultdict
 from helmholtzbase import HelmholtzBase
 from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix, max_abs_error, pad_boundaries_torch, relative_error, squeeze_
-from torch import rand, complex64, zeros_like
+from torch import complex64, rand, zeros_like
 
 
 @pytest.mark.parametrize("n_size, boundary_widths", [(512, 0), (512, 10),
@@ -17,7 +17,7 @@ def test_compare_a(n_size, boundary_widths):
     source[0] = 1.
 
     base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='wrap_corr', scaling=1.)
-    x = rand(*base_w.s.shape, dtype=complex64, device=base_w.device)
+    x = rand(*base_w.s.shape, dtype=complex64)
     patch = (0, 0, 0)
     x_dict = defaultdict(list)
     x_dict[patch] = x
@@ -26,7 +26,7 @@ def test_compare_a(n_size, boundary_widths):
     a_w = l_w_plus1 - b_w
 
     base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega', scaling=1.)
-    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base_o.s.shape)-np.array(base_w.s.shape)),
+    x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base_o.s.shape) - np.array(base_w.s.shape)),
                               mode="constant")
     x2_dict = defaultdict(list)
     x2_dict[patch] = x2.clone()
@@ -64,22 +64,22 @@ def test_symmetry(n_size, boundary_widths, n_domains, corr_type):
     def corr(x):
         u_dict = defaultdict(list)
         for patch in base.domains_iterator:
-            u_dict[patch] = map_domain(x, restrict, patch)
+            u_dict[patch] = map_domain(x.to(base.devices[patch]), restrict, patch)
 
         c_dict = defaultdict(list)
-        y = zeros_like(x, dtype=complex64, device=base.device)
+        y = zeros_like(x, dtype=complex64)
         for patch in base.domains_iterator:
-            c_dict[patch] = map_domain(y, restrict, patch)
+            c_dict[patch] = map_domain(y.to(base.devices[patch]), restrict, patch)
 
         c_dict = base.apply_corrections(u_dict, c_dict, corr_type, im=False)
         c_ = 0.
         for patch in base.domains_iterator:
-            c_ += map_domain(c_dict[patch], extend, patch)
+            c_ += map_domain(c_dict[patch], extend, patch).cpu()
         return c_
 
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post
     c = full_matrix(corr, n_ext)
-    acc = np.min(np.real(np.linalg.eigvals(1j*c + (1j*c).conj().T)))
+    acc = np.min(np.real(np.linalg.eigvals(1j * c + (1j * c).conj().T)))
     print(f'acc {acc:.2e}')
 
     assert np.allclose(c, c.T)

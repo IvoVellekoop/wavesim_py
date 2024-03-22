@@ -27,7 +27,7 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
             a_dict[patch] = l_dict[patch] - b_dict[patch]
         a_ = 0.
         for patch in base.domains_iterator:
-            a_ += map_domain(a_dict[patch], extend, patch)
+            a_ += map_domain(a_dict[patch], extend, patch).cpu()
         return a_
     
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post

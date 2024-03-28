@@ -16,7 +16,7 @@ def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):
     :param n_domains: Number of subdomains to decompose into, in each dimension
     :param omega: Compute the fft over omega times the domain size
     :return: Preprocessed parameters """
-    n = check_input_dims(n)  # Ensure n is a 3-d array
+    n = check_input_dims(n.astype(np.complex64))  # Ensure n is a 3-d array
     n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
@@ -33,10 +33,13 @@ def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):
     if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
         domain_size = n_ext.copy()
     else:  # Else, domain decomposition
-        # # To set maximum domain_size based on n_dims
-        # max_domain_size = np.array([100000, 100000, 200])
-        # if min(n_ext) <= max_domain_size[n_dims - 1]:
-        #     n_domains = np.array([1., 1., 1.])
+        # Modify such that decompose into domains only when total_size*bytes (or bits?) > t * (memory of one GPU/device)
+        # If decomposing, size of one domain * bytes (or bits) < t * (memory of one GPU)
+        # Here t a factor, say 0.8? Try different values
+        # To set maximum domain_size based on n_dims 
+        max_domain_size = np.array([100000, 100000, 500])
+        if min(n_ext) <= max_domain_size[n_dims - 1]:
+            n_domains = np.array([1., 1., 1.])
 
         # Modify n_domains and domain_size to optimum values. Enables different number of domains in each dimension
         # round n_ext to nearest 10 and get new n_domains based on min(n_ext)

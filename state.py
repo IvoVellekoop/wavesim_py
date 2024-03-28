@@ -42,9 +42,13 @@ class State(object):
 
     def next(self, i):
         """ Check termination conditions and to proceed to next iteration or not """
-        if (self.full_residuals[i] <= self.base.threshold_residual
-                or self.full_residuals[i] >= self.base.divergence_limit
-                or i >= self.base.max_iterations - 1):
+        subdomain_residuals_i = []
+        for patch in self.base.domains_iterator:
+            subdomain_residuals_i.append(self.subdomain_residuals[patch][i])
+        if ((np.array(subdomain_residuals_i) <= self.base.threshold_residual).all()
+            or self.full_residuals[i] <= self.base.threshold_residual
+            or self.full_residuals[i] >= self.base.divergence_limit
+            or i >= self.base.max_iterations - 1):
             print(f'Residual {self.full_residuals[i]:.2e}. '
                   f'Stopping at iteration {i + 1} ')
             self.should_terminate = True

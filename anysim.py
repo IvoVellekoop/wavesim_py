@@ -37,7 +37,8 @@ def run_algorithm(base: HelmholtzBase):
         t_dict = precon_iteration(base, u_dict, ut_dict, s_dict)
 
         for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
-            state.log_subdomain_residual(norm(t_dict[patch]), patch)  # log residual for current subdomain
+            subdomain_residual = norm(t_dict[patch]).cpu()
+            state.log_subdomain_residual(subdomain_residual, patch)  # log residual for current subdomain
 
             u_dict[patch] = u_dict[patch] - (base.alpha * t_dict[patch])  # update subdomain u
 
@@ -46,9 +47,9 @@ def run_algorithm(base: HelmholtzBase):
             u[patch_slice] = u_dict[patch]
 
             # state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
-            residual += map_domain(t_dict[patch], extend, patch).cpu()  # add up all subdomain residuals
+            residual += subdomain_residual**2  # add up all subdomain residuals
 
-        state.log_full_residual(norm(residual))  # log residual for entire domain
+        state.log_full_residual(torch.sqrt(residual))  # log residual for entire domain
         state.next(i)  # Check termination conditions
         if state.should_terminate:  # Proceed to next iteration or not
             break

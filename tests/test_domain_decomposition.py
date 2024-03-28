@@ -149,7 +149,8 @@ def test_precon_iteration(n_size, n_domains):
     u_dict2 = s_dict2.copy()
     ut_dict2 = s_dict2.copy()
     for patch2 in base2.domains_iterator:
-        s_dict2[patch2] = 1j * np.sqrt(base2.scaling[patch2]) * map_domain(base2.s.to(base2.devices[patch2]), restrict2, patch2)
+        s_dict2[patch2] = (1j * np.sqrt(base2.scaling[patch2]) *
+                           map_domain(base2.s.to(base2.devices[patch2]), restrict2, patch2))
         u_dict2[patch2] = map_domain(u2.to(base2.devices[patch2]), restrict2, patch2)
 
     for _ in range(iterations):

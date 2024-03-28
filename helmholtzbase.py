@@ -159,8 +159,6 @@ class HelmholtzBase:
                 scaling[patch] = 0.95 / v_norm
                 v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 
-        # # Make b and apply ARL
-        # b = pad_func(1 - v, self.boundary_pre, self.boundary_post, self.n_roi, self.n_dims)
         # Make b
         b = torch.tensor(1 - v, dtype=torch.complex64)
 
@@ -169,7 +167,7 @@ class HelmholtzBase:
         for patch in self.domains_iterator:
             patch_slice = self.patch_slice(patch)  # get slice/indices for the subdomain patch
             b_p = b[patch_slice].to(self.devices[patch])
-            medium_operators[patch] = lambda x, b_=b_p, p_=patch: b_ * x.to(self.devices[p_])
+            medium_operators[patch] = lambda x, b_=b_p: b_ * x
 
         # # Make the propagator operator that does fast convolution with (l_p+1)^(-1)
         propagator_operators = {}
@@ -181,21 +179,21 @@ class HelmholtzBase:
                 propagator_operators[patch] = lambda x, p_=patch: (
                     ifftn(1 / (1j * scaling[p_] *
                                (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, self.devices[p_]) - v0) + 1) *
-                          fftn(x.to(self.devices[p_]), tuple(n_fft))))[self.crop2domain]
+                          fftn(x, tuple(n_fft))))[self.crop2domain]
                 l_plus1_operators[patch] = lambda x, p_=patch: (
                     ifftn((1j * scaling[p_] *
                            (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, self.devices[p_]) - v0) + 1) *
-                          fftn(x.to(self.devices[p_]), tuple(n_fft))))
+                          fftn(x, tuple(n_fft))))
         else:
             for patch in self.domains_iterator:
                 propagator_operators[patch] = lambda x, p_=patch: ifftn(
                     1 / (1j * scaling[p_] *
                          (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, self.devices[p_]) - v0) + 1) *
-                    fftn(x.to(self.devices[p_])))
+                    fftn(x))
                 l_plus1_operators[patch] = lambda x, p_=patch: ifftn(
                     (1j * scaling[p_] *
                      (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, self.devices[p_]) - v0) + 1) *
-                    fftn(x.to(self.devices[p_])))
+                    fftn(x))
 
         return medium_operators, propagator_operators, l_plus1_operators, scaling
 
@@ -263,13 +261,16 @@ class HelmholtzBase:
         return t
 
     @staticmethod
-    def compute_corrections(x, wrap_matrix):
+    def compute_corrections(x, wrap_matrix, device):
         """ Function to compute the wrapping/transfer corrections in 3 dimensions as six separate arrays
         for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
+        :param device: 
         :return: corr: Dict of List of correction arrays corresponding to x
         """
+        wrap_matrix = wrap_matrix.to(device)
+
         # construct slices to select the side pixels
         n_correction = wrap_matrix.shape[0]
         left = [(slice(None),) * d + (slice(0, n_correction),) for d in range(3)]
@@ -287,8 +288,8 @@ class HelmholtzBase:
                 corr_dict[(dim, +1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[right[dim]], ([0, ], [dim, ])),
                                                       0, dim)
             else:  # no correction if dim doesn't exist
-                corr_dict[(dim, -1)] = torch.tensor([0.0])
-                corr_dict[(dim, +1)] = torch.tensor([0.0])
+                corr_dict[(dim, -1)] = torch.tensor([0.0], device=device)
+                corr_dict[(dim, +1)] = torch.tensor([0.0], device=device)
         return corr_dict
 
     def apply_corrections(self, f, t, corr_type, im=True):
@@ -328,7 +329,7 @@ class HelmholtzBase:
             for from_patch in self.domains_iterator:
                 # get Dict of List of (six) correction arrays corresponding to f's left and right edges in each axis
                 device = self.devices[from_patch]
-                f_corr = self.compute_corrections(f[from_patch].to(device), self.wrap_matrix.to(device))
+                f_corr = self.compute_corrections(f[from_patch], self.wrap_matrix, device)
                 if corr_type == 'wrapping':
                     to_patch = from_patch  # wrapping corrections added to same patch
                 for d, i in edges:  # d: dim (0,1,2), i: correction for right (-1) or left (+1) edge

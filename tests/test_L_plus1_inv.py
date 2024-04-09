@@ -19,7 +19,7 @@ def check_l_plus1_inv(n_size, boundary_widths, n_domains, wrap_correction):
     def l_inv_l(x):
         u_dict = defaultdict(list)
         for patch in base.domains_iterator:
-            u_dict[patch] = map_domain(x, restrict, patch)
+            u_dict[patch] = map_domain(x.to(base.devices[patch]), restrict, patch)
         l_dict = base.l_plus1(u_dict, crop=False)
         l_dict = base.propagator(l_dict)
         x_ = 0.
@@ -27,7 +27,7 @@ def check_l_plus1_inv(n_size, boundary_widths, n_domains, wrap_correction):
             x_ += map_domain(l_dict[patch], extend, patch).cpu()
         return x_
     
-    x_in = rand(*base.s.shape, dtype=complex64)
+    x_in = rand(*base.s.shape, dtype=complex64, device=base.devices[(0, 0, 0)])
     x_out = l_inv_l(x_in)
 
     if boundary_widths != 0:

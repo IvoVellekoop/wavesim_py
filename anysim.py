@@ -12,47 +12,41 @@ def run_algorithm(base: HelmholtzBase):
     :return: u (computed field), state (object) """
 
     u = torch.zeros_like(base.s, dtype=torch.complex64)
-    restrict, extend = domain_decomp_operators(base)  # Construct restriction and extension operators
+    restrict, _ = domain_decomp_operators(base)  # Construct restriction and extension operators
     state = State(base)
-    # list of preconditioner i.e. medium(propagator()) applied to source term in each subdomain patch
-    norm_patch = [(map_domain(base.medium_operators[patch](
-        base.propagator_operators[patch](map_domain(base.s, restrict, patch).to(base.devices[patch]))),
-        extend, patch)).cpu() for patch in base.domains_iterator]
-    # initial norm for residual computation. Summing up all patches of medium(propagator(source)) and taking norm
-    state.init_norm = norm(sum(norm_patch))
 
     # Empty dicts of lists to store patch-wise source (s) and field (u)
-    s_dict = defaultdict(list)
-    u_dict = s_dict.copy()
-    ut_dict = s_dict.copy()
+    u_dict = defaultdict(list) 
+    s_dict = u_dict.copy()
+    ut_dict = u_dict.copy()
+    norm_patch = []
     for patch in base.domains_iterator:
-        # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
-        s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * map_domain(base.s.to(base.devices[patch]), restrict, patch)
         # restrict full-domain field u to the subdomain patch
         u_dict[patch] = map_domain(u.to(base.devices[patch]), restrict, patch)
 
+        # restrict full-domain source s to the patch subdomain, and apply scaling for that subdomain
+        s_patch = map_domain(base.s.to(base.devices[patch]), restrict, patch)
+        s_dict[patch] = 1j * np.sqrt(base.scaling[patch]) * s_patch
+
+        # norm of medium(propagator(source)), i.e., preconditioner applied to source term for each subdomain
+        norm_ps = norm(base.medium_operators[patch](base.propagator_operators[patch](s_patch))).to(base.device)
+        norm_patch.append(norm_ps)
+    state.init_norm = norm(torch.tensor(norm_patch, device=base.device))  # initial norm for residual computation
+
     for i in range(base.max_iterations):
         print(f'Iteration {i + 1}', end='\r')
-        residual = 0
-        t_dict = precon_iteration(base, u_dict, ut_dict, s_dict)
-
+        t_dict = precon_iteration(base, u_dict, ut_dict, s_dict)  # get dict of subdomain residuals
         for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
-            subdomain_residual = norm(t_dict[patch]).cpu()
-            state.log_subdomain_residual(subdomain_residual, patch)  # log residual for current subdomain
-
             u_dict[patch] = u_dict[patch] - (base.alpha * t_dict[patch])  # update subdomain u
 
-            # find the slice of full domain u and update
-            patch_slice = base.patch_slice(patch)
-            u[patch_slice] = u_dict[patch]
-
-            # state.log_u_iter(u, patch)  # collect u updates (store separately subdomain-wise)
-            residual += subdomain_residual**2  # add up all subdomain residuals
-
-        state.log_full_residual(torch.sqrt(residual))  # log residual for entire domain
-        state.next(i)  # Check termination conditions
+        state.next(t_dict, i)  # Log residuals and Check termination conditions
         if state.should_terminate:  # Proceed to next iteration or not
             break
+
+    for patch in base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
+        # find the slice of full domain u and update
+        u[base.patch_slice(patch)] = u_dict[patch]
+
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
     return state.finalize(u), state
 
@@ -62,6 +56,7 @@ def domain_decomp_operators(base):
     restrict = [[] for _ in range(3)]
     extend = [[] for _ in range(3)]
 
+    one = torch.tensor([[1.]], dtype=torch.complex64)
     if base.total_domains == 1:
         [restrict[dim].append(1.) for dim in range(3)]
         [extend[dim].append(1.) for dim in range(3)]
@@ -74,7 +69,6 @@ def domain_decomp_operators(base):
         for dim in range(3):
             if base.domain_size[dim] == 1:
                 for patch in range(base.n_domains[dim]):
-                    one = torch.tensor([[1.]], dtype=torch.complex64)
                     restrict[dim].append(one)
                     extend[dim].append(one)
             else:

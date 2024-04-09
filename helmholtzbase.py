@@ -68,24 +68,29 @@ class HelmholtzBase:
         else:
             self.n_correction = n_correction
 
-        self.wrap_matrix = None
-        self.medium_operators = None
         self.propagator_operators = None
+        self.medium_operators = None
+        self.wrap_matrices = None
+        self.scaling = None
         self.l_plus1_operators = None
 
         # to iterate through subdomains in all dimensions
         self.domains_iterator = list(product(*(range(self.n_domains[i]) for i in range(3))))
-
-        # to set a device for each subdomain
-        self.devices = {}
+        
+        self.devices = {}  # to set a device for each subdomain
+        self.device_list = []  # to make a list of all devices (to send wrapping matrix to)
         if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            device_count = torch.cuda.device_count() if torch.cuda.is_available() else 1
             for idx, patch in enumerate(self.domains_iterator):
-                device = f'cuda:{idx % torch.cuda.device_count()}' \
-                    if torch.cuda.is_available() and torch.cuda.device_count() > 0 else 'cpu'
+                device = f'cuda:{idx % device_count}' if device_count > 0 else 'cpu'
                 self.devices[patch] = device
+            self.device_list = [f'cuda:{i}' for i in range(device_count)] if device_count > 0 else ['cpu']
         else:
+            self.device = device
             for patch in self.domains_iterator:
                 self.devices[patch] = device
+            self.device_list = ['cpu']
 
         # crop to n_roi, excluding boundaries
         self.crop2roi = tuple([slice(self.boundary_pre[d], -self.boundary_post[d])
@@ -102,9 +107,10 @@ class HelmholtzBase:
 
         self.print_details()
         if setup_operators:
-            # Get Medium (b = 1 - v + corrections), Propagator (L+1)^(-1), and (L+1) operators, and Scaling
-            (self.medium_operators, self.propagator_operators,
-             self.l_plus1_operators, self.scaling) = self.make_operators()
+            # Get Propagator (L+1)^(-1) and Medium (b = 1 - v) operators, Wrapping Matrix (for wrapping and transfer
+            # corrections), Scaling and (L+1) operators
+            (self.propagator_operators, self.medium_operators, self.wrap_matrices, self.scaling,
+             self.l_plus1_operators) = self.make_operators()
 
     def print_details(self):
         """ Print main information about the problem """
@@ -131,8 +137,11 @@ class HelmholtzBase:
         else:
             n_fft = self.domain_size.copy()
 
+        wrap_matrices = {}
         if self.wrap_correction == 'wrap_corr':
-            self.make_wrap_matrix(n_fft)
+            wrap_matrix = self.make_wrap_matrix(n_fft)
+            for device in self.device_list:
+                wrap_matrices[device] = wrap_matrix.to(device)
 
         # Compute the scaling, scale v. Scaling computation includes wrap_corr if it is used in wrapping &// transfer
         scaling = {}
@@ -147,20 +156,20 @@ class HelmholtzBase:
             # Scaling option 1. Compute one scaling for entire domain
             v_norm = np.max(np.abs(v))
             if self.wrap_correction == 'wrap_corr':
-                v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix, 2)
+                v_norm += m * self.n_dims * torch.linalg.norm(wrap_matrix, 2).cpu().numpy()
             v_norm = np.maximum(v_norm, self.v_min)  # minimum scaling if medium empty
             for patch in self.domains_iterator:
                 patch_slice = self.patch_slice(patch)
                 # # Scaling option 2. Compute scaling patch/subdomain-wise
                 # v_norm = np.max(np.abs(v[patch_slice]))
                 # if self.wrap_correction == 'wrap_corr':
-                #     v_norm += m * self.n_dims * np.linalg.norm(self.wrap_matrix, 2)
+                #     v_norm += m * self.n_dims * np.linalg.norm(wrap_matrix, 2)
                 # v_norm = np.maximum(v_norm, self.v_min)  # minimum scaling if medium empty
                 scaling[patch] = 0.95 / v_norm
                 v[patch_slice] = scaling[patch] * v[patch_slice]  # Scale v patch/subdomain-wise
 
         # Make b
-        b = torch.tensor(1 - v, dtype=torch.complex64)
+        b = torch.tensor(1 - v, dtype=torch.complex64, device=self.device)
 
         # Make the medium operator(s) patch/subdomain-wise
         medium_operators = {}
@@ -195,23 +204,24 @@ class HelmholtzBase:
                      (laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, self.devices[p_]) - v0) + 1) *
                     fftn(x))
 
-        return medium_operators, propagator_operators, l_plus1_operators, scaling
+        return propagator_operators, medium_operators, wrap_matrices, scaling, l_plus1_operators
 
     def make_wrap_matrix(self, n_fft):
         """ Make the wrap matrix for the wrapping correction
-        :param n_fft: Size of the padded domain for the fft """
+        :param n_fft: Size of the padded domain for the fft 
+        :return: wrap_matrix: A square matrix of side n_correction"""
         # compute the 1-D convolution kernel (brute force) and take the wrapped part of it
-        side = torch.zeros(*self.domain_size)
+        side = torch.zeros(*self.domain_size, device=self.device)
         side[-1, ...] = 1.0
-        k_wrap = np.real(ifftn(laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, device='cpu') * fftn(side))[:, 0,
-                         0])  # discard tiny imaginary part due to numerical errors
+        k_wrap = np.real(ifftn(laplacian_sq_f(self.n_dims, n_fft, self.pixel_size, device=self.device) *
+                               fftn(side))[:, 0, 0])  # discard tiny imaginary part due to numerical errors
 
         # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-        self.wrap_matrix = torch.zeros((self.n_correction, self.n_correction),
-                                       dtype=torch.complex64)
+        wrap_matrix = torch.zeros((self.n_correction, self.n_correction), dtype=torch.complex64, device=self.device)
         for r in range(self.n_correction):
             size = r + 1
-            self.wrap_matrix[r, :] = k_wrap[self.n_correction - size:2 * self.n_correction - size]
+            wrap_matrix[r, :] = k_wrap[self.n_correction - size:2 * self.n_correction - size]
+        return wrap_matrix
 
     def patch_slice(self, patch):
         """ Return the slice, i.e., indices for the current 'patch', i.e., the subdomain """
@@ -266,10 +276,9 @@ class HelmholtzBase:
         for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
         :param x: Array to which wrapping correction is to be applied
         :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
-        :param device: 
+        :param device: To ensure all corrections are on the same device
         :return: corr: Dict of List of correction arrays corresponding to x
         """
-        wrap_matrix = wrap_matrix.to(device)
 
         # construct slices to select the side pixels
         n_correction = wrap_matrix.shape[0]
@@ -288,8 +297,9 @@ class HelmholtzBase:
                 corr_dict[(dim, +1)] = torch.moveaxis(torch.tensordot(wrap_matrix, x[right[dim]], ([0, ], [dim, ])),
                                                       0, dim)
             else:  # no correction if dim doesn't exist
-                corr_dict[(dim, -1)] = torch.tensor([0.0], device=device)
-                corr_dict[(dim, +1)] = torch.tensor([0.0], device=device)
+                zero_tensor = torch.zeros(1, device=device)
+                corr_dict[(dim, -1)] = zero_tensor
+                corr_dict[(dim, +1)] = zero_tensor
         return corr_dict
 
     def apply_corrections(self, f, t, corr_type, im=True):
@@ -329,7 +339,7 @@ class HelmholtzBase:
             for from_patch in self.domains_iterator:
                 # get Dict of List of (six) correction arrays corresponding to f's left and right edges in each axis
                 device = self.devices[from_patch]
-                f_corr = self.compute_corrections(f[from_patch], self.wrap_matrix, device)
+                f_corr = self.compute_corrections(f[from_patch], self.wrap_matrices[device], device)
                 if corr_type == 'wrapping':
                     to_patch = from_patch  # wrapping corrections added to same patch
                 for d, i in edges:  # d: dim (0,1,2), i: correction for right (-1) or left (+1) edge

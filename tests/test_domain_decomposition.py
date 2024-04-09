@@ -75,7 +75,7 @@ def test_forward_iteration(n_size, n_domains):
     x = torch.rand(*base.s.shape, dtype=torch.complex64)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
     x_dict = defaultdict(list)
-    x_dict[patch] = x
+    x_dict[patch] = x.to(base.devices[patch])
     l_plus1_x = base.l_plus1_operators[patch](x_dict[patch])
     b_x = base.medium_operators[patch](x_dict[patch])
     a_x = (l_plus1_x - b_x) / base.scaling[patch]
@@ -87,7 +87,7 @@ def test_forward_iteration(n_size, n_domains):
     restrict, extend = domain_decomp_operators(base2)
     x_dict2 = defaultdict(list)
     for patch2 in base2.domains_iterator:
-        x_dict2[patch2] = map_domain(x2, restrict, patch2)
+        x_dict2[patch2] = map_domain(x2.to(base2.devices[patch2]), restrict, patch2)
     l_plus1_x2 = base2.l_plus1(x_dict2)
     b_x2 = base2.medium(x_dict2)
     a_x2 = 0.

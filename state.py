@@ -1,6 +1,7 @@
 import time
-import torch
 import numpy as np
+from torch import tensor
+from torch.linalg import norm
 from collections import defaultdict
 from helmholtzbase import HelmholtzBase
 from utilities import squeeze_
@@ -18,39 +19,25 @@ class State(object):
         self.start_time = time.time()
         self.sim_time = 0
 
-    def log_subdomain_residual(self, residual_s, patch):
-        """ Normalize subdomain residual wrt preconditioned source """
-        self.subdomain_residuals[patch].append((residual_s / self.init_norm))
+    def next(self, t_dict, i):
+        """ Log residuals and Check termination conditions to proceed to next iteration or not """
+        subdomain_residuals = []
+        for patch in self.base.domains_iterator:  # patch gives the 3-element position tuple of subdomain
+            # compute and log residual for patch
+            subdomain_residual = norm(t_dict[patch]).to(self.base.device) / self.init_norm
+            self.subdomain_residuals[patch].append(subdomain_residual)
+            subdomain_residuals.append(subdomain_residual)  # collect all subdomain residuals
+        subdomain_residuals = tensor(subdomain_residuals, device=self.base.device)
+        full_residual = norm(subdomain_residuals)
+        self.full_residuals.append(full_residual)  # log residual for entire domain
 
-    def log_full_residual(self, residual_f):
-        """ Normalize full domain residual wrt preconditioned source """
-        self.full_residuals.append(residual_f / self.init_norm)
-
-    def log_u_iter(self, u, patch):
-        """ Collect u_iter after rescaling and cropping to ROI"""
-        u = np.sqrt(self.base.scaling[patch]) * u[self.base.crop2roi]  # Crop u to ROI and rescale
-
-        # Collect u_iter 
-        # mainly for plotting animation, so process accordingly:
-        # 2D -- abs() for imshow; 3D -- abs() of 2D-slice in the middle for imshow
-        if self.base.n_dims == 1:
-            self.u_iter[patch].append(u)
-        elif self.base.n_dims == 2:
-            self.u_iter[patch].append(torch.abs(u))
-        elif self.base.n_dims == 3:
-            self.u_iter[patch].append(np.abs(u[..., np.array([0, u.shape[-1] // 2, -1])]))
-
-    def next(self, i):
-        """ Check termination conditions and to proceed to next iteration or not """
-        subdomain_residuals_i = []
-        for patch in self.base.domains_iterator:
-            subdomain_residuals_i.append(self.subdomain_residuals[patch][i])
-        if ((np.array(subdomain_residuals_i) <= self.base.threshold_residual).all()
-            or self.full_residuals[i] <= self.base.threshold_residual
-            or self.full_residuals[i] >= self.base.divergence_limit
-            or i >= self.base.max_iterations - 1):
-            print(f'Residual {self.full_residuals[i]:.2e}. '
-                  f'Stopping at iteration {i + 1} ')
+        # Check termination conditions
+        if (subdomain_residuals <= self.base.threshold_residual).all() \
+                or (subdomain_residuals >= self.base.divergence_limit).all() \
+                or full_residual <= self.base.threshold_residual \
+                or full_residual >= self.base.divergence_limit \
+                or i >= self.base.max_iterations - 1:
+            print(f'Residual {full_residual:.2e}. Stopping at iteration {i + 1}')
             self.should_terminate = True
             self.iterations = i + 1
             self.sim_time = time.time() - self.start_time
@@ -66,8 +53,8 @@ class State(object):
         u = u[self.base.crop2roi]  # Crop u to ROI
 
         # convert residuals to arrays and reshape if needed
-        self.subdomain_residuals = torch.tensor(list(map(list, self.subdomain_residuals.values())))
+        self.subdomain_residuals = tensor(list(map(list, self.subdomain_residuals.values())))
         if self.subdomain_residuals.shape[0] < self.subdomain_residuals.shape[1]:
             self.subdomain_residuals = self.subdomain_residuals.T
-        self.full_residuals = torch.tensor(self.full_residuals)
+        self.full_residuals = tensor(self.full_residuals)
         return squeeze_(u)

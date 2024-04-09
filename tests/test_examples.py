@@ -1,4 +1,5 @@
 import os
+
 if os.path.basename(os.getcwd()) == 'tests':
     os.chdir('..')
 
@@ -38,14 +39,14 @@ def u_ref_1d_h(n):
     k = (1. * 2. * np.pi) / 1.
     phi = k * x
     u_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
-               np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
-                -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
+            np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
+        -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
     return u_theory[64:-64]
 
 
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'), 
+@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'),
                                                         (2, 'wrap_corr'), (3, 'wrap_corr'), (4, 'wrap_corr')])
 def test_1d_homogeneous(n_domains, wrap_correction):
     """ Test for 1D free-space propagation. Compare with analytic solution """
@@ -91,8 +92,8 @@ def test_2d_high_contrast(n_domains, wrap_correction):
         os.chdir('..')
     n = matlab_results['n2d_hc']
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
-    base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3*np.max(abs(n_contrast + 1)), 
-                         n_domains=n_domains, wrap_correction=wrap_correction, 
+    base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3 * np.max(abs(n_contrast + 1)),
+                         n_domains=n_domains, wrap_correction=wrap_correction,
                          max_iterations=int(1.e+5))
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u2d_hc']
@@ -113,7 +114,7 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
-    base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3*abs(n_fat), 
+    base = HelmholtzBase(n=n, source=source, wavelength=0.532, ppw=3 * abs(n_fat),
                          n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u2d_lc']
@@ -121,10 +122,6 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     compare(base, u_computed.cpu().numpy(), u_ref, threshold=1.e-3)
 
 
-# @pytest.mark.parametrize("n_roi", [np.array([128, 128, 128]), np.array([128, 48, 96])])
-# @pytest.mark.parametrize("boundary_widths", [np.array([24, 24, 24]), np.array([20, 24, 32])])
-# @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr'])
-# def test_3d_homogeneous(n_roi, boundary_widths, wrap_correction):
 @pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'),
                                                         (2, 'wrap_corr'), (3, 'wrap_corr')])
 def test_3d_homogeneous(n_domains, wrap_correction):

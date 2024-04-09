@@ -19,7 +19,7 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
     def forward(x):
         u_dict = defaultdict(list)
         for patch in base.domains_iterator:
-            u_dict[patch] = map_domain(x, restrict, patch)
+            u_dict[patch] = map_domain(x.to(base.devices[patch]), restrict, patch)
         l_dict = base.l_plus1(u_dict)
         b_dict = base.medium(u_dict)
         a_dict = defaultdict(list)

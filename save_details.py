@@ -7,11 +7,8 @@ import numpy as np
 from datetime import date
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib import rc, colors
+from matplotlib import colors, gridspec
 
-font = {'family': 'Times New Roman',  # 'Times New Roman', 'Helvetica', 'Arial', 'Cambria', or 'Symbol'
-        'size': 10}  # 8-10 pt
-rc('font', **font)
 figsize = (8, 8)  # (14.32,8)
 
 
@@ -82,8 +79,7 @@ class LogPlot:
 
     def log_and_plot(self, save=False):
         """ Call logging, plotting (, saving) functions """
-        # stats_file_name = self.run_loc + '_stats.txt'
-        self.log_details()#stats_file_name)
+        self.log_details()
         self.plot_details()
         if save:
             np.savez_compressed(f'{self.file_name}.npz',
@@ -96,15 +92,15 @@ class LogPlot:
     def log_details(self):
         """ Save parameters and stats """
         print('Saving stats...')
-        save_string = (f'ndim {self.base.n_dims}; n {self.base.n_roi[:self.base.n_dims]}; '
-                       + f'bw {list(zip(self.base.boundary_pre[:self.base.n_dims], self.base.boundary_post[:self.base.n_dims]))}; '
-                       + f'domains {self.base.n_domains[:self.base.n_dims]}')
+        save_string = (f'ndim {self.base.n_dims}; n {self.base.n_roi[:self.base.n_dims]}'
+                       + f'; bw {list(zip(self.base.boundary_pre[:self.base.n_dims], self.base.boundary_post[:self.base.n_dims]))}'
+                       + f'; domains {self.base.n_domains[:self.base.n_dims]}')
         if self.base.wrap_correction:
             save_string += f'; {self.base.wrap_correction}; corr {self.base.n_correction}'
         if self.base.total_domains > 1:
             save_string += f'; transfer {self.base.n_correction}'
-        save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iters; '
-                        + f'residual {self.state.full_residuals[self.state.iterations - 1]:>2.2e}')
+        save_string += (f'; {self.state.sim_time:>2.2f} sec; {self.state.iterations} iters'
+                        + f'; residual {self.state.full_residuals[self.state.iterations - 1]:>2.2e}')
         if self.rel_err:
             save_string += f'; RE {self.rel_err:>2.2e}'
         if self.mae:
@@ -300,76 +296,124 @@ class LogPlot:
             u = np.abs(self.u_computed[:, :, z_slice])
             if self.u_reference is not None:
                 u_reference = np.abs(self.u_reference[:, :, z_slice])
+                u_diff = np.abs(self.u_reference[:, :, z_slice] - self.u_computed[:, :, z_slice])
         else:
             plot_roi = self.base.n_roi
             extent = np.array([0, plot_roi[0], plot_roi[1], 0]) * self.base.pixel_size
             u = np.abs(self.u_computed)
             if self.u_reference is not None:
                 u_reference = np.abs(self.u_reference)
+                u_diff = np.abs(self.u_reference - self.u_computed)
 
         if self.u_reference is not None:
-            n_rows = 2
-            vmax = np.maximum(np.max(u_reference), np.max(u_reference))
-            vmin = np.minimum(np.min(u_reference), np.min(u_reference))
+            ncols = 4
+            max_val = max(np.max(u_reference), np.max(u), np.max(u_diff))
+            min_val = min(np.min(u_reference), np.min(u), np.min(u_diff))
+            u_diff = normalize(u_diff, min_val=min_val, max_val=max_val) + min_val
+            u_reference = normalize(u_reference, min_val=min_val, max_val=max_val) + min_val
+            u = normalize(u, min_val=min_val, max_val=max_val) + min_val
+            vmax = 1.
+            vmin = 0. + min_val
         else:
-            n_rows = 1
-            vmax = np.maximum(np.max(u), np.max(u))
-            vmin = np.minimum(np.min(u), np.min(u))
-        plt.subplots(figsize=(figsize[0], figsize[1] * n_rows / 2), ncols=2, nrows=n_rows)
-        pad = 0.03
-        shrink = 0.65
+            ncols = 2
+            max_val = np.max(u)
+            min_val = np.min(u)
+            u = normalize(u, min_val=min_val, max_val=max_val) + min_val
+            vmax = 1.
+            vmin = 0. + min_val
 
-        plt.subplot(n_rows, 2, 1)
-        plt.imshow(u, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
+        fig = plt.figure(figsize=(figsize[0] * ncols / 2, figsize[1] / 2), facecolor='white')
+        gs = gridspec.GridSpec(1, ncols + 1, width_ratios=[1] * (ncols - 1) + [0.05] + [1])
+        pad = 0.04
+        fraction = 0.046
+
+        col = 0
+        txt = '(a)'
+        if self.u_reference is not None:
+            ax0 = fig.add_subplot(gs[col])
+            ax0.imshow(u_reference, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
+            ax0.minorticks_on()
+            ax0.set_xlabel(r"$x~(\mu m)$")
+            ax0.set_ylabel(r"$y~(\mu m)$")
+            ax0.set_title('Domain = 1')
+            ax0.text(0.5, -0.225, txt, transform=ax0.transAxes, horizontalalignment='center')
+            col += 1
+            txt = '(b)'
+
+        ax1 = fig.add_subplot(gs[col])
+        im1 = ax1.imshow(u, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
         if self.base.n_domains[0] > 1:
-            plt.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size,
-                        c='b', ls='dashdot', lw=1., alpha=0.5, label='Subdomain boundaries')
+            ax1.axvline(x=(self.base.domain_size[0] - self.base.boundary_widths[0]) * self.base.pixel_size,
+                        c='gray', ls='dashdot', lw=1., label=f'Subdomain\n boundaries')
         if self.base.n_domains[1] > 1:
-            plt.axhline(y=(self.base.domain_size[1] - self.base.boundary_widths[1]) * self.base.pixel_size,
-                        c='b', ls='dashdot', lw=1., alpha=0.5, label='Subdomain boundaries')
-        plt.colorbar(shrink=shrink, pad=pad)
-        plt.xlabel("$x~(\lambda)$")
-        plt.ylabel("$y~(\lambda)$")
-        plt.title('AnySim')
+            ax1.axhline(y=(self.base.domain_size[1] - self.base.boundary_widths[1]) * self.base.pixel_size,
+                        c='gray', ls='dashdot', lw=1., label=f'Subdomain\n boundaries')
+        if self.base.total_domains > 1:
+            handles, labels = ax1.get_legend_handles_labels()
+            ax1.legend(handles=handles[-1:], labels=labels[-1:], fontsize='medium')
+        ax1.minorticks_on()
+        ax1.set_xlabel(r"$x~(\mu m)$")
+        if self.u_reference is not None:
+            ax1.set_yticklabels([])
+        else:
+            ax1.set_ylabel(r"$y~(\mu m)$")
+            col += 1
+            cax = fig.add_subplot(gs[col])
+            cbar1 = plt.colorbar(mappable=im1, cax=cax, fraction=fraction, pad=pad)
+            # cbar1.set_ticks(ticks=np.arange(0, 1.1, 0.2), labels=np.arange(0, 1.1, 0.2))
+            cbar1.ax.set_title('$|\mathbf{x}|$', fontdict={'fontsize': 'medium'})
+        ax1.set_title(f'Domains = {tuple(self.base.n_domains[:self.base.n_dims])}')
+        ax1.text(0.5, -0.225, txt, transform=ax1.transAxes, horizontalalignment='center')
 
-        plt.subplot(n_rows, 2, 2)
-        res_plots = plt.loglog(np.arange(1, self.state.iterations + 1),
+        col += 1
+        if self.u_reference is not None:
+            ax2 = fig.add_subplot(gs[col])
+            im2 = ax2.imshow(u_diff, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
+            col += 1
+            cax2 = fig.add_subplot(gs[col])
+            cbar2 = plt.colorbar(mappable=im2, cax=cax2, fraction=fraction, pad=pad)
+            cbar2.ax.set_title('$|\mathbf{x}|$', fontdict={'fontsize': 'medium'})
+            ax2.minorticks_on()
+            ax2.set_xlabel(r"$x~(\mu m)$")
+            ax2.set_yticklabels([])
+            # ax2.set_title(f'|Difference|. RE {self.rel_err:.2e}. MAE {self.mae:.2e}', fontdict={'fontsize': 'medium'})
+            ax2.set_title(f'|Difference|')
+            txt = '(c)'
+            ax2.text(0.5, -0.225, txt, transform=ax2.transAxes, horizontalalignment='center')
+            col += 1
+
+        ax3 = fig.add_subplot(gs[col])
+        res_plots = ax3.loglog(np.arange(1, self.state.iterations + 1),
                                self.state.subdomain_residuals, lw=1.5)
         if self.base.total_domains > 1:
-            plt.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
-                       title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5)
-        plt.loglog(np.arange(1, self.state.iterations + 1), self.state.full_residuals, lw=3., c='k',
-                   ls='dashed')
-        plt.axhline(y=self.base.threshold_residual, c='k', ls=':')
-        plt.yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
+            l1 = ax3.legend(handles=iter(res_plots), labels=tuple(f'{i + 1}' for i in range(self.base.total_domains)),
+                            title='Subdomains', ncols=int(self.base.total_domains / 4) + 1, framealpha=0.5, loc=1)
+            ax3.add_artist(l1)
+        res, = ax3.loglog(np.arange(1, self.state.iterations + 1), self.state.full_residuals, lw=2., c='k',
+                          ls='dashed', label='Global Residual')
+        ax3.legend(handles=[res], loc=2)
+        # ax3.axhline(y=self.base.threshold_residual, c='k', ls=':')
+        ax3.set_yticks([1.e+6, 1.e+3, 1.e+0, 1.e-3, 1.e-6, 1.e-9, 1.e-12])
         y_min = np.minimum(6.e-7, 0.8 * np.nanmin(self.state.subdomain_residuals))
         y_max = np.maximum(2.e+0, 1.2 * np.nanmax(self.state.subdomain_residuals))
-        plt.ylim([y_min, y_max])
-        plt.title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations {self.state.iterations}')
-        plt.ylabel('Residual')
-        plt.xlabel('Iterations')
-        plt.grid()
-
+        ax3.set_ylim([y_min, y_max])
+        # ax3.set_title(f'Residual {self.state.full_residuals[-1]:.2e}. Iterations {self.state.iterations}')
+        ax3.set_title(f'Residual')
+        ax3.set_ylabel('Residual')
+        ax3.set_xlabel('Iterations')
         if self.u_reference is not None:
-            plt.subplot(n_rows, 2, 3)
-            im3 = plt.imshow(u_reference, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
-            plt.colorbar(mappable=im3, shrink=shrink, pad=pad)
-            plt.xlabel("$x~(\lambda)$")
-            plt.ylabel("$y~(\lambda)$")
-            plt.title('Reference')
+            txt = '(d)'
+        else:
+            txt = '(b)'
+        ax3.text(0.5, -0.225, txt, transform=ax3.transAxes, horizontalalignment='center')
+        ax3.grid()
 
-            plt.subplot(n_rows, 2, 4)
-            im4 = plt.imshow(u_reference - u, cmap='hot_r', extent=extent, norm=colors.LogNorm(vmin=vmin, vmax=vmax))
-            plt.colorbar(mappable=im4, shrink=shrink, pad=pad)
-            plt.xlabel("$x~(\lambda)$")
-            plt.ylabel("$y~(\lambda)$")
-            plt.title(f'Difference. RE {self.rel_err:.2e}. MAE {self.mae:.2e}')
-
-        plt.suptitle(self.title_text)
-        plt.tight_layout()
+        # plt.suptitle(self.title_text)
+        gs.tight_layout(fig, pad=0.01)
         fig_name = f'{self.file_name}_FieldNResidual_{z_slice}'
-        fig_name += f'.png'
-        plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=300)
+        # plt.savefig(fig_name + '.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
+        # plt.savefig(fig_name + '.eps', bbox_inches='tight', pad_inches=0.03, dpi=300)
+        plt.savefig(fig_name + '.png', bbox_inches='tight', pad_inches=0.03, dpi=300)
         plt.close('all')
 
     def anim_field_n_residual(self, idx=0, z_slice=0):  # movie/animation/GIF
@@ -462,3 +506,12 @@ class LogPlot:
         ani_name += f'.mp4'
         ani.save(ani_name, writer=writer)
         plt.close('all')
+
+
+def normalize(x, a=0, b=1, min_val=None, max_val=None):
+    if min_val is None:
+        min_val = np.min(x)
+    if max_val is None:
+        max_val = np.max(x)
+    normalized_x = (x - min_val) / (max_val - min_val) * (b - a) + a
+    return normalized_x

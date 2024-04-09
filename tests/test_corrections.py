@@ -16,23 +16,23 @@ def test_compare_a(n_size, boundary_widths):
     source = np.zeros_like(n, dtype=np.complex64)
     source[0] = 1.
 
-    base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='wrap_corr', scaling=1.)
-    x = rand(*base_w.s.shape, dtype=complex64)
+    base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='wrap_corr')
     patch = (0, 0, 0)
+    x = rand(*base_w.s.shape, dtype=complex64, device=base_w.devices[patch])
     x_dict = defaultdict(list)
     x_dict[patch] = x
     l_w_plus1 = base_w.l_plus1(x_dict)[patch]
     b_w = base_w.medium(x_dict)[patch]
-    a_w = l_w_plus1 - b_w
+    a_w = (l_w_plus1 - b_w) / base_w.scaling[patch]
 
-    base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega', scaling=1.)
+    base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')
     x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base_o.s.shape) - np.array(base_w.s.shape)),
                               mode="constant")
     x2_dict = defaultdict(list)
-    x2_dict[patch] = x2.clone()
+    x2_dict[patch] = x2.to(base_o.devices[patch])
     l_o_plus1 = base_o.l_plus1(x2_dict)[patch]
     b_o = base_o.medium(x2_dict)[patch]
-    a_o = l_o_plus1 - b_o
+    a_o = (l_o_plus1 - b_o) / base_o.scaling[patch]
 
     if boundary_widths != 0:
         # crop to n_roi, excluding boundaries

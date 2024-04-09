@@ -3,6 +3,7 @@ import numpy as np
 from helmholtzbase import HelmholtzBase  # to set up medium, propagation operators, and scaling
 from anysim import run_algorithm  # to run the anysim iteration
 from save_details import LogPlot  # to log and plot the results
+from torch.profiler import profile, record_function, ProfilerActivity  # to profile the code
 
 # %% generate a refractive index map
 n_size = (3000, 6000)  # Size of the simulation domain
@@ -17,8 +18,15 @@ source[tuple(i // 2 for i in n_size)] = 1.  # Source term at the center of the d
 # %% set up scaling, and medium, propagation, and if required, correction (wrapping and transfer) operators
 base = HelmholtzBase(n, source, n_domains=(1, 2))
 
-# %% run the algorithm
-u, state = run_algorithm(base)  # Field u and state object with information about the run
+with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:  #, profile_memory=True
+    with record_function("RunAlg"):
+        # %% run the algorithm
+        u, state = run_algorithm(base)  # Field u and state object with information about the run
+
+output = prof.key_averages().table(sort_by='self_cpu_time_total', row_limit=30)
+# with open('./output.txt', 'w') as file:
+#     file.write(output)
+print(output)
 
 # %% log, plot, and save the results
 LogPlot(base, state, u).log_and_plot(save=False)

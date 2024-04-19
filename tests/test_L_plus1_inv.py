@@ -7,12 +7,10 @@ from utilities import max_abs_error, relative_error, squeeze_
 from torch import complex64, rand
 
 
-@pytest.fixture
-def check_l_plus1_inv(n_size, boundary_widths, n_domains, wrap_correction):
+def check_l_plus1_inv(n_size, n_domains):
     """ Check that (L+1)^(-1) (L+1) x = x """
     n = np.ones(n_size, dtype=np.complex64)
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction,
-                         scaling=1.)
+    base = HelmholtzBase(refractive_index=n, n_domains=n_domains)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates (L+1)^(-1) (L+1) x
@@ -26,7 +24,7 @@ def check_l_plus1_inv(n_size, boundary_widths, n_domains, wrap_correction):
         for patch in base.domains_iterator:
             x_ += map_domain(l_dict[patch], extend, patch).cpu()
         return x_
-    
+
     x_in = rand(*base.s.shape, dtype=complex64, device=base.devices[(0, 0, 0)])
     x_out = l_inv_l(x_in)
 

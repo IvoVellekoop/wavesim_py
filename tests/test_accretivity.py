@@ -11,7 +11,8 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
     """ Check that operator A = L + V is accretive, 
         i.e., has a non-negative real part """
     n = np.ones(n_size, dtype=np.complex64)
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = HelmholtzBase(refractive_index=n, boundary_widths=boundary_widths, n_domains=n_domains,
+                         wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates one forward iteration and gives operator A
@@ -29,7 +30,7 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
         for patch in base.domains_iterator:
             a_ += map_domain(a_dict[patch], extend, patch).cpu()
         return a_
-    
+
     n_ext = base.n_roi + base.boundary_pre + base.boundary_post
     a = full_matrix(forward, n_ext)
     acc = np.min(np.real(np.linalg.eigvals(a + a.conj().T)))

@@ -12,8 +12,8 @@ torch.set_default_dtype(torch.float32)
 def forward_operator(x, n, n_domains, n_correction):
     """Construct forward operator for given number of subdomains and compute its action on x
     The result should be the same regardless of n_domains"""
-    base = HelmholtzBase(n=n, n_domains=n_domains, wrap_correction='wrap_corr', boundary_widths=0,
-                         n_correction=n_correction)
+    base = HelmholtzBase(refractive_index=n, n_domains=n_domains, wrap_correction='wrap_corr', boundary_widths=0,
+                         n_boundary=n_correction)
 
     # Split x into subdomains
     restrict, extend = domain_decomp_operators(base)
@@ -71,7 +71,7 @@ def test_forward_iteration(n_size, n_domains):
     n = np.ones(n_size, dtype=np.complex64)
 
     # 1 domain problem
-    base = HelmholtzBase(n=n, n_domains=1, wrap_correction='wrap_corr')
+    base = HelmholtzBase(refractive_index=n, n_domains=1, wrap_correction='wrap_corr')
     x = torch.rand(*base.s.shape, dtype=torch.complex64)
     patch = (0, 0, 0)  # 1 domain so only 1 patch
     x_dict = defaultdict(list)
@@ -81,7 +81,7 @@ def test_forward_iteration(n_size, n_domains):
     a_x = (l_plus1_x - b_x) / base.scaling[patch]
 
     # n_domains
-    base2 = HelmholtzBase(n=n, n_domains=n_domains, wrap_correction='wrap_corr')
+    base2 = HelmholtzBase(refractive_index=n, n_domains=n_domains, wrap_correction='wrap_corr')
     x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base2.s.shape) - np.array(base.s.shape)),
                               mode="constant")
     restrict, extend = domain_decomp_operators(base2)
@@ -120,7 +120,7 @@ def test_precon_iteration(n_size, n_domains):
     source[0] = 1.
 
     # 1 domain problem
-    base = HelmholtzBase(n=n, source=source, n_domains=1, wrap_correction=None)
+    base = HelmholtzBase(refractive_index=n, source=source, n_domains=1, wrap_correction=None)
     u = torch.rand(*base.s.shape, dtype=torch.complex64)
 
     _, extend = domain_decomp_operators(base)
@@ -141,7 +141,7 @@ def test_precon_iteration(n_size, n_domains):
         t1 += map_domain(t1_patch, extend, patch).cpu()
 
     # n_domains
-    base2 = HelmholtzBase(n=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr')
+    base2 = HelmholtzBase(refractive_index=n, source=source, n_domains=n_domains, wrap_correction='wrap_corr')
     u2 = pad_boundaries_torch(u, (0, 0, 0), tuple(np.array(base2.s.shape) - np.array(base.s.shape)),
                               mode="constant")
     restrict2, extend2 = domain_decomp_operators(base2)

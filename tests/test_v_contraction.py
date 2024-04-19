@@ -14,7 +14,7 @@ def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
     # n = np.ones(n_size, dtype=np.complex64)
     n = np.random.rand(*n_size).astype(np.float32)
     # n[tuple(i//2 for i in n_size)] = 1.5
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths,
+    base = HelmholtzBase(refractive_index=n, boundary_widths=boundary_widths,
                          n_domains=n_domains, wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 

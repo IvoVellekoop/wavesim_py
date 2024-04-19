@@ -13,7 +13,8 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
         and spectral radius, i.e. max(abs(eigvals(Op))) < 1 """
     n = np.ones(n_size, dtype=np.complex64)
     # n[tuple(i//2 for i in n_size)] = 1.5
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = HelmholtzBase(refractive_index=n, boundary_widths=boundary_widths, n_domains=n_domains,
+                         wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates one preconditioned iteration

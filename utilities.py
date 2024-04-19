@@ -197,32 +197,6 @@ def boundary_(x):
     return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
 
 
-# Laplacian
-def laplacian_sq_f(n_dims, n_fft, pixel_size=1., device='cpu'):
-    """ Laplacian squared Fourier space coordinates for given size, spacing, and dimensions
-    :param n_dims: number of dimensions
-    :param n_fft: window length
-    :param pixel_size: sample spacing
-    :param device: device to perform computations on (default: 'cpu')
-    :return: Laplacian squared in Fourier coordinates"""
-    l_p = coordinates_f(n_fft[0], pixel_size, device) ** 2
-    for d in range(1, n_dims):
-        l_p = torch.unsqueeze(l_p, -1) + torch.unsqueeze(coordinates_f(n_fft[d], pixel_size, device) ** 2, 0)
-
-    for _ in range(3 - n_dims):  # ensure l_p has 3 dimensions
-        l_p = torch.unsqueeze(l_p, -1)
-    return l_p
-
-
-def coordinates_f(n_, pixel_size=1., device='cpu'):
-    """ Calculate the coordinates in the frequency domain
-    :param n_: Number of points
-    :param pixel_size: Pixel size. Defaults to 1.
-    :param device: device to perform computations on (default: 'cpu')
-    :return: Tensor containing the coordinates in the frequency domain """
-    return 2 * torch.pi * fftfreq(n_, pixel_size, device=device)
-
-
 # Used in tests
 def full_matrix(operator, d):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) 

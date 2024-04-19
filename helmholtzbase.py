@@ -48,9 +48,10 @@ class HelmholtzBase:
         # enumerate the cuda devices. We will assign the domains to the devices in a round-robin fashion.
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
+        self.device = devices[0]  # use as primary device
 
         # compute domain boundaries in each dimension
-        if any([(n_boundary > self.shape[i] / n_domains[i] / 3) and not periodic[i] for i in range(3)]):
+        if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size")
         self.domains = np.empty(n_domains, dtype=Domain)
 
@@ -101,22 +102,32 @@ class HelmholtzBase:
         for domain in self.domains.flat:
             domain.clear(slot)
 
-    def get(self, slot: int):
-        """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in one big numpy array"""
-        full_field = np.zeros(self.shape, dtype=np.complex64)
+    def get(self, slot: int, device=None):
+        """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in one big array
+
+         :param: device: device on which to store the data. Defaults to the primary device
+        """
+        device = device or self.device
+        full_field = torch.zeros(self.shape, dtype=torch.complex64, device=device)
         pos = np.array((0, 0, 0))
         for x0 in range(self.domains.shape[0]):
             pos[1:2] = 0
             for x1 in range(self.domains.shape[1]):
                 pos[2] = 0
                 for x2 in range(self.domains.shape[2]):
-                    data = self.domains[x0, x1, x2].get(slot).cpu().numpy()
+                    data = self.domains[x0, x1, x2].get(slot).to(device)
                     full_field[pos[0]:pos[0] + data.shape[0], pos[1]:pos[1] + data.shape[1],
                     pos[2]:pos[2] + data.shape[2]] = data
                     pos[2] += data.shape[2]
                 pos[1] += data.shape[1]
             pos[0] += data.shape[0]
         return full_field
+
+    def set(self, slot: int, data):
+        """Copy the date into the specified slot"""
+        parts = self.partition(data)
+        for domain, part in zip(self.domains.flat, parts.flat):
+            domain.set(slot, part)
 
     def inner_product(self, slot_a: int, slot_b: int):
         """ Compute the inner product of the fields in slots a and b
@@ -195,16 +206,16 @@ class HelmholtzBase:
 
         n_domains = np.array(self.domains.shape)
         partitions = np.empty(n_domains, dtype=object)
-        domain_size = np.array(array.shape) // n_domains
+        domain_size = np.ceil(np.array(array.shape) / n_domains).astype(int)
         for x0 in range(n_domains[0]):
             start0 = x0 * domain_size[0]
-            end0 = np.minimum(x0 + domain_size[0], array.shape[0])
+            end0 = np.minimum(start0 + domain_size[0], array.shape[0] + 1)
             for x1 in range(n_domains[1]):
                 start1 = x1 * domain_size[1]
-                end1 = np.minimum(x1 + domain_size[1], array.shape[1])
+                end1 = np.minimum(start1 + domain_size[1], array.shape[1] + 1)
                 for x2 in range(n_domains[2]):
                     start2 = x2 * domain_size[2]
-                    end2 = np.minimum(x2 + domain_size[2], array.shape[2])
+                    end2 = np.minimum(start2 + domain_size[2], array.shape[2] + 1)
                     if not sparse:
                         partitions[x0, x1, x2] = array[start0:end0, start1:end1, start2:end2]
                     else:

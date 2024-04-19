@@ -17,8 +17,8 @@ class Domain:
     def __init__(self,
                  refractive_index,
                  pixel_size: float,
-                 n_boundary: int,
                  periodic: tuple[bool, bool, bool],
+                 n_boundary: int,
                  n_slots=2,
                  ):
         """Construct a domain object with the given refractive index and allocate memory.
@@ -85,7 +85,7 @@ class Domain:
 
         # allocate storage for temporary data, use the raw scattering potential one of the locations
         # (which will be overwritten later)
-        self.x = [refractive_index] + [torch.zeros_like(refractive_index) for _ in range(n_slots - 1)]
+        self._x = [refractive_index] + [torch.zeros_like(refractive_index) for _ in range(n_slots - 1)]
 
         # compute the un-scaled laplacian kernel and the un-scaled wrapping correction matrices
         # This kernel is given by -(px² + py² + pz²), with p_ the Fourier space coordinate
@@ -96,7 +96,7 @@ class Domain:
         for dim in range(3):
             self.propagator_kernel = self.propagator_kernel - self.coordinates_f(dim) ** 2
 
-        (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.propagator_kernel, n_boundary, self.x[1])
+        (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.propagator_kernel, n_boundary, self._x[1])
 
     ## Functions implementing the domain interface
     # add_source()
@@ -109,15 +109,19 @@ class Domain:
     # set_source()
     def add_source(self, slot_in: int, slot_out: int):
         if self._source is not None:
-            torch.add(self.x[slot_in], self._source, out=self.x[slot_out])
+            torch.add(self._x[slot_in], self._source, out=self._x[slot_out])
 
     def clear(self, slot: int):
         """Clears the data in the specified slot"""
-        self.x[slot].zero_()
+        self._x[slot].zero_()
 
     def get(self, slot: int):
         """Returns the data in the specified slot"""
-        return self.x[slot]
+        return self._x[slot]
+
+    def set(self, slot: int, data):
+        """Copy the date into the specified slot"""
+        self._x[slot].copy_(data)
 
     def inner_product(self, slot_a: int, slot_b: int):
         """Computes the inner product of two data vectors
@@ -127,29 +131,29 @@ class Domain:
         Although it would be possible to use flatten(), this would create a
         copy when the array is not contiguous, causing a hidden performance hit.
         """
-        return torch.vdot(self.x[slot_a].view(-1), self.x[slot_b].view(-1))
+        return torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1))
 
     def medium(self, slot_in: int, slot_out: int):
         """Applies the operator 1-Vscat.
 
         Note: does not apply the wrapping correction.
         """
-        torch.mul(self._Bscat, self.x[slot_in], out=self.x[slot_out])
+        torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """Mixes two data arrays and stores the result in the specified slot"""
         # todo: optimize for cases where weight_a=1.0 or weight_b= 1.0
         #   and for weight_a+weight_b = 1.0 (lerp)
-        torch.mul(self.x[slot_a], weight_a, out=self.x[slot_out])
-        torch.add(self.x[slot_out], self.x[slot_b], alpha=weight_b, out=self.x[slot_out])
+        torch.mul(self._x[slot_a], weight_a, out=self._x[slot_out])
+        torch.add(self._x[slot_out], self._x[slot_b], alpha=weight_b, out=self._x[slot_out])
 
     def propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1)^-1 (x + y).
         """
         # todo: convert to on-the-fly computation
-        torch.fft.fftn(self.x[slot_in], out=self.x[slot_out])
-        self.x[slot_out].mul_(self.propagator_kernel)
-        torch.fft.ifftn(self.x[slot_out], out=self.x[slot_out])
+        torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
+        self._x[slot_out].mul_(self.propagator_kernel)
+        torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def set_source(self, source):
         """Sets the source term for this domain.
@@ -157,14 +161,14 @@ class Domain:
         if source is None or (source.is_sparse and len(source.indices()) == 0):
             self._source = None
         else:
-            self._source = self._scale * source.to(self.device, self.x[0].dtype)
+            self._source = self._scale * source.to(self.device, self._x[0].dtype)
 
     ## Functions specific for subdomains
     def initialize_shift(self, shift) -> float:
         """Shifts the scattering potential and propagator kernel, then returns the norm of the shifted operator."""
         self.propagator_kernel.add_(shift)
-        self.x[0].add_(-shift)  # currently holds the scattering potential
-        return torch.linalg.norm(self.x[0].ravel(), ord=2).item()
+        self._x[0].add_(-shift)  # currently holds the scattering potential
+        return torch.linalg.norm(self._x[0].ravel(), ord=2).item()
 
     def initialize_scale(self, scale: complex):
         """Scales all operators.
@@ -179,7 +183,7 @@ class Domain:
 
         # B = 1 - scale·(n² k₀² - shift). Scaling and shifting was already applied. 1-... not yet
         self._scale = scale
-        self._Bscat = 1.0 - scale * self.x[0]
+        self._Bscat = 1.0 - scale * self._x[0]
 
         # kernel = 1 / (scale·(L + shift) + 1). Scaling and shifting was already applied. +1 and reciprocal not yet
         self.propagator_kernel.add_(1.0)
@@ -207,7 +211,7 @@ class Domain:
             # (of size n_correction) is always at axis=0. It should be at axis=dim does this
             # note: currently does not allow specifying an output array, so a new array is allocated every time
             self.edges[edge] = torch.moveaxis(
-                torch.tensordot(self.Vwrap, self.x[slot_in][self.edge_slices[edge]], (axes, [dim, ])), 0, dim)
+                torch.tensordot(self.Vwrap, self._x[slot_in][self.edge_slices[edge]], (axes, [dim, ])), 0, dim)
 
         return self.edges
 
@@ -220,11 +224,11 @@ class Domain:
         """
         for edge in range(6):
             if transfer_corrections[edge] is None and wrap_corrections[edge] is not None:
-                self.x[slot][self.edge_slices[edge]] += wrap_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge]
             elif wrap_corrections[edge] is None and wrap_corrections[edge] is not None:
-                self.x[slot][self.edge_slices[edge]] += transfer_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge]
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is not None:
-                self.x[slot][self.edge_slices[edge]] += transfer_corrections[edge] - wrap_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge] - wrap_corrections[edge]
             else:
                 pass
 

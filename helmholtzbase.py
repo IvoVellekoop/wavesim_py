@@ -48,7 +48,7 @@ class HelmholtzBase:
         # enumerate the cuda devices. We will assign the domains to the devices in a round-robin fashion.
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
-        self.device = devices[0]  # use as primary device
+        self.device = torch.device(devices[0])  # use as primary device
 
         # compute domain boundaries in each dimension
         if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
@@ -92,10 +92,10 @@ class HelmholtzBase:
     # mix()
     # propagator()
     # set_source()
-    def add_source(self, slot_in: int, slot_out: int):
-        """ Add the source to the field in slot_in, and store the result in slot_out """
+    def add_source(self, slot: int):
+        """ Add the source to the field in slot """
         for domain in self.domains.flat:
-            domain.add_source(slot_in, slot_out)
+            domain.add_source(slot)
 
     def clear(self, slot: int):
         """ Clear the field in the specified slot """
@@ -186,48 +186,9 @@ class HelmholtzBase:
 
     def set_source(self, source):
         """ Split the source into subdomains and store in the subdomain states """
+        if source.is_sparse:
+            source = source.coalesce()
         for domain, source in zip(self.domains.flat, self.partition(source).flat):
             domain.set_source(source)
 
     ## other functions (may become part of utilities?)
-
-    def partition(self, array):
-        """ Split the array into a list of subdomains.
-
-         Unfortunately, slicing is not supported for sparse tensors, so we have to do this manually.
-         Currently only works for coo-type sparse tensors.
-         """
-        if torch.is_tensor(array) and array.is_sparse:
-            indices = array.indices().cpu().numpy()
-            values = array.values().cpu().numpy()
-            sparse = True
-        else:
-            sparse = False
-
-        n_domains = np.array(self.domains.shape)
-        partitions = np.empty(n_domains, dtype=object)
-        domain_size = np.ceil(np.array(array.shape) / n_domains).astype(int)
-        for x0 in range(n_domains[0]):
-            start0 = x0 * domain_size[0]
-            end0 = np.minimum(start0 + domain_size[0], array.shape[0] + 1)
-            for x1 in range(n_domains[1]):
-                start1 = x1 * domain_size[1]
-                end1 = np.minimum(start1 + domain_size[1], array.shape[1] + 1)
-                for x2 in range(n_domains[2]):
-                    start2 = x2 * domain_size[2]
-                    end2 = np.minimum(start2 + domain_size[2], array.shape[2] + 1)
-                    if not sparse:
-                        partitions[x0, x1, x2] = array[start0:end0, start1:end1, start2:end2]
-                    else:
-                        mask = np.all((indices.T >= [start0, start1, start2]) & (indices.T < [end0, end1, end2]),
-                                      axis=1)
-                        domain_indices = (indices[:, mask].T - np.array([start0, start1, start2])).T
-                        if domain_indices.size == 0:
-                            partitions[x0, x1, x2] = None
-                        else:
-                            size = (end0 - start0, end1 - start1, end2 - start2)
-                            partitions[x0, x1, x2] = torch.sparse_coo_tensor(domain_indices, values[mask],
-                                                                             size=size, dtype=array.dtype,
-                                                                             device=array.device)
-
-        return partitions

@@ -1,5 +1,4 @@
 import pytest
-import numpy as np
 from helmholtzbase import HelmholtzBase
 from wavesim.domain import Domain
 import torch
@@ -32,12 +31,23 @@ def construct_source(n_size):
 
 
 def allclose(a, b):
+    if not torch.is_tensor(a):
+        a = tensor(a, dtype=b.dtype)
+    if not torch.is_tensor(b):
+        b = tensor(b, dtype=a.dtype)
+    if a.dtype != b.dtype:
+        a = a.astype(b.dtype)
+    if a.device != b.device:
+        a = a.to('cpu')
+        b = b.to('cpu')
+    a = a.to_dense()
+    b = b.to_dense()
     return torch.allclose(a, b)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
 @pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])
-def test_domains(n_size, n_domains):
+def test_domains(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | None):
     # construct the (multi-) domain operator
     domain = construct_domain(n_size, n_domains, n_boundary=8)
 
@@ -48,17 +58,24 @@ def test_domains(n_size, n_domains):
     # perform some very basic checks
     # mainly, this tests if the partitioning and composition works correctly
     assert domain.shape == n_size
+
     domain.set(0, x)
     domain.set(1, y)
+    assert x.device == domain.device
     assert allclose(domain.get(0), x)
     assert allclose(domain.get(1), y)
 
     inp = domain.inner_product(0, 1)
     assert torch.isclose(inp, torch.vdot(x.flatten(), y.flatten()))
 
-    # construct a source
+    # construct a source and test adding it
+    domain.clear(0)
+    assert allclose(domain.get(0), 0.0)
     source = construct_source(n_size)
-
+    domain.set_source(source)
+    domain.add_source(0)
+    domain.add_source(0)
+    assert allclose(domain.get(0), 2.0 * source)
 #
 # def check_l_plus1_inv(n_size, n_domains):
 #     """ Check that (L+1)^(-1) (L+1) x = x """

@@ -90,7 +90,7 @@ def precon_iteration(base, alpha=0.75, compute_norm2=False):
     """
     base.medium(0, 1)  # x_1 = B·x
     base.mix(1.0 - alpha, 0, alpha, 1, 0)  # x_0 = (1-alpha) · x + alpha · B·x
-    base.add_source(1, 1)  # x_1 = B·x + y
+    base.add_source(1)  # x_1 = B·x + y
     base.propagator(1, 1)  # x_1 = (L+1)^-1 (B·x + y)
     base.medium(1, 1)
     retval = base.inner_product(1, 1) if compute_norm2 else 0.0

@@ -107,9 +107,9 @@ class Domain:
     # mix()
     # propagator()
     # set_source()
-    def add_source(self, slot_in: int, slot_out: int):
+    def add_source(self, slot: int):
         if self._source is not None:
-            torch.add(self._x[slot_in], self._source, out=self._x[slot_out])
+            torch.add(self._x[slot], self._source, out=self._x[slot])
 
     def clear(self, slot: int):
         """Clears the data in the specified slot"""
@@ -158,10 +158,17 @@ class Domain:
     def set_source(self, source):
         """Sets the source term for this domain.
         """
-        if source is None or (source.is_sparse and len(source.indices()) == 0):
-            self._source = None
-        else:
-            self._source = self._scale * source.to(self.device, self._x[0].dtype)
+        self._source = None
+        if source is None:
+            return
+
+        source = source.to(self.device)
+        if source.is_sparse:
+            source = source.coalesce()
+            if len(source.indices()) == 0:
+                return
+
+        self._source = self._scale * source.to(self.device, self._x[0].dtype)
 
     ## Functions specific for subdomains
     def initialize_shift(self, shift) -> float:

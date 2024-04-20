@@ -1,9 +1,47 @@
 import numpy as np
 import torch
-from torch.fft import fftfreq
 from itertools import chain
 
-torch.set_default_dtype(torch.float32)
+
+def partition(array, n_domains):
+    """ Split a 3-D array into a 3-D set of subarrays of approximiate equal sizes.
+
+     Note: Unfortunately, slicing is not supported for sparse tensors, so we have to do this manually.
+     Currently only works for coo-type sparse tensors.
+     """
+    if torch.is_tensor(array) and array.is_sparse:
+        indices = array.indices().cpu().numpy()
+        values = array.values().cpu().numpy()
+        sparse = True
+    else:
+        sparse = False
+
+    partitions = np.empty(n_domains, dtype=object)
+    domain_size = np.ceil(np.array(array.shape) / n_domains).astype(int)
+    for x0 in range(n_domains[0]):
+        start0 = x0 * domain_size[0]
+        end0 = np.minimum(start0 + domain_size[0], array.shape[0] + 1)
+        for x1 in range(n_domains[1]):
+            start1 = x1 * domain_size[1]
+            end1 = np.minimum(start1 + domain_size[1], array.shape[1] + 1)
+            for x2 in range(n_domains[2]):
+                start2 = x2 * domain_size[2]
+                end2 = np.minimum(start2 + domain_size[2], array.shape[2] + 1)
+                if not sparse:
+                    partitions[x0, x1, x2] = array[start0:end0, start1:end1, start2:end2]
+                else:
+                    mask = np.all((indices.T >= [start0, start1, start2]) & (indices.T < [end0, end1, end2]),
+                                  axis=1)
+                    domain_indices = (indices[:, mask].T - np.array([start0, start1, start2])).T
+                    if domain_indices.size == 0:
+                        partitions[x0, x1, x2] = None
+                    else:
+                        size = (end0 - start0, end1 - start1, end2 - start2)
+                        partitions[x0, x1, x2] = torch.sparse_coo_tensor(domain_indices, values[mask],
+                                                                         size=size, dtype=array.dtype,
+                                                                         device=array.device)
+
+    return partitions
 
 
 def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):

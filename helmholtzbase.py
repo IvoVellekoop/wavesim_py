@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import tensor
+from utilities import partition, combine, list_to_array
 
 torch.set_default_dtype(torch.float32)
 from wavesim.domain import Domain
@@ -54,9 +55,10 @@ class HelmholtzBase:
         if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size")
         self.domains = np.empty(n_domains, dtype=Domain)
+        self.n_domains = n_domains
 
         # distribute the refractive index map over the subdomains.
-        ri_domains = self.partition(refractive_index)
+        ri_domains = partition(refractive_index, self.n_domains)
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, dtype=torch.complex64, device=devices[domain_index % len(devices)])
             self.domains.flat[domain_index] = Domain(refractive_index=ri_domain, pixel_size=pixel_size,
@@ -107,25 +109,12 @@ class HelmholtzBase:
 
          :param: device: device on which to store the data. Defaults to the primary device
         """
-        device = device or self.device
-        full_field = torch.zeros(self.shape, dtype=torch.complex64, device=device)
-        pos = np.array((0, 0, 0))
-        for x0 in range(self.domains.shape[0]):
-            pos[1:2] = 0
-            for x1 in range(self.domains.shape[1]):
-                pos[2] = 0
-                for x2 in range(self.domains.shape[2]):
-                    data = self.domains[x0, x1, x2].get(slot).to(device)
-                    full_field[pos[0]:pos[0] + data.shape[0], pos[1]:pos[1] + data.shape[1],
-                    pos[2]:pos[2] + data.shape[2]] = data
-                    pos[2] += data.shape[2]
-                pos[1] += data.shape[1]
-            pos[0] += data.shape[0]
-        return full_field
+        domain_data = list_to_array([domain.get(slot) for domain in self.domains.flat], 1).reshape(self.domains.shape)
+        return combine(domain_data, device)
 
     def set(self, slot: int, data):
         """Copy the date into the specified slot"""
-        parts = self.partition(data)
+        parts = partition(data, self.n_domains)
         for domain, part in zip(self.domains.flat, parts.flat):
             domain.set(slot, part)
 
@@ -188,7 +177,7 @@ class HelmholtzBase:
         """ Split the source into subdomains and store in the subdomain states """
         if source.is_sparse:
             source = source.coalesce()
-        for domain, source in zip(self.domains.flat, self.partition(source).flat):
+        for domain, source in zip(self.domains.flat, partition(source, self.n_domains).flat):
             domain.set_source(source)
 
     ## other functions (may become part of utilities?)

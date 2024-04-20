@@ -3,6 +3,7 @@ from helmholtzbase import HelmholtzBase
 from wavesim.domain import Domain
 import torch
 from torch import tensor
+from . import allclose
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
 
@@ -23,26 +24,11 @@ def construct_domain(n_size, n_domains, n_boundary):
 def construct_source(n_size):
     """ Construct a sparse-matrix source with some points at the corners and in the center"""
     locations = tensor([
-        [n_size[0] // 2, 0, n_size[0]],
+        [n_size[0] // 2, 0, n_size[0] - 1],
         [n_size[1] // 2, 0, 0],
         [n_size[2] // 2, 0, 0]])
 
     return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=torch.complex64)
-
-
-def allclose(a, b):
-    if not torch.is_tensor(a):
-        a = tensor(a, dtype=b.dtype)
-    if not torch.is_tensor(b):
-        b = tensor(b, dtype=a.dtype)
-    if a.dtype != b.dtype:
-        a = a.astype(b.dtype)
-    if a.device != b.device:
-        a = a.to('cpu')
-        b = b.to('cpu')
-    a = a.to_dense()
-    b = b.to_dense()
-    return torch.allclose(a, b)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
@@ -75,7 +61,7 @@ def test_domains(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] |
     domain.set_source(source)
     domain.add_source(0)
     domain.add_source(0)
-    assert allclose(domain.get(0), 2.0 * source)
+    assert allclose(domain.get(0), 2.0 * source * domain.scale)
 #
 # def check_l_plus1_inv(n_size, n_domains):
 #     """ Check that (L+1)^(-1) (L+1) x = x """

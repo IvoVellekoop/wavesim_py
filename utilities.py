@@ -1,47 +1,114 @@
+from typing import Sequence
+
 import numpy as np
 import torch
+from torch import Tensor
 from itertools import chain
 
 
-def partition(array, n_domains):
-    """ Split a 3-D array into a 3-D set of subarrays of approximiate equal sizes.
+def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
+    """ Split a 3-D array into a 3-D set of subarrays of approximately equal sizes."""
+    n_domains = np.array(n_domains)
+    size = np.array(array.shape)
+    if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 3:
+        raise ValueError(
+            f"Number of domains {n_domains} must be larger than 1 and less than or equal to the size of the array {array.shape}")
 
-     Note: Unfortunately, slicing is not supported for sparse tensors, so we have to do this manually.
-     Currently only works for coo-type sparse tensors.
-     """
-    if torch.is_tensor(array) and array.is_sparse:
-        indices = array.indices().cpu().numpy()
-        values = array.values().cpu().numpy()
-        sparse = True
-    else:
-        sparse = False
+    # Calculate the size of each domain
+    large_domain_size = np.ceil(size / n_domains).astype(int)
+    small_domain_count = large_domain_size * n_domains - size
+    large_domain_count = n_domains - small_domain_count
+    subdomain_sizes = [
+        (large_domain_size[dim],) * large_domain_count[dim] + (large_domain_size[dim] - 1,) * small_domain_count[
+            dim] for dim in range(3)]
 
-    partitions = np.empty(n_domains, dtype=object)
-    domain_size = np.ceil(np.array(array.shape) / n_domains).astype(int)
-    for x0 in range(n_domains[0]):
-        start0 = x0 * domain_size[0]
-        end0 = np.minimum(start0 + domain_size[0], array.shape[0] + 1)
-        for x1 in range(n_domains[1]):
-            start1 = x1 * domain_size[1]
-            end1 = np.minimum(start1 + domain_size[1], array.shape[1] + 1)
-            for x2 in range(n_domains[2]):
-                start2 = x2 * domain_size[2]
-                end2 = np.minimum(start2 + domain_size[2], array.shape[2] + 1)
-                if not sparse:
-                    partitions[x0, x1, x2] = array[start0:end0, start1:end1, start2:end2]
-                else:
-                    mask = np.all((indices.T >= [start0, start1, start2]) & (indices.T < [end0, end1, end2]),
-                                  axis=1)
-                    domain_indices = (indices[:, mask].T - np.array([start0, start1, start2])).T
-                    if domain_indices.size == 0:
-                        partitions[x0, x1, x2] = None
-                    else:
-                        size = (end0 - start0, end1 - start1, end2 - start2)
-                        partitions[x0, x1, x2] = torch.sparse_coo_tensor(domain_indices, values[mask],
-                                                                         size=size, dtype=array.dtype,
-                                                                         device=array.device)
+    split = _sparse_split if array.is_sparse else torch.split
 
-    return partitions
+    array = split(array, subdomain_sizes[0], dim=0)
+    array = [split(part, subdomain_sizes[1], dim=1) for part in array]
+    array = [[split(part, subdomain_sizes[2], dim=2) for part in subpart] for subpart in array]
+    return list_to_array(array, dim=3)
+
+
+def list_to_array(input: list, dim: int) -> np.ndarray:
+    """ Convert a nested list of depth `dim` to a numpy object array """
+    # first determine the size of the final array
+    size = np.zeros(dim, dtype=int)
+    outer = input
+    for i in range(dim):
+        size[i] = len(outer)
+        outer = outer[0]
+
+    # allocate memory
+    array = np.empty(size, dtype=object)
+
+    # flatten the input array
+    for i in range(dim - 1):
+        input = sum(input, input[0][0:0])  # works both for tuples and lists
+
+    # copy to the output array
+    ra = array.reshape(-1)
+    assert ra.base is not None  # must be a view
+    for i in range(ra.size):
+        ra[i] = input[i]
+    return array
+
+
+def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
+    """ Split a COO-sparse tensor into a 3-D set of subarrays of approximately equal sizes."""
+    coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
+    domain_starts = np.cumsum((0,) + sizes)
+    tensor = tensor.coalesce()
+    indices = tensor.indices().cpu().numpy()
+    domains = coordinate_to_domain[indices[dim, :]]
+
+    def extract_subarray(domain: int) -> Tensor:
+        mask = domains == domain
+        domain_indices = indices[:, mask]
+        if len(domain_indices) == 0:
+            return None
+        domain_values = tensor.values()[mask]
+        domain_indices[dim, :] -= domain_starts[domain]
+        size = list(tensor.shape)
+        size[dim] = sizes[domain]
+        return torch.sparse_coo_tensor(domain_indices, domain_values, size)
+
+    return [extract_subarray(d) for d in range(len(sizes))]
+
+
+def combine(domains: np.ndarray, device=None) -> Tensor:
+    """ Concatenates a 3-d array of 3-d tensors"""
+
+    # Calculate total size for each dimension
+    total_size = [
+        sum(tensor.shape[0] for tensor in domains[:, 0, 0]),
+        sum(tensor.shape[1] for tensor in domains[0, :, 0]),
+        sum(tensor.shape[2] for tensor in domains[0, 0, :])
+    ]
+
+    # allocate memory
+    template = domains[0, 0, 0]
+    result_tensor = torch.empty(size=total_size, dtype=template.dtype, device=device or template.device)
+
+    # Fill the pre-allocated tensor
+    index0 = 0
+    for i, tensor_slice0 in enumerate(domains[:, 0, 0]):
+        index1 = 0
+        for j, tensor_slice1 in enumerate(domains[0, :, 0]):
+            index2 = 0
+            for k, tensor in enumerate(domains[0, 0, :]):
+                tensor = domains[i, j, k]
+                if tensor.is_sparse:
+                    tensor = tensor.to_dense()
+                end0 = index0 + tensor.shape[0]
+                end1 = index1 + tensor.shape[1]
+                end2 = index2 + tensor.shape[2]
+                result_tensor[index0:end0, index1:end1, index2:end2] = tensor
+                index2 += tensor.shape[2]
+            index1 += domains[i, j, 0].shape[1]
+        index0 += tensor_slice0.shape[0]
+
+    return result_tensor
 
 
 def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):

@@ -81,7 +81,7 @@ class HelmholtzBase:
 
         # compute the scaling factor
         # apply the scaling to compute the final form of all operators in the iteration
-        self.scale = 1.0j / (Vscat_norm + Vwrap_norm)
+        self.scale = 0.95j / (Vscat_norm + Vwrap_norm)
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
 

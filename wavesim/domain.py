@@ -7,11 +7,11 @@ class Domain:
     """Represents a single domain of the simulation.
 
     The `Domain` object encapsulates all data that is stored on a single computation node (e.g. a GPU or a node in a
-    cluster), and provides methods to perform the basic operations that the wavesim algorithm needs.
+    cluster), and provides methods to perform the basic operations that the Wavesim algorithm needs.
 
-    Domain currently works only for the Helmholtz equation and the pytorch backend.
-    If we want to have further functionality, this class should be refactored.
-    Also, for simplicity only cubic domains are supported.
+    Note:
+        Domain currently works only for the Helmholtz equation and the PyTorch backend.
+        If we want to have further functionality, this class should be refactored.
     """
 
     def __init__(self,
@@ -20,6 +20,7 @@ class Domain:
                  periodic: tuple[bool, bool, bool],
                  n_boundary: int,
                  n_slots=2,
+                 stand_alone=True,
                  ):
         """Construct a domain object with the given refractive index and allocate memory.
 
@@ -32,9 +33,16 @@ class Domain:
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are used
                 for all operations.
             pixel_size: grid spacing (in wavelength units)
-            n_boundary: Number of pixels used for the boundary correction.
             periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.
+            n_boundary: Number of pixels used for the boundary correction.
             n_slots: number of arrays used for storing the field and temporary data.
+
+            stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
+                refractive index of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
+                 making it equivalent to the original Wavesim algorithm.
+                 Set to False when part of a multi-domain, where the all subdomains need to be considered together to compute the
+                shift and scale factors.
+
          """
         # allocate temporary storage for the field.
         if n_slots < 2:
@@ -51,7 +59,8 @@ class Domain:
         self._Bscat = None
         self._periodic = periodic
         self._source = None
-        self._scale = None
+        self.scale = None
+        self._stand_alone = stand_alone
 
         # allocate memory for the side pixels
         # note: at the moment, compute_corrections does not support in-place operations,
@@ -97,6 +106,12 @@ class Domain:
             self.propagator_kernel = self.propagator_kernel - self.coordinates_f(dim) ** 2
 
         (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.propagator_kernel, n_boundary, self._x[1])
+
+        # when in stand-alone mode, compute scaling factors now
+        if stand_alone:
+            center = 0.5 * (r_min + r_max) + 0.5j * (i_min + i_max)
+            V_norm = self.initialize_shift(center)
+            self.initialize_scale(0.95j / V_norm)
 
     ## Functions implementing the domain interface
     # add_source()
@@ -168,7 +183,7 @@ class Domain:
             if len(source.indices()) == 0:
                 return
 
-        self._source = self._scale * source.to(self.device, self._x[0].dtype)
+        self._source = self.scale * source.to(self.device, self._x[0].dtype)
 
     ## Functions specific for subdomains
     def initialize_shift(self, shift) -> float:
@@ -189,7 +204,7 @@ class Domain:
         """
 
         # B = 1 - scale·(n² k₀² - shift). Scaling and shifting was already applied. 1-... not yet
-        self._scale = scale
+        self.scale = scale
         self._Bscat = 1.0 - scale * self._x[0]
 
         # kernel = 1 / (scale·(L + shift) + 1). Scaling and shifting was already applied. +1 and reciprocal not yet

@@ -74,6 +74,40 @@ def test_domains(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] |
     domain.add_source(0)
     domain.add_source(0)
     assert allclose(domain.get(0), 2.0 * source * domain.scale)
+
+
+@pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
+@pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])
+def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | None):
+    """Tests the forward and inverse propagator
+
+    The wavesim algorithm only needs the propagator (L+1)^(-1) to be implemented.
+    For testing, and for evaluating the final residue, the Domain and MultiDomain classes
+    also implement the 'inverse propagator L+1', which is basically the homogeneous
+    part of the forward operator A.
+
+    This test checks that the forward and inverse propagator are consistent, namely
+    (L+1)^(-1) (L+1) x = x, also in the case of multiple domains.
+    """
+
+    # construct the (multi-) domain operator
+    domain = construct_domain(n_size, n_domains, n_boundary=8)
+
+    # assert that (L+1) (L+1)^-1 x = x
+    x = random_vector(n_size)
+    domain.set(0, x)
+    domain.propagator(0, 0)
+    domain.inverse_propagator(0, 0)
+    x_reconstructed = domain.get(0)
+    assert allclose(x, x_reconstructed)
+
+    # also assert that (L+1)^-1 (L+1) x = x, use different slots for input and output
+    domain.set(0, x)
+    domain.inverse_propagator(0, 1)
+    domain.propagator(1, 1)
+    x_reconstructed = domain.get(1)
+    assert allclose(x, x_reconstructed)
+
 #
 # def check_l_plus1_inv(n_size, n_domains):
 #     """ Check that (L+1)^(-1) (L+1) x = x """

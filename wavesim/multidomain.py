@@ -171,10 +171,14 @@ class MultiDomain:
         for domain in self.domains.flat:
             domain.propagator(slot_in, slot_out)
 
+    def inverse_propagator(self, slot_in: int, slot_out: int):
+        """ Apply inverse propagator operators L+1 to subdomains/patches of x
+        """
+        for domain in self.domains.flat:
+            domain.inverse_propagator(slot_in, slot_out)
+
     def set_source(self, source):
         """ Split the source into subdomains and store in the subdomain states """
-        if source.is_sparse:
-            source = source.coalesce()
         for domain, source in zip(self.domains.flat, partition(source, self.n_domains).flat):
             domain.set_source(source)
 

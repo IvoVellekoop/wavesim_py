@@ -101,11 +101,12 @@ class Domain:
         # We temporarily store the kernel in `propagator_kernel`.
         # The shift and scale functions convert it to 1 / (scale·(L+shift)+1)
         # todo: convert to on-the-fly computation as in MATLAB code so that we don't need to store the kernel
-        self.propagator_kernel = 0.0j
+        self.inverse_propagator_kernel = 0.0j
         for dim in range(3):
-            self.propagator_kernel = self.propagator_kernel - self.coordinates_f(dim) ** 2
+            self.inverse_propagator_kernel = self.inverse_propagator_kernel - self.coordinates_f(dim) ** 2
+        self.propagator_kernel = None  # will be set in initialize_scale
 
-        (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.propagator_kernel, n_boundary, self._x[1])
+        (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.inverse_propagator_kernel, n_boundary, self._x[1])
 
         # when in stand-alone mode, compute scaling factors now
         if stand_alone:
@@ -163,11 +164,22 @@ class Domain:
         torch.add(self._x[slot_out], self._x[slot_b], alpha=weight_b, out=self._x[slot_out])
 
     def propagator(self, slot_in: int, slot_out: int):
-        """Applies the operator (L+1)^-1 (x + y).
+        """Applies the operator (L+1)^-1 x.
         """
         # todo: convert to on-the-fly computation
         torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
         self._x[slot_out].mul_(self.propagator_kernel)
+        torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
+
+    def inverse_propagator(self, slot_in: int, slot_out: int):
+        """Applies the operator (L+1) x .
+
+        This operation is not needed for the Wavesim algorithm, but is provided for testing purposes,
+        and can be used to evaluate the residue of the solution.
+        """
+        # todo: convert to on-the-fly computation
+        torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
+        self._x[slot_out].mul_(self.inverse_propagator_kernel)
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def set_source(self, source):
@@ -188,7 +200,7 @@ class Domain:
     ## Functions specific for subdomains
     def initialize_shift(self, shift) -> float:
         """Shifts the scattering potential and propagator kernel, then returns the norm of the shifted operator."""
-        self.propagator_kernel.add_(shift)
+        self.inverse_propagator_kernel.add_(shift)
         self._x[0].add_(-shift)  # currently holds the scattering potential
         return torch.linalg.norm(self._x[0].ravel(), ord=2).item()
 
@@ -208,8 +220,8 @@ class Domain:
         self._Bscat = 1.0 - scale * self._x[0]
 
         # kernel = 1 / (scale·(L + shift) + 1). Scaling and shifting was already applied. +1 and reciprocal not yet
-        self.propagator_kernel.add_(1.0)
-        self.propagator_kernel.reciprocal_()
+        self.inverse_propagator_kernel.add_(1.0)
+        self.propagator_kernel = 1.0 / self.inverse_propagator_kernel
 
         self.Vwrap = [(scale * wrap if wrap is not None else None) for wrap in self.Vwrap]
 

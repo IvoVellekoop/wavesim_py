@@ -7,7 +7,7 @@ torch.set_default_dtype(torch.float32)
 from wavesim.domain import Domain
 
 
-class HelmholtzBase:
+class MultiDomain:
     """" Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
      and setting up wrapping and transfer corrections """
 
@@ -62,7 +62,7 @@ class HelmholtzBase:
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, dtype=torch.complex64, device=devices[domain_index % len(devices)])
             self.domains.flat[domain_index] = Domain(refractive_index=ri_domain, pixel_size=pixel_size,
-                                                     n_boundary=n_boundary, periodic=periodic)
+                                                     n_boundary=n_boundary, periodic=periodic, stand_alone=False)
 
         # determine the optimal shift
         limits = np.array([domain.V_bounds for domain in self.domains.flat])
@@ -167,8 +167,6 @@ class HelmholtzBase:
 
     def propagator(self, slot_in: int, slot_out: int):
         """ Apply propagator operators (L+1)^-1 to subdomains/patches of x
-        :param x: Dict of List of arrays to which propagator operators are to be applied
-        :return: t: Dict of List of subdomain-wise (L+1)^-1
         """
         for domain in self.domains.flat:
             domain.propagator(slot_in, slot_out)

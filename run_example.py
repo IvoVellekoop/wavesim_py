@@ -2,10 +2,9 @@
 import torch
 from torch import tensor
 import numpy as np
-from helmholtzbase import HelmholtzBase  # to set up medium, propagation operators, and scaling
+from wavesim.multidomain import MultiDomain  # to set up medium, propagation operators, and scaling
 from anysim import run_algorithm  # to run the anysim iteration
 from save_details import LogPlot  # to log and plot the results
-from torch.profiler import profile, record_function, ProfilerActivity  # to profile the code
 
 # generate a refractive index map
 n_size = (3000, 6000, 1)  # Size of the simulation domain
@@ -21,7 +20,7 @@ periodic = (True, True, True)
 pixel_size = 0.25
 
 # set up scaling, and medium, propagation, and if required, correction (wrapping and transfer) operators
-base = HelmholtzBase(n, n_domains=(1, 2, 1), pixel_size=pixel_size, periodic=periodic)
+base = MultiDomain(n, n_domains=(1, 2, 1), pixel_size=pixel_size, periodic=periodic)
 
 # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True, with_stack=True,
 #             record_shapes=True) as prof:

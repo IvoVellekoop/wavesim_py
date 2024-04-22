@@ -8,7 +8,7 @@ import numpy as np
 from scipy.io import loadmat
 from PIL.Image import open, BILINEAR, fromarray  # needed for 2D tests
 
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from anysim import run_algorithm
 from save_details import LogPlot
 from utilities import max_abs_error, relative_error
@@ -17,7 +17,7 @@ from utilities import max_abs_error, relative_error
 matlab_results = loadmat('matlab_results.mat')
 
 
-def compare(base: HelmholtzBase, u_computed, u_reference, threshold=1.e-3):
+def compare(base: MultiDomain, u_computed, u_reference, threshold=1.e-3):
     """ Compute, Print, and Assert relative and maximum absolute errors between computed and reference field """
     if u_reference.shape[0] != base.n_roi[0]:
         u_computed = u_computed[tuple([slice(0, base.n_roi[i]) for i in range(base.n_dims)])]
@@ -31,7 +31,7 @@ def compare(base: HelmholtzBase, u_computed, u_reference, threshold=1.e-3):
 
 def u_ref_1d_h(n):
     """ Compute analytic solution for 1D case """
-    base_ = HelmholtzBase(refractive_index=n, setup_operators=False)
+    base_ = MultiDomain(refractive_index=n, setup_operators=False)
 
     x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size, dtype=np.complex64)
     x = np.pad(x, (64, 64), mode='constant')
@@ -55,7 +55,7 @@ def test_1d_homogeneous(n_domains, wrap_correction):
     u_ref = u_ref_1d_h(n)
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(refractive_index=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
     compare(base, u_computed.cpu().numpy(), u_ref, threshold=1.e-3)
@@ -69,7 +69,7 @@ def test_1d_glass_plate(n_domains, wrap_correction):
     n[99:130] = 1.5
     source = np.zeros_like(n)
     source[0] = 1.
-    base = HelmholtzBase(refractive_index=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = np.squeeze(matlab_results['u'])
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -92,9 +92,9 @@ def test_2d_high_contrast(n_domains, wrap_correction):
         os.chdir('..')
     n = matlab_results['n2d_hc']
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
-    base = HelmholtzBase(refractive_index=n, source=source, wavelength=0.532, ppw=3 * np.max(abs(n_contrast + 1)),
-                         n_domains=n_domains, wrap_correction=wrap_correction,
-                         max_iterations=int(1.e+5))
+    base = MultiDomain(refractive_index=n, source=source, wavelength=0.532, ppw=3 * np.max(abs(n_contrast + 1)),
+                       n_domains=n_domains, wrap_correction=wrap_correction,
+                       max_iterations=int(1.e+5))
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u2d_hc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -114,8 +114,8 @@ def test_2d_low_contrast(n_domains, wrap_correction):
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
-    base = HelmholtzBase(refractive_index=n, source=source, wavelength=0.532, ppw=3 * abs(n_fat),
-                         n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n, source=source, wavelength=0.532, ppw=3 * abs(n_fat),
+                       n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u2d_lc']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -132,7 +132,7 @@ def test_3d_homogeneous(n_domains, wrap_correction):
     source = np.zeros_like(n_sample)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(refractive_index=n_sample, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n_sample, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results[f'u3d_{n_roi[0]}_{n_roi[1]}_{n_roi[2]}_bw_20_24_32']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()
@@ -148,7 +148,7 @@ def test_3d_disordered(n_domains, wrap_correction):
     source = np.zeros_like(n_sample, dtype=np.complex64)
     source[int(n_roi[0] / 2 - 1), int(n_roi[1] / 2 - 1), int(n_roi[2] / 2 - 1)] = 1.
 
-    base = HelmholtzBase(refractive_index=n_sample, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n_sample, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
     u_computed, state = run_algorithm(base)
     u_ref = matlab_results['u3d_disordered']
     LogPlot(base, state, u_computed, u_ref).log_and_plot()

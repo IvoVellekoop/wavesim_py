@@ -1,12 +1,8 @@
 import torch
-import numpy as np
-from torch.linalg import norm
-from collections import defaultdict
-from helmholtzbase import HelmholtzBase
-from state import State
+from wavesim.multidomain import MultiDomain
 
 
-def run_algorithm(base: HelmholtzBase, source, alpha=0.75, max_iterations=1000):
+def run_algorithm(base: MultiDomain, source, alpha=0.75, max_iterations=1000):
     """ AnySim update
     :param base: Helmholtz base parameters
     :return: u (computed field), state (object) """

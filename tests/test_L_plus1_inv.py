@@ -1,5 +1,5 @@
 import pytest
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from wavesim.domain import Domain
 import torch
 from torch import tensor
@@ -17,8 +17,8 @@ def construct_domain(n_size, n_domains, n_boundary):
     if n_domains is None:  # single domain
         return Domain(refractive_index=n, pixel_size=0.25, periodic=(False, False, True), n_boundary=n_boundary)
     else:
-        return HelmholtzBase(refractive_index=n, pixel_size=0.25, periodic=(False, False, True), n_boundary=n_boundary,
-                             n_domains=n_domains)
+        return MultiDomain(refractive_index=n, pixel_size=0.25, periodic=(False, False, True), n_boundary=n_boundary,
+                           n_domains=n_domains)
 
 
 def construct_source(n_size):
@@ -31,15 +31,27 @@ def construct_source(n_size):
     return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=torch.complex64)
 
 
+def random_vector(n_size):
+    """Construct a random vector for testing operators"""
+    return torch.randn(n_size, device=device) + 1.0j * torch.randn(n_size, device=device)
+
+
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
 @pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])
 def test_domains(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | None):
+    """Tests the basic functionality of the Domain and MultiDomain classes
+
+    Tests constructing a domain, subdividing data over subdomains,
+    concatenating data from the subdomains, adding sparse sources,
+    and computing the inner product.
+    """
+
     # construct the (multi-) domain operator
     domain = construct_domain(n_size, n_domains, n_boundary=8)
 
     # construct a random vector for testing operators
-    x = torch.randn(n_size, device=device) + 1.0j * torch.randn(n_size, device=device)
-    y = torch.randn(n_size, device=device) + 1.0j * torch.randn(n_size, device=device)
+    x = random_vector(n_size)
+    y = random_vector(n_size)
 
     # perform some very basic checks
     # mainly, this tests if the partitioning and composition works correctly

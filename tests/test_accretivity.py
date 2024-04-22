@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from collections import defaultdict
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix
 
@@ -11,8 +11,8 @@ def accretivity(n_size, boundary_widths, n_domains, wrap_correction):
     """ Check that operator A = L + V is accretive, 
         i.e., has a non-negative real part """
     n = np.ones(n_size, dtype=np.complex64)
-    base = HelmholtzBase(refractive_index=n, boundary_widths=boundary_widths, n_domains=n_domains,
-                         wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n, boundary_widths=boundary_widths, n_domains=n_domains,
+                       wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates one forward iteration and gives operator A

@@ -1,12 +1,12 @@
 import pytest
 import numpy as np
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 
 
 @pytest.fixture
 def setup_inputs():
     """ Setup base problem with dummy input """
-    yield HelmholtzBase(refractive_index=np.ones((256, 256, 1)), setup_operators=False)
+    yield MultiDomain(refractive_index=np.ones((256, 256, 1)), setup_operators=False)
 
 
 def test_n(setup_inputs):
@@ -24,6 +24,6 @@ def test_n_domains(setup_inputs):
 def test_input_boundary_widths(boundary_widths):
     """ Input parameters (here, boundary_widths) should be 3-element numpy arrays irrespective of input type and shape.
         Elements beyond the dimensions of the problem should be either 1 or 0"""
-    anysim_bw = HelmholtzBase(refractive_index=np.ones((256, 256, 1)), boundary_widths=boundary_widths,
-                              setup_operators=False)
+    anysim_bw = MultiDomain(refractive_index=np.ones((256, 256, 1)), boundary_widths=boundary_widths,
+                            setup_operators=False)
     assert np.array_equal(anysim_bw.boundary_widths, np.array([10, 10, 0]))

@@ -75,6 +75,16 @@ def test_domains(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] |
     domain.add_source(0)
     assert allclose(domain.get(0), 2.0 * source * domain.scale)
 
+    # test mixing: α x + β y
+    # make sure to include the special cases α=0, β=0, α=1, β=1 and α+β=1
+    # since they may be optimized and thus have different code paths
+    domain.set(0, x)
+    for alpha in [0.0, 1.0, 0.25]:
+        for beta in [0.0, 1.0, 0.75]:
+            domain.set(1, y)
+            domain.mix(alpha, 0, beta, 1, 0)
+            assert allclose(domain.get(0), alpha * x + beta * y)
+
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
 @pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])

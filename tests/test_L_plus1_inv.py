@@ -13,7 +13,8 @@ dtype = torch.complex64
 
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
     """ Construct a domain or multi-domain"""
-    n = torch.rand(n_size, dtype=dtype, device=device) + 1.0
+    n = torch.rand(n_size, dtype=dtype, device=device) + 1.0  # random refractive index between 1 and 2
+    n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))
     if n_domains is None:  # single domain
         return HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
     else:
@@ -158,8 +159,8 @@ def test_wrapped_propagator():
     up to the difference in scaling factor.
     """
     n_size = (128, 100, 93)
-    domain_single = construct_domain(n_size, n_domains=None, n_boundary=8, periodic=(False, False, True))
-    domain_multi = construct_domain(n_size, n_domains=(3, 3, 3), n_boundary=8, periodic=(False, False, True))
+    domain_single = construct_domain(n_size, n_domains=None, n_boundary=8, periodic=(True, False, True))
+    domain_multi = construct_domain(n_size, n_domains=(3, 3, 3), n_boundary=8, periodic=(False, False, False))
     source = construct_source(n_size)
 
     for domain in [domain_single, domain_multi]:

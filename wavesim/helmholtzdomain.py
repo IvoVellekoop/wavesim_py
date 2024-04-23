@@ -207,7 +207,7 @@ class HelmholtzDomain(Domain):
         self.inverse_propagator_kernel.add_(shift)
         self._x[0].add_(-shift)  # currently holds the scattering potential
         self.shift = shift
-        return torch.linalg.norm(self._x[0].ravel(), ord=2).item()
+        return self._x[0].view(-1).abs().max().item()
 
     def initialize_scale(self, scale: complex):
         """Scales all operators.

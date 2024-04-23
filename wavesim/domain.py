@@ -52,6 +52,7 @@ class Domain:
             raise ValueError(
                 f"refractive_index must be 3-dimensional and complex float32 or float64, not {refractive_index.dtype}.")
 
+        refractive_index = tensor(refractive_index)
         self.pixel_size = pixel_size
         self.shape = refractive_index.shape
         self.device = refractive_index.device
@@ -60,6 +61,7 @@ class Domain:
         self._periodic = periodic
         self._source = None
         self.scale = None
+        self.shift = None
         self._stand_alone = stand_alone
 
         # allocate memory for the side pixels
@@ -84,18 +86,6 @@ class Domain:
             None if self._periodic[2] else torch.zeros_like(refractive_index[self.edge_slices[5]]),
         ]
 
-        # compute n²·k₀² (the raw scattering potential)
-        # also compute the bounding box holding the values of the scattering potential in the complex plane.
-        refractive_index.mul_(refractive_index)
-        refractive_index.mul_((2.0 * torch.pi / self.pixel_size) ** 2)
-        r_min, r_max = torch.aminmax(refractive_index.real)
-        i_min, i_max = torch.aminmax(refractive_index.imag)
-        self.V_bounds = tensor((r_min, r_max, i_min, i_max)).cpu().numpy()
-
-        # allocate storage for temporary data, use the raw scattering potential one of the locations
-        # (which will be overwritten later)
-        self._x = [refractive_index] + [torch.zeros_like(refractive_index) for _ in range(n_slots - 1)]
-
         # compute the un-scaled laplacian kernel and the un-scaled wrapping correction matrices
         # This kernel is given by -(px² + py² + pz²), with p_ the Fourier space coordinate
         # We temporarily store the kernel in `propagator_kernel`.
@@ -106,13 +96,29 @@ class Domain:
             self.inverse_propagator_kernel = self.inverse_propagator_kernel - self.coordinates_f(dim) ** 2
         self.propagator_kernel = None  # will be set in initialize_scale
 
-        (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.inverse_propagator_kernel, n_boundary, self._x[1])
+        # allocate storage for temporary data, re-use the memory we got for the raw scattering potential
+        # as one of the locations (which will be overwritten later)
+        self._x = [refractive_index] + [torch.zeros_like(refractive_index) for _ in range(n_slots - 1)]
 
-        # when in stand-alone mode, compute scaling factors now
+        # compute n²·k₀² (the raw scattering potential)
+        # also compute the bounding box holding the values of the scattering potential in the complex plane.
+        refractive_index.mul_(refractive_index)
+        refractive_index.mul_((2.0 * torch.pi / self.pixel_size) ** 2)
+        r_min, r_max = torch.aminmax(refractive_index.real)
+        i_min, i_max = torch.aminmax(refractive_index.imag)
+        self.V_bounds = tensor((r_min, r_max, i_min, i_max)).cpu().numpy()
+
         if stand_alone:
+            # When in stand-alone mode, compute scaling factors now.
+            self.Vwrap = None
+            self.Vwrap_norm = 0.0
             center = 0.5 * (r_min + r_max) + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
             self.initialize_scale(0.95j / V_norm)
+        else:
+            # when used as part of a multi-domain, the shift and scale factors are computed by the multi-domain.
+            # In this case, we do need to compute the wrapping matrices
+            (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.inverse_propagator_kernel, n_boundary, self._x[1])
 
     ## Functions implementing the domain interface
     # add_source()
@@ -202,6 +208,7 @@ class Domain:
         """Shifts the scattering potential and propagator kernel, then returns the norm of the shifted operator."""
         self.inverse_propagator_kernel.add_(shift)
         self._x[0].add_(-shift)  # currently holds the scattering potential
+        self.shift = shift
         return torch.linalg.norm(self._x[0].ravel(), ord=2).item()
 
     def initialize_scale(self, scale: complex):
@@ -219,11 +226,14 @@ class Domain:
         self.scale = scale
         self._Bscat = 1.0 - scale * self._x[0]
 
-        # kernel = 1 / (scale·(L + shift) + 1). Scaling and shifting was already applied. +1 and reciprocal not yet
+        # kernel = 1 / (scale·(L + shift) + 1). Shifting was already applied. scaling, +1 and reciprocal not yet
+        self.inverse_propagator_kernel.multiply_(scale)
         self.inverse_propagator_kernel.add_(1.0)
         self.propagator_kernel = 1.0 / self.inverse_propagator_kernel
 
-        self.Vwrap = [(scale * wrap if wrap is not None else None) for wrap in self.Vwrap]
+        # scale the wrapping correction
+        if self.Vwrap is not None:
+            self.Vwrap = [(scale * wrap if wrap is not None else None) for wrap in self.Vwrap]
 
     def compute_corrections(self, slot_in: int):
         """Computes the edge corrections by multiplying the first and last pixels of each line with the Vwrap matrix.
@@ -242,10 +252,12 @@ class Domain:
                 continue
 
             # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of wrap matrix
-            # (of size n_correction) is always at axis=0. It should be at axis=dim does this
-            # note: currently does not allow specifying an output array, so a new array is allocated every time
+            # (of size n_correction) is always at axis=0. It should be at axis=dim,
+            # moveaxis moves the non-contracted dimension to the correct position
+            # todo: convert to an in-place operation using the 'out' parameter
             self.edges[edge] = torch.moveaxis(
-                torch.tensordot(self.Vwrap, self._x[slot_in][self.edge_slices[edge]], (axes, [dim, ])), 0, dim)
+                torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ])), 0,
+                dim)
 
         return self.edges
 

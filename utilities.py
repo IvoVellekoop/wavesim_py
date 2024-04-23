@@ -27,15 +27,15 @@ def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
     array = split(array, subdomain_sizes[0], dim=0)
     array = [split(part, subdomain_sizes[1], dim=1) for part in array]
     array = [[split(part, subdomain_sizes[2], dim=2) for part in subpart] for subpart in array]
-    return list_to_array(array, dim=3)
+    return list_to_array(array, depth=3)
 
 
-def list_to_array(input: list, dim: int) -> np.ndarray:
-    """ Convert a nested list of depth `dim` to a numpy object array """
+def list_to_array(input: list, depth: int) -> np.ndarray:
+    """ Convert a nested list of depth `depth` to a numpy object array """
     # first determine the size of the final array
-    size = np.zeros(dim, dtype=int)
+    size = np.zeros(depth, dtype=int)
     outer = input
-    for i in range(dim):
+    for i in range(depth):
         size[i] = len(outer)
         outer = outer[0]
 
@@ -43,7 +43,7 @@ def list_to_array(input: list, dim: int) -> np.ndarray:
     array = np.empty(size, dtype=object)
 
     # flatten the input array
-    for i in range(dim - 1):
+    for i in range(depth - 1):
         input = sum(input, input[0][0:0])  # works both for tuples and lists
 
     # copy to the output array

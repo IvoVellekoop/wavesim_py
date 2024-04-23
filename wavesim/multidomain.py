@@ -81,6 +81,7 @@ class MultiDomain:
 
         # compute the scaling factor
         # apply the scaling to compute the final form of all operators in the iteration
+        self.shift = center
         self.scale = 0.95j / (Vscat_norm + Vwrap_norm)
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
@@ -135,7 +136,7 @@ class MultiDomain:
         """ Apply the medium operator B, including wrapping corrections
         """
         domain_edges = [domain.compute_corrections(slot_in) for domain in self.domains.flat]
-        domain_edges = np.array(domain_edges).reshape(self.domains.shape + (6,))
+        domain_edges = list_to_array(domain_edges, 2).reshape(*self.domains.shape, 6)
 
         for domain in self.domains.flat:
             domain.medium(slot_in, slot_out)

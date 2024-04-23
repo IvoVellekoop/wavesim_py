@@ -96,9 +96,10 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
     domain.set(0, x)
     for alpha in [0.0, 1.0, 0.25]:
         for beta in [0.0, 1.0, 0.75]:
-            domain.set(1, y)
-            domain.mix(alpha, 0, beta, 1, 0)
-            assert allclose(domain.get(0), alpha * x + beta * y)
+            for out_slot in [0, 1]:
+                domain.set(1, y)
+                domain.mix(alpha, 0, beta, 1, out_slot)
+                assert allclose(domain.get(out_slot), alpha * x + beta * y)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])

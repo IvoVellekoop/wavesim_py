@@ -22,4 +22,4 @@ def allclose(a, b):
     # error should be within 100 ULPs.
     # This corresponds to a relative error of 1e-5 for float32 and 1e-12 for float64
     # (we usually do quite some back-and-forth ffts, which may cause errors to accumulate)
-    return torch.allclose(a, b, atol=100 * ulp), f"Arrays are not close within 100 ULPs"
+    return torch.allclose(a, b, atol=100 * ulp)

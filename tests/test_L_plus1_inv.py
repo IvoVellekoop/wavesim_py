@@ -1,6 +1,6 @@
 import pytest
 from wavesim.multidomain import MultiDomain
-from wavesim.domain import Domain
+from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
 from torch import tensor
 from . import allclose
@@ -15,7 +15,7 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
     """ Construct a domain or multi-domain"""
     n = torch.rand(n_size, dtype=dtype, device=device) + 1.0
     if n_domains is None:  # single domain
-        return Domain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
+        return HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
     else:
         return MultiDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary,
                            n_domains=n_domains)
@@ -49,14 +49,28 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
     # construct the (multi-) domain operator
     domain = construct_domain(n_size, n_domains, n_boundary=8)
 
+    # test coordinates
+    assert domain.shape == n_size
+    for dim in range(3):
+        coordinates = domain.coordinates(dim)
+        assert coordinates.shape[dim] == n_size[dim]
+        assert coordinates.numel() == n_size[dim]
+
+        coordinates_f = domain.coordinates_f(dim)
+        assert coordinates_f.shape == coordinates.shape
+        assert coordinates_f[0, 0, 0] == 0
+
+        if n_size[dim] > 1:
+            assert allclose(coordinates.flatten()[1] - coordinates.flatten()[0], domain.pixel_size)
+            assert allclose(coordinates_f.flatten()[1] - coordinates_f.flatten()[0],
+                            2.0 * torch.pi / (n_size[dim] * domain.pixel_size))
+
     # construct a random vector for testing operators
     x = random_vector(n_size)
     y = random_vector(n_size)
 
     # perform some very basic checks
     # mainly, this tests if the partitioning and composition works correctly
-    assert domain.shape == n_size
-
     domain.set(0, x)
     domain.set(1, y)
     assert x.device == domain.device

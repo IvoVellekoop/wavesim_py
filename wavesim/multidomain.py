@@ -2,12 +2,11 @@ import numpy as np
 import torch
 from torch import tensor
 from utilities import partition, combine, list_to_array
+from .domain import Domain
+from .helmholtzdomain import HelmholtzDomain
 
-torch.set_default_dtype(torch.float32)
-from wavesim.domain import Domain
 
-
-class MultiDomain:
+class MultiDomain(Domain):
     """" Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
      and setting up wrapping and transfer corrections """
 
@@ -41,28 +40,26 @@ class MultiDomain:
         if not len(n_domains) == 3:
             raise ValueError("The number of domains must be a 3-tuple")
 
-        # store the input parameters. We don't need them anymore, but they might be useful for debugging
-        self.periodic = np.array(periodic)
-        self.pixel_size = pixel_size
-        self.shape = refractive_index.shape
-
         # enumerate the cuda devices. We will assign the domains to the devices in a round-robin fashion.
+        # we use the first GPU as primary device
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
-        self.device = torch.device(devices[0])  # use as primary device
-
+        super().__init__(pixel_size, refractive_index.shape, torch.device(devices[0]))
+        self.periodic = np.array(periodic)
+       
         # compute domain boundaries in each dimension
         if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size")
-        self.domains = np.empty(n_domains, dtype=Domain)
+        self.domains = np.empty(n_domains, dtype=HelmholtzDomain)
         self.n_domains = n_domains
 
         # distribute the refractive index map over the subdomains.
         ri_domains = partition(refractive_index, self.n_domains)
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, dtype=torch.complex64, device=devices[domain_index % len(devices)])
-            self.domains.flat[domain_index] = Domain(refractive_index=ri_domain, pixel_size=pixel_size,
-                                                     n_boundary=n_boundary, periodic=periodic, stand_alone=False)
+            self.domains.flat[domain_index] = HelmholtzDomain(refractive_index=ri_domain, pixel_size=pixel_size,
+                                                              n_boundary=n_boundary, periodic=periodic,
+                                                              stand_alone=False)
 
         # determine the optimal shift
         limits = np.array([domain.V_bounds for domain in self.domains.flat])

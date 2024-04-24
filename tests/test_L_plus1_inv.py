@@ -7,8 +7,8 @@ from . import allclose
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
 
-device = "cuda:0"
-dtype = torch.complex64
+device = "cuda"  # "cpu"  # "cuda:0"
+dtype = torch.complex128  # torch.complex64
 
 
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
@@ -29,12 +29,12 @@ def construct_source(n_size):
         [n_size[1] // 2, 0, 0],
         [n_size[2] // 2, 0, 0]])
 
-    return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=torch.complex64)
+    return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=dtype)
 
 
 def random_vector(n_size):
     """Construct a random vector for testing operators"""
-    return torch.randn(n_size, device=device) + 1.0j * torch.randn(n_size, device=device)
+    return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
@@ -79,7 +79,7 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
     assert allclose(domain.get(1), y)
 
     inp = domain.inner_product(0, 1)
-    assert torch.isclose(inp, torch.vdot(x.flatten(), y.flatten()))
+    assert allclose(inp, torch.vdot(x.flatten(), y.flatten()))
 
     # construct a source and test adding it
     domain.clear(0)
@@ -89,16 +89,18 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
     domain.add_source(0)
     domain.add_source(0)
     assert allclose(domain.get(0), 2.0 * source * domain.scale)
-
+    x[0, 0, 0] = 1
+    y[0, 0, 0] = 2
     # test mixing: α x + β y
     # make sure to include the special cases α=0, β=0, α=1, β=1 and α+β=1
     # since they may be optimized and thus have different code paths
-    domain.set(0, x)
-    for alpha in [0.0, 1.0, 0.25]:
+    for alpha in [0.0, 1.0, 0.25, -0.1]:
         for beta in [0.0, 1.0, 0.75]:
             for out_slot in [0, 1]:
+                domain.set(0, x)
                 domain.set(1, y)
                 domain.mix(alpha, 0, beta, 1, out_slot)
+                print(f"alpha {alpha}, beta{beta}, slot{out_slot}")
                 assert allclose(domain.get(out_slot), alpha * x + beta * y)
 
 
@@ -139,7 +141,8 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
 
     # for the non-decomposed case, test if the propagator gives the correct value
     if n_domains is None:
-        k = 2 * torch.pi * tensor((3.0, 5.0, 7.0)) / tensor(n_size)  # in 1/pixels
+        k = 2 * torch.pi * tensor((33.0, 45.0, 7.0), dtype=torch.float64) / tensor(n_size,
+                                                                                   dtype=torch.float64)  # in 1/pixels
         plane_wave = torch.exp(1j * (
                 k[0] * torch.arange(n_size[0], device=device).reshape(-1, 1, 1) +
                 k[1] * torch.arange(n_size[1], device=device).reshape(1, -1, 1) +
@@ -147,7 +150,7 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
         domain.set(0, plane_wave)
         domain.inverse_propagator(0, 0)
         result = domain.get(0)
-        laplace_kernel = - (k[0] ** 2 + k[1] ** 2 + k[2] ** 2) * domain.pixel_size ** 2
+        laplace_kernel = - (k[0] ** 2 + k[1] ** 2 + k[2] ** 2) / domain.pixel_size ** 2
         correct_result = (1.0 + domain.scale * (laplace_kernel + domain.shift)) * plane_wave  # L+1 =  scale·∇² + 1.
         assert allclose(result, correct_result)
 

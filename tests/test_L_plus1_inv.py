@@ -141,8 +141,11 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
 
     # for the non-decomposed case, test if the propagator gives the correct value
     if n_domains is None:
-        k = 2 * torch.pi * tensor((33.0, 45.0, 7.0), dtype=torch.float64) / tensor(n_size,
-                                                                                   dtype=torch.float64)  # in 1/pixels
+        n_size = tensor(n_size, dtype=torch.float64)
+        # choose |k| <  Nyquist, make sure k is at exact grid point in Fourier space
+        k_relative = tensor((0.2, -0.15, 0.4), dtype=torch.float64)
+        k = 2 * torch.pi * torch.round(k_relative * n_size) / n_size  # in 1/pixels
+        k[n_size == 1] = 0.0
         plane_wave = torch.exp(1j * (
                 k[0] * torch.arange(n_size[0], device=device).reshape(-1, 1, 1) +
                 k[1] * torch.arange(n_size[1], device=device).reshape(1, -1, 1) +

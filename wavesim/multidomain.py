@@ -55,17 +55,16 @@ class MultiDomain(Domain):
         self.periodic = np.array(periodic)
 
         # compute domain boundaries in each dimension
-        if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
-            raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size")
         self.domains = np.empty(n_domains, dtype=HelmholtzDomain)
         self.n_domains = n_domains
 
         # distribute the refractive index map over the subdomains.
         ri_domains = partition(refractive_index, self.n_domains)
+        subdomain_periodic = [periodic[i] and n_domains[i] == 1 for i in range(3)]
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, device=devices[domain_index % len(devices)])
             self.domains.flat[domain_index] = HelmholtzDomain(refractive_index=ri_domain, pixel_size=pixel_size,
-                                                              n_boundary=n_boundary, periodic=periodic,
+                                                              n_boundary=n_boundary, periodic=subdomain_periodic,
                                                               stand_alone=False)
 
         # determine the optimal shift

@@ -48,17 +48,20 @@ class HelmholtzDomain(Domain):
         refractive_index = tensor(refractive_index)
         super().__init__(pixel_size, refractive_index.shape, refractive_index.device)
 
-        # allocate temporary storage for the field.
+        # validate input arguments
         if n_slots < 2:
             raise ValueError("n_slots must be at least 2")
         if refractive_index.ndim != 3 or not (
                 refractive_index.dtype == torch.complex64 or refractive_index.dtype == torch.complex128):
             raise ValueError(
                 f"refractive_index must be 3-dimensional and complex float32 or float64, not {refractive_index.dtype}.")
+        if any([n_boundary > 0.5 * self.shape[i] and not periodic[i] for i in range(3)]):
+            raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size {self.shape}")
 
         self._n_boundary = n_boundary
         self._Bscat = None
-        self._periodic = periodic
+        self._periodic = periodic if n_boundary > 0 else [True, True,
+                                                          True]  # allow manually disabling wrapping corrections by setting n_boundary=0
         self._source = None
         self._stand_alone = stand_alone
 
@@ -114,9 +117,23 @@ class HelmholtzDomain(Domain):
             V_norm = self.initialize_shift(center)
             self.initialize_scale(0.95j / V_norm)
         else:
-            # when used as part of a multi-domain, the shift and scale factors are computed by the multi-domain.
-            # In this case, we do need to compute the wrapping matrices
-            (self.Vwrap, self.Vwrap_norm) = _make_wrap_matrix(self.inverse_propagator_kernel, n_boundary, self._x[1])
+            # compute the wrapping correction.
+            # These matrices must be computed before initialize_scale, since they
+            # affect the overall scaling.
+            # place a point at -1,-1,-1 in slot 1 (which currently holds all zeros)
+            # and then convolve the point with the inverse propagator kernel
+            # we now have the wrap-around artefacts located at [:,-1,-1], [-1,:,-1] and [-1,-1,:]
+            self._x[1][-1, -1, -1] = 1.0
+            self.inverse_propagator(1, 1)
+            self.Vwrap = [
+                _make_wrap_matrix(self._x[1][:, -1, -1], n_boundary) if not self._periodic[0] else None,
+                _make_wrap_matrix(self._x[1][-1, :, -1], n_boundary) if not self._periodic[1] else None,
+                _make_wrap_matrix(self._x[1][-1, -1, :], n_boundary) if not self._periodic[2] else None,
+            ]
+            # compute the norm of Vwrap. Then add the norms of all matrices (in rms sense, because the matrices operate on different parts of the data)
+            # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
+            self.Vwrap_norm = np.sqrt(
+                2.0 * sum([torch.linalg.norm(W, ord=2).item() ** 2 for W in self.Vwrap if W is not None]))
 
     ## Functions implementing the domain interface
     # add_source()
@@ -243,10 +260,8 @@ class HelmholtzDomain(Domain):
         self.inverse_propagator_kernel.multiply_(scale)
         self.inverse_propagator_kernel.add_(1.0)
         self.propagator_kernel = 1.0 / self.inverse_propagator_kernel
-
-        # scale the wrapping correction
         if self.Vwrap is not None:
-            self.Vwrap = [(scale * wrap if wrap is not None else None) for wrap in self.Vwrap]
+            self.Vwrap = [scale * W if W is not None else None for W in self.Vwrap]
 
     def compute_corrections(self, slot_in: int):
         """Computes the edge corrections by multiplying the first and last pixels of each line with the Vwrap matrix.
@@ -261,7 +276,7 @@ class HelmholtzDomain(Domain):
         for edge in range(6):
             axes = [1, ] if edge % 2 == 0 else [0, ]
             dim = edge // 2
-            if self._periodic[dim]:
+            if self.Vwrap[dim] is None:
                 continue
 
             # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of wrap matrix
@@ -277,14 +292,17 @@ class HelmholtzDomain(Domain):
     def apply_corrections(self, wrap_corrections, transfer_corrections, slot: int):
         """Apply the wrapping/transfer corrections computed from compute_corrections()
 
+        Transfer corrections correspond to a contribution from neighboring domains. They are added to the current domain.
+        Wrap corrections correct for the periodicity of the fft. They are subtracted from the domain
+
         :param slot: slot index for the data to which the corrections are applied. Operation is always in-place
         :param transfer_corrections: list of 6 corrections coming from neighboring segments (may contain None for end of domain)
         :param transfer_corrections: list of 6 corrections for wrap-around (may contain None for periodic boundary)
         """
         for edge in range(6):
-            if transfer_corrections[edge] is None and wrap_corrections[edge] is not None:
-                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge]
-            elif wrap_corrections[edge] is None and wrap_corrections[edge] is not None:
+            if wrap_corrections[edge] is not None and transfer_corrections[edge] is None:
+                self._x[slot][self.edge_slices[edge]] -= wrap_corrections[edge]
+            elif transfer_corrections[edge] is not None and wrap_corrections[edge] is None:
                 self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge]
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is not None:
                 self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge] - wrap_corrections[edge]
@@ -292,7 +310,7 @@ class HelmholtzDomain(Domain):
                 pass
 
 
-def _make_wrap_matrix(L_kernel, n_boundary, tmp):
+def _make_wrap_matrix(L_kernel, n_boundary):
     """ Make the matrices for the wrapping correction
 
     :param L_kernel: the kernel for the laplace operator
@@ -305,32 +323,11 @@ def _make_wrap_matrix(L_kernel, n_boundary, tmp):
 
     # define a single point source at (0,0,0) and compute the (wrapped) convolution
     # with the forward kernel (L+1)
-    tmp[-1, -1, -1] = 1.0
+    kernel_section = L_kernel.real
 
-    torch.fft.fftn(tmp, out=tmp)
-    tmp.mul_(L_kernel)
-    torch.fft.ifftn(tmp, out=tmp)
-
-    Vwrap = []
-    norm2 = 0.0  # sum of the squared norms of the matrices
-    for dim in range(3):
-        selection = [0, 0, 0]
-        selection[dim] = slice(None)
-        kernel_section = tmp[selection].real
-        if kernel_section.numel() < n_boundary:  # happens for 1D or 2D simulations
-            Vwrap.append(None)
-            continue
-
-        # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
-        wrap_matrix = torch.zeros((n_boundary, n_boundary), dtype=kernel_section.dtype, device=kernel_section.device)
-        for r in range(n_boundary):
-            size = r + 1
-            wrap_matrix[r, :] = kernel_section[n_boundary - size:2 * n_boundary - size]
-        Vwrap.append(wrap_matrix)
-        norm2 += torch.linalg.norm(wrap_matrix, ord=2).item() ** 2
-
-    # compute the norm of Vwrap. Then add the norms of all matrices (in rms sense, because the matrices operate on different parts of the data)
-    # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
-    Vwrap_norm = np.sqrt(2.0 * norm2)
-
-    return Vwrap, Vwrap_norm
+    # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
+    wrap_matrix = torch.zeros((n_boundary, n_boundary), dtype=kernel_section.dtype, device=kernel_section.device)
+    for r in range(n_boundary):
+        size = r + 1
+        wrap_matrix[r, :] = kernel_section[n_boundary - size:2 * n_boundary - size]
+    return wrap_matrix

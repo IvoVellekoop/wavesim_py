@@ -4,6 +4,8 @@ from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
 from torch import tensor
 from . import allclose
+import matplotlib.pyplot as plt
+import numpy as np
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
 
@@ -25,9 +27,9 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
 def construct_source(n_size):
     """ Construct a sparse-matrix source with some points at the corners and in the center"""
     locations = tensor([
-        [n_size[0] // 2, 0, n_size[0] - 1],
+        [n_size[0] // 2, 0, 0],
         [n_size[1] // 2, 0, 0],
-        [n_size[2] // 2, 0, 0]])
+        [n_size[2] // 2, 0, n_size[2] - 1]])
 
     return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=dtype)
 
@@ -100,7 +102,6 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
                 domain.set(0, x)
                 domain.set(1, y)
                 domain.mix(alpha, 0, beta, 1, out_slot)
-                print(f"alpha {alpha}, beta{beta}, slot{out_slot}")
                 assert allclose(domain.get(out_slot), alpha * x + beta * y)
 
 
@@ -166,11 +167,12 @@ def test_wrapped_propagator():
     up to the difference in scaling factor.
     """
     n_size = (128, 100, 93)
-    domain_single = construct_domain(n_size, n_domains=None, n_boundary=8, periodic=(True, False, True))
-    domain_multi = construct_domain(n_size, n_domains=(3, 3, 3), n_boundary=8, periodic=(False, False, False))
+    domain_single = construct_domain(n_size, n_domains=None, n_boundary=1, periodic=(True, True, True))
+    domain_multi = construct_domain(n_size, n_domains=(2, 1, 1), n_boundary=1, periodic=(True, True, True))
     source = construct_source(n_size)
 
-    for domain in [domain_single, domain_multi]:
+    x = [None, None]
+    for i, domain in enumerate([domain_single, domain_multi]):
         V = 0
         L1 = 1
         domain.clear(0)
@@ -178,8 +180,60 @@ def test_wrapped_propagator():
         domain.add_source(0)
         domain.inverse_propagator(0, L1)  # (L+1) y
         domain.medium(0, V)  # (1-V) y
-        domain.mix(1.0, L1, -1.0, V, 0)  # (L+V) y
+        #        domain.mix(1.0, L1, -1.0, V, 0)  # (L+V) y
+        x[i] = domain.get(0)
+        x[i] = x[i] - source.to(device)
+        x[i] = x[i] / domain.scale
+        x[i] = x[i].cpu().numpy()
 
-    x_single = domain_single.get(0)
-    x_multi = domain_multi.get(0)
-    assert allclose(x_single, x_multi)
+    fig, axes = plt.subplots(2)
+    axes[0].imshow(np.log(np.abs(x[0][:, :, 0])))
+    axes[1].imshow(np.log(np.abs(x[1][:, :, 0])))
+    plt.show()
+    assert allclose(x[0], x[1])
+
+
+def test_basic_wrapping():
+    """Simple test if the wrapping correction is applied at the correct position.
+
+    Constructs a 1-D domain and splits it in two. A source is placed at the right edge of the left domain.
+    """
+    n_size = (10, 1, 1)
+    n_boundary = 2
+    source = torch.sparse_coo_tensor(tensor([[(n_size[0] - 1) // 2, 0, 0]]).T, tensor([1.0]), n_size, dtype=dtype)
+    domain = MultiDomain(refractive_index=torch.ones(n_size, dtype=dtype), pixel_size=0.25, n_domains=(2, 1, 1),
+                         n_boundary=n_boundary, periodic=(False, True, True))
+    domain.clear(0)
+    domain.set_source(source)
+    domain.add_source(0)
+    left = torch.squeeze(domain.domains[0, 0, 0].get(0))
+    right = torch.squeeze(domain.domains[1, 0, 0].get(0))
+    total = torch.squeeze(domain.get(0))
+    assert allclose(torch.concat([left, right]), total)
+    assert torch.all(right == 0.0)
+    assert torch.all(left[:-2] == 0.0)
+    assert left[-1] != 0.0
+
+    domain.medium(0, 1)
+
+    # periodic in 2nd and 3rd dimension: no edges
+    left_edges = domain.domains[0, 0, 0].edges
+    right_edges = domain.domains[1, 0, 0].edges
+    for edge in range(2, 6):
+        assert left_edges[edge] is None
+        assert right_edges[edge] is None
+
+    # right domain should have zero edge corrections (since domain is empty)
+    assert torch.all(right_edges[0] == 0.0)
+    assert torch.all(right_edges[1] == 0.0)
+
+    # left domain should have wrapping correction at the right edge
+    # and nothing at the left edge
+    assert torch.all(left_edges[0] == 0.0)
+    assert left_edges[1].abs().max() > 1e-3
+
+    # after applying the correction, the first n_boundary elements
+    # of the left domain should be non-zero (wrapping correction)
+    # and the first n_boundary elements of the right domain should be non-zero
+    total2 = torch.squeeze(domain.get(1))
+    assert allclose(total2.real[0:n_boundary], -total2.real[n_size[0] // 2:n_size[0] // 2 + n_boundary])

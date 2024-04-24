@@ -79,10 +79,12 @@ class Domain(metaclass=ABCMeta):
     def coordinates_f(self, dim):
         """Returns the Fourier-space coordinates along the specified dimension"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device)).reshape(
+        return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device,
+                                                 dtype=torch.float64)).reshape(
             shapes[dim])
 
     def coordinates(self, dim):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        return (torch.arange(self.shape[dim], device=self.device) * self.pixel_size).reshape(shapes[dim])
+        return (torch.arange(self.shape[dim], device=self.device, dtype=torch.float64) * self.pixel_size).reshape(
+            shapes[dim])

@@ -162,10 +162,25 @@ class HelmholtzDomain(Domain):
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """Mixes two data arrays and stores the result in the specified slot"""
-        # todo: optimize for cases where weight_a=1.0 or weight_b= 1.0
-        #   and for weight_a+weight_b = 1.0 (lerp)
-        torch.mul(self._x[slot_a], weight_a, out=self._x[slot_out])
-        torch.add(self._x[slot_out], self._x[slot_b], alpha=weight_b, out=self._x[slot_out])
+        a = self._x[slot_a]
+        b = self._x[slot_b]
+        out = self._x[slot_out]
+        if weight_a == 1.0:
+            torch.add(a, b, alpha=weight_b, out=out)
+        elif weight_a == 0.0:
+            torch.mul(b, weight_b, out=out)
+        elif weight_b == 1.0:
+            torch.add(b, a, alpha=weight_a, out=out)
+        elif weight_b == 0.0:
+            torch.mul(a, weight_a, out=out)
+        elif weight_a + weight_b == 1.0:
+            torch.lerp(a, b, weight_b, out=out)
+        elif slot_a == slot_out:
+            a.mul_(weight_a)
+            a.add_(b, alpha=weight_b)
+        else:
+            torch.mul(b, weight_b, out=out)
+            out.add_(a, alpha=weight_a)
 
     def propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1)^-1 x.

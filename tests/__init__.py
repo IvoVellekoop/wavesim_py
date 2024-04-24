@@ -8,7 +8,7 @@ def allclose(a, b):
     if not torch.is_tensor(b):
         b = tensor(b, dtype=a.dtype)
     if a.dtype != b.dtype:
-        a = a.astype(b.dtype)
+        a = a.type(b.dtype)
     if a.device != b.device:
         a = a.to('cpu')
         b = b.to('cpu')
@@ -22,4 +22,9 @@ def allclose(a, b):
     # error should be within 100 ULPs.
     # This corresponds to a relative error of 1e-5 for float32 and 1e-12 for float64
     # (we usually do quite some back-and-forth ffts, which may cause errors to accumulate)
-    return torch.allclose(a, b, atol=100 * ulp)
+    if torch.allclose(a, b, atol=100 * ulp):
+        return True
+    else:
+        abs_err = (a - b).abs().max()
+        print(f"absolute error {abs_err} = {abs_err / ulp} ulp")
+        return False

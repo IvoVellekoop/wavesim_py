@@ -15,17 +15,24 @@ class MultiDomain(Domain):
                  pixel_size: float,
                  periodic: tuple[bool, bool, bool],
                  n_domains: tuple[int, int, int] = (1, 1, 1),
-                 n_boundary: int = 8):
+                 n_boundary: int = 8,
+                 device: str = None):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
-        :param refractive_index: Refractive index distribution, must be 3-d.
-        :param pixel_size: Grid spacing in wavelengths.
-        :param periodic: Indicates for each dimension whether the simulation is periodic or not.
-            For periodic dimensions, the field is wrapped around the domain.
-        :param n_domains: number of domains to split the simulation into.
-            If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones.
-            In the future, the domain size may be adjusted to have an efficient fourier transform.
-            Default is (1,1,1), no domain decomposition.
-        :param n_boundary: Number of points used in the wrapping and domain transfer correction. Default is 8.
+
+        Arguments:
+            refractive_index: Refractive index distribution, must be 3-d.
+            pixel_size: Grid spacing in wavelengths.
+            periodic: Indicates for each dimension whether the simulation is periodic or not.
+                periodic dimensions, the field is wrapped around the domain.
+            n_domains: number of domains to split the simulation into.
+                the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones.
+                the future, the domain size may be adjusted to have an efficient fourier transform.
+                is (1,1,1), no domain decomposition.
+            n_boundary: Number of points used in the wrapping and domain transfer correction. Default is 8.
+            device: 'cpu' to use the cpu, 'cuda' to distribute the simulation over all available cuda devices, 'cuda:x'
+                to use a specific cuda device, a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the simulation over these devices
+                in a round-robin fashion, or None, which is equivalent to 'cuda' if cuda devices are available, and 'cpu' if they are not.
+                todo: implement
         """
 
         # Takes the input parameters and returns these in the appropriate format, with more parameters for setting up
@@ -46,7 +53,7 @@ class MultiDomain(Domain):
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
         super().__init__(pixel_size, refractive_index.shape, torch.device(devices[0]))
         self.periodic = np.array(periodic)
-       
+
         # compute domain boundaries in each dimension
         if any([(n_boundary > self.shape[i] / n_domains[i] // 2) and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size")
@@ -56,7 +63,7 @@ class MultiDomain(Domain):
         # distribute the refractive index map over the subdomains.
         ri_domains = partition(refractive_index, self.n_domains)
         for domain_index, ri_domain in enumerate(ri_domains.flat):
-            ri_domain = torch.tensor(ri_domain, dtype=torch.complex64, device=devices[domain_index % len(devices)])
+            ri_domain = torch.tensor(ri_domain, device=devices[domain_index % len(devices)])
             self.domains.flat[domain_index] = HelmholtzDomain(refractive_index=ri_domain, pixel_size=pixel_size,
                                                               n_boundary=n_boundary, periodic=periodic,
                                                               stand_alone=False)

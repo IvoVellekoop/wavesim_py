@@ -148,20 +148,24 @@ class MultiDomain(Domain):
         # the opposite side of the domain to compensate for the wrapping.
         # also, we add each correction to the opposite side of the neighbouring domain
         for idx, domain in enumerate(self.domains.flat):
-            x0, x1, x2 = np.unravel_index(idx, self.domains.shape)
+            x = np.unravel_index(idx, self.domains.shape)
             # for the wrap corrections, take the corrections for this domain and swap them
-            wrap_corrections = domain_edges[x0, x1, x2, (1, 0, 3, 2, 5, 4)]
+            wrap_corrections = domain_edges[*x, (1, 0, 3, 2, 5, 4)]
 
-            # for the transfer corrections, take the corrections for this domain and swap them
-            transfer_corrections = [
-                domain_edges[x0 - 1, x1, x2, 1] if x0 > 0 else None,
-                domain_edges[x0 + 1, x1, x2, 0] if x0 < self.domains.shape[0] - 1 else None,
-                domain_edges[x0, x1 - 1, x2, 3] if x1 > 0 else None,
-                domain_edges[x0, x1 + 1, x2, 2] if x1 < self.domains.shape[1] - 1 else None,
-                domain_edges[x0, x1, x2 - 1, 5] if x2 > 0 else None,
-                domain_edges[x0, x1, x2 + 1, 4] if x2 < self.domains.shape[2] - 1 else None
-            ]
+            # for the transfer corrections, take the corrections from the neighbors
+            def get_neighbor(edge):
+                dim = edge // 2
+                offset = -1 if edge % 2 == 0 else 1
+                x_neighbor = np.array(x)
+                x_neighbor[dim] += offset
+                if self.periodic[dim]:
+                    x_neighbor = np.mod(x_neighbor, self.domains.shape)
+                else:
+                    if x_neighbor[dim] < 0 or x_neighbor[dim] >= self.domains.shape[dim]:
+                        return None
+                return domain_edges[*tuple(x_neighbor), edge - offset]
 
+            transfer_corrections = [get_neighbor(edge) for edge in range(6)]
             domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):

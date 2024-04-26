@@ -2,7 +2,14 @@ import torch
 from torch import tensor
 
 
-def allclose(a, b):
+def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
+    """Check if two tensors are close to each other.
+
+    Condition: |a-b| <= atol + rtol * maximum(|b|,|a|) + ulptol * ulp
+    Where ulp is the size of the smallest representable difference between two numbers of magnitude ~max(|b[...]|)
+    """
+
+    # make sure that a and b are tensors of the same dtype and device
     if not torch.is_tensor(a):
         a = tensor(a, dtype=b.dtype)
     if not torch.is_tensor(b):
@@ -16,15 +23,16 @@ def allclose(a, b):
     b = b.to_dense()
 
     # compute the size of a single ULP
-    exponent = torch.max(a.abs().log2().ceil()).item()
-    ulp = torch.finfo(a.dtype).eps * 2 ** exponent
+    ab_max = torch.maximum(a.abs(), b.abs())
+    exponent = ab_max.max().log2().ceil().item()
+    ulp = torch.finfo(b.dtype).eps * 2 ** exponent
+    tolerance = atol + rtol * ab_max + ulptol * ulp
+    diff = (a - b).abs()
 
-    # error should be within 100 ULPs.
-    # This corresponds to a relative error of 1e-5 for float32 and 1e-12 for float64
-    # (we usually do quite some back-and-forth ffts, which may cause errors to accumulate)
-    if torch.allclose(a, b, atol=100 * ulp):
+    if (diff - tolerance).max() <= 0.0:
         return True
     else:
-        abs_err = (a - b).abs().max()
-        print(f"absolute error {abs_err} = {abs_err / ulp} ulp")
+        abs_err = diff.max().item()
+        rel_err = (diff / ab_max).max()
+        print(f"\nabsolute error {abs_err} = {abs_err / ulp} ulp\nrelative error {rel_err}")
         return False

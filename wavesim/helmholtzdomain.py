@@ -290,22 +290,24 @@ class HelmholtzDomain(Domain):
         return self.edges
 
     def apply_corrections(self, wrap_corrections, transfer_corrections, slot: int):
-        """Apply the wrapping/transfer corrections computed from compute_corrections()
+        """Apply  -1·wrapping/transfer corrections
 
         Transfer corrections correspond to a contribution from neighboring domains. They are added to the current domain.
         Wrap corrections correct for the periodicity of the fft. They are subtracted from the domain
+        In this case, there is an additional factor of -1 because this function is called from `medium`, which applies 1-V instead of V.
+        Therefore, transfer corrections are now subtracted, and wrap corrections are added.
 
         :param slot: slot index for the data to which the corrections are applied. Operation is always in-place
+        :param wrap_corrections: list of 6 corrections for wrap-around (may contain None for periodic boundary)
         :param transfer_corrections: list of 6 corrections coming from neighboring segments (may contain None for end of domain)
-        :param transfer_corrections: list of 6 corrections for wrap-around (may contain None for periodic boundary)
         """
         for edge in range(6):
             if wrap_corrections[edge] is not None and transfer_corrections[edge] is None:
-                self._x[slot][self.edge_slices[edge]] -= wrap_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge]
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is None:
-                self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] -= transfer_corrections[edge]
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is not None:
-                self._x[slot][self.edge_slices[edge]] += transfer_corrections[edge] - wrap_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge] - transfer_corrections[edge]
             else:
                 pass
 

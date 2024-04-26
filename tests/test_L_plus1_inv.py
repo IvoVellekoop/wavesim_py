@@ -15,6 +15,7 @@ dtype = torch.complex128  # torch.complex64
 
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
     """ Construct a domain or multi-domain"""
+    torch.manual_seed(12345)
     n = torch.rand(n_size, dtype=dtype, device=device) + 1.0  # random refractive index between 1 and 2
     n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))
     if n_domains is None:  # single domain
@@ -159,40 +160,6 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
         assert allclose(result, correct_result)
 
 
-def test_wrapped_propagator():
-    """Tests the inverse propagator L+1 with wrapping corrections
-
-    This test compares the situation of a single large domain to that of a multi-domain.
-    If the wrapping and transfer corrections are implemented correctly, the results should be the same
-    up to the difference in scaling factor.
-    """
-    n_size = (128, 100, 93)
-    domain_single = construct_domain(n_size, n_domains=None, n_boundary=1, periodic=(True, True, True))
-    domain_multi = construct_domain(n_size, n_domains=(2, 1, 1), n_boundary=1, periodic=(True, True, True))
-    source = construct_source(n_size)
-
-    x = [None, None]
-    for i, domain in enumerate([domain_single, domain_multi]):
-        V = 0
-        L1 = 1
-        domain.clear(0)
-        domain.set_source(source)
-        domain.add_source(0)
-        domain.inverse_propagator(0, L1)  # (L+1) y
-        domain.medium(0, V)  # (1-V) y
-        #        domain.mix(1.0, L1, -1.0, V, 0)  # (L+V) y
-        x[i] = domain.get(0)
-        x[i] = x[i] - source.to(device)
-        x[i] = x[i] / domain.scale
-        x[i] = x[i].cpu().numpy()
-
-    fig, axes = plt.subplots(2)
-    axes[0].imshow(np.log(np.abs(x[0][:, :, 0])))
-    axes[1].imshow(np.log(np.abs(x[1][:, :, 0])))
-    plt.show()
-    assert allclose(x[0], x[1])
-
-
 def test_basic_wrapping():
     """Simple test if the wrapping correction is applied at the correct position.
 
@@ -237,3 +204,39 @@ def test_basic_wrapping():
     # and the first n_boundary elements of the right domain should be non-zero
     total2 = torch.squeeze(domain.get(1))
     assert allclose(total2.real[0:n_boundary], -total2.real[n_size[0] // 2:n_size[0] // 2 + n_boundary])
+
+
+def test_wrapped_propagator():
+    """Tests the inverse propagator L+1 with wrapping corrections
+
+    This test compares the situation of a single large domain to that of a multi-domain.
+    If the wrapping and transfer corrections are implemented correctly, the results should be the same
+    up to the difference in scaling factor.
+    """
+    # n_size = (128, 100, 93)
+    n_size = (3 * 32 * 1024, 1, 1)
+    n_boundary = 16
+    domain_single = construct_domain(n_size, n_domains=None, n_boundary=n_boundary, periodic=(True, True, True))
+    domain_multi = construct_domain(n_size, n_domains=(3, 1, 1), n_boundary=n_boundary, periodic=(True, True, True))
+    source = torch.sparse_coo_tensor(tensor([[0, 0, 0]]).T, tensor([1.0]), n_size, dtype=dtype)
+
+    x = [None, None]
+    for i, domain in enumerate([domain_single, domain_multi]):
+        # evaluate L+1-B = L + Vscat + wrapping correction for the multi-domain,
+        # and L+1-B = L + Vscat for the full domain
+        # Note that we need to compensate for scaling squared,
+        # because scaling affects both the source and operators L and B
+        B = 0
+        L1 = 1
+        domain.clear(0)
+        domain.set_source(source)
+        domain.add_source(0)
+        domain.inverse_propagator(0, L1)  # (L+1) y
+        domain.medium(0, B)  # (1-V) y
+        domain.mix(1.0, L1, -1.0, B, 0)  # (L+V) y
+        x[i] = domain.get(0) / domain.scale ** 2
+
+    # first non-compensated point
+    pos = domain_multi.domains[0].shape[0] - n_boundary - 1
+    atol = x[0][pos, 0, 0].abs()
+    assert allclose(x[0], x[1], atol=atol)

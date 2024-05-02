@@ -61,11 +61,13 @@ class MultiDomain(Domain):
         # distribute the refractive index map over the subdomains.
         ri_domains = partition(refractive_index, self.n_domains)
         subdomain_periodic = [periodic[i] and n_domains[i] == 1 for i in range(3)]
+        Vwrap = None
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, device=devices[domain_index % len(devices)])
             self.domains.flat[domain_index] = HelmholtzDomain(refractive_index=ri_domain, pixel_size=pixel_size,
                                                               n_boundary=n_boundary, periodic=subdomain_periodic,
-                                                              stand_alone=False)
+                                                              stand_alone=False, Vwrap=Vwrap)
+            Vwrap = self.domains.flat[domain_index].Vwrap  # re-use wrapping matrix
 
         # determine the optimal shift
         limits = np.array([domain.V_bounds for domain in self.domains.flat])
@@ -73,7 +75,7 @@ class MultiDomain(Domain):
         r_max = np.max(limits[:, 1])
         i_min = np.min(limits[:, 2])
         i_max = np.max(limits[:, 3])
-        center = 0.5 * (r_min + r_max) + 0.5j * (i_min + i_max)
+        center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
 
         # shift L and V to minimize norm of V
         Vscat_norm = 0.0
@@ -85,7 +87,7 @@ class MultiDomain(Domain):
         # compute the scaling factor
         # apply the scaling to compute the final form of all operators in the iteration
         self.shift = center
-        self.scale = 0.95j / (Vscat_norm + Vwrap_norm)
+        self.scale = -0.95j / (Vscat_norm + Vwrap_norm)
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
 
@@ -108,7 +110,7 @@ class MultiDomain(Domain):
         for domain in self.domains.flat:
             domain.clear(slot)
 
-    def get(self, slot: int, device=None):
+    def get(self, slot: int, copy=False, device=None):
         """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in one big array
 
          :param: device: device on which to store the data. Defaults to the primary device

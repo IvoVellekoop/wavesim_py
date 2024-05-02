@@ -22,6 +22,7 @@ class HelmholtzDomain(Domain):
                  n_boundary: int,
                  n_slots=2,
                  stand_alone=True,
+                 Vwrap=None,
                  ):
         """Construct a domain object with the given refractive index and allocate memory.
 
@@ -37,6 +38,7 @@ class HelmholtzDomain(Domain):
             periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.
             n_boundary: Number of pixels used for the boundary correction.
             n_slots: number of arrays used for storing the field and temporary data.
+            Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
 
             stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
                 refractive index of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
@@ -56,7 +58,7 @@ class HelmholtzDomain(Domain):
             raise ValueError(
                 f"refractive_index must be 3-dimensional and complex float32 or float64, not {refractive_index.dtype}.")
         if any([n_boundary > 0.5 * self.shape[i] and not periodic[i] for i in range(3)]):
-            raise ValueError(f"Domain boundary of {n_boundary} is too small for the given domain size {self.shape}")
+            raise ValueError(f"Domain boundary of {n_boundary} is too large for the given domain size {self.shape}")
 
         self._n_boundary = n_boundary
         self._Bscat = None
@@ -94,7 +96,7 @@ class HelmholtzDomain(Domain):
         # todo: convert to on-the-fly computation as in MATLAB code so that we don't need to store the kernel
         self.inverse_propagator_kernel = 0.0j
         for dim in range(3):
-            self.inverse_propagator_kernel = self.inverse_propagator_kernel - self.coordinates_f(dim) ** 2
+            self.inverse_propagator_kernel = self.inverse_propagator_kernel + self._laplace_kernel(dim)
         self.propagator_kernel = None  # will be set in initialize_scale
 
         # allocate storage for temporary data, re-use the memory we got for the raw scattering potential
@@ -111,13 +113,15 @@ class HelmholtzDomain(Domain):
 
         if stand_alone:
             # When in stand-alone mode, compute scaling factors now.
-            self.Vwrap = None
-            self.Vwrap_norm = 0.0
-            center = 0.5 * (r_min + r_max) + 0.5j * (i_min + i_max)
+            self.Vwrap = [None, None, None]
+            center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
-            self.initialize_scale(0.95j / V_norm)
+            self.initialize_scale(-0.95j / V_norm)
+        elif Vwrap is not None:
+            # Use the provided wrapping matrices. This is used to ensure all subdomains in a domain use the same wrapping matrix
+            self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
         else:
-            # compute the wrapping correction.
+            # Compute the wrapping correction matrices if none were provided
             # These matrices must be computed before initialize_scale, since they
             # affect the overall scaling.
             # place a point at -1,-1,-1 in slot 1 (which currently holds all zeros)
@@ -130,10 +134,11 @@ class HelmholtzDomain(Domain):
                 _make_wrap_matrix(self._x[1][-1, :, -1], n_boundary) if not self._periodic[1] else None,
                 _make_wrap_matrix(self._x[1][-1, -1, :], n_boundary) if not self._periodic[2] else None,
             ]
-            # compute the norm of Vwrap. Then add the norms of all matrices (in rms sense, because the matrices operate on different parts of the data)
-            # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
-            self.Vwrap_norm = np.sqrt(
-                2.0 * sum([torch.linalg.norm(W, ord=2).item() ** 2 for W in self.Vwrap if W is not None]))
+
+        # compute the norm of Vwrap. Then add the norms of all matrices (in rms sense, because the matrices operate on different parts of the data)
+        # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
+        self.Vwrap_norm = np.sqrt(
+            2.0 * sum([torch.linalg.norm(W, ord=2).item() ** 2 for W in self.Vwrap if W is not None]))
 
     ## Functions implementing the domain interface
     # add_source()
@@ -152,9 +157,14 @@ class HelmholtzDomain(Domain):
         """Clears the data in the specified slot"""
         self._x[slot].zero_()
 
-    def get(self, slot: int):
-        """Returns the data in the specified slot"""
-        return self._x[slot]
+    def get(self, slot: int, copy=False):
+        """Returns the data in the specified slot.
+
+        param: slot: slot from which to return the data
+        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible. Note that this data may be overwritten by the next call to domain.
+        """
+        data = self._x[slot]
+        return data.detach().clone() if copy else data
 
     def set(self, slot: int, data):
         """Copy the date into the specified slot"""
@@ -310,6 +320,26 @@ class HelmholtzDomain(Domain):
                 self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge] - transfer_corrections[edge]
             else:
                 pass
+
+    def _laplace_kernel(self, dim):
+        """Compute the Fourier-domain kernel for the Laplace operator in the given dimension"""
+
+        # original way (introduces wrapping artifacts in the kernel)
+        # return -self.coordinates_f(dim) ** 2
+
+        # new way: uses exact Laplace kernel in real space, and returns Fourier transform of that
+        x = self.coordinates(dim, 'periodic')
+        if len(x) == 1:
+            return tensor(0.0, device=self.device, dtype=torch.float64)
+
+        x = x * torch.pi / self.pixel_size
+        c = torch.cos(x)
+        s = torch.sin(x)
+        x_kernel = 2.0 * c / x ** 2 - 2.0 * s / x ** 3 + s / x
+        x_kernel[0] = 1.0 / 3.0  # remove singularity at x=0
+        x_kernel *= -torch.pi ** 2 / self.pixel_size ** 2
+        f_kernel = torch.fft.fftn(x_kernel)
+        return f_kernel.real
 
 
 def _make_wrap_matrix(L_kernel, n_boundary):

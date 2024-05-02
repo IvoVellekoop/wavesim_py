@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from collections import defaultdict
 from wavesim.multidomain import MultiDomain
-from anysim import domain_decomp_operators, map_domain, precon_iteration
+from anysim import domain_decomp_operators, map_domain, preconditioned_iteration
 from utilities import pad_boundaries_torch, max_abs_error, relative_error, squeeze_, max_relative_error
 import torch
 
@@ -132,7 +132,7 @@ def test_precon_iteration(n_size, n_domains):
     u_dict[patch] = u.to(base.devices[patch])
 
     for _ in range(iterations):
-        t_dict = precon_iteration(base, u_dict, ut_dict, s_dict)
+        t_dict = preconditioned_iteration(base, u_dict, ut_dict, s_dict)
         for patch in base.domains_iterator:
             u_dict[patch] = u_dict[patch] - (base.alpha * t_dict[patch])
     t1 = 0.
@@ -154,7 +154,7 @@ def test_precon_iteration(n_size, n_domains):
         u_dict2[patch2] = map_domain(u2.to(base2.devices[patch2]), restrict2, patch2)
 
     for _ in range(iterations):
-        t_dict2 = precon_iteration(base2, u_dict2, ut_dict2, s_dict2)
+        t_dict2 = preconditioned_iteration(base2, u_dict2, ut_dict2, s_dict2)
         for patch2 in base2.domains_iterator:
             u_dict2[patch2] = u_dict2[patch2] - (base2.alpha * t_dict2[patch2])
     t2 = 0.

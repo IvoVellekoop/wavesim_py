@@ -1,6 +1,9 @@
 import torch
 from torch import tensor
 
+device = "cuda"  # "cpu"  # "cuda:0"
+dtype = torch.complex64
+
 
 def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
     """Check if two tensors are close to each other.
@@ -36,3 +39,8 @@ def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
         rel_err = (diff / ab_max).max()
         print(f"\nabsolute error {abs_err} = {abs_err / ulp} ulp\nrelative error {rel_err}")
         return False
+
+
+def random_vector(n_size):
+    """Construct a random vector for testing operators"""
+    return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)

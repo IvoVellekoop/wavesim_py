@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from collections import defaultdict
 from wavesim.multidomain import MultiDomain
-from anysim import domain_decomp_operators, map_domain, precon_iteration
+from anysim import domain_decomp_operators, map_domain, preconditioned_iteration
 from utilities import full_matrix
 
 
@@ -24,7 +24,7 @@ def operator_checks(n_size, boundary_widths, n_domains, wrap_correction):
         ut_dict = u_dict.copy()
         for patch_ in base.domains_iterator:
             u_dict[patch_] = map_domain(x.to(base.devices[patch_]), restrict, patch_)
-        t_dict = precon_iteration(base, u_dict, ut_dict)
+        t_dict = preconditioned_iteration(base, u_dict, ut_dict)
         t = 0.
         for patch in base.domains_iterator:
             t += map_domain(t_dict[patch], extend, patch).cpu()

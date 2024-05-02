@@ -5,6 +5,14 @@ from abc import ABCMeta, abstractmethod
 
 
 class Domain(metaclass=ABCMeta):
+    """Base class for all simulation domains
+
+    This base class defines the interface for operations that are common for all simulation types, and for MultiDomains.
+    todo: the design using slots minimizes memory use, but it is a suboptimal design because it mixes mutable
+        and immutable state. This design should be revisited so that the Domain is immutable,
+        and the code that runs the algorithms performs the memory management.
+    """
+
     def __init__(self, pixel_size: float, shape, device):
         self.pixel_size = pixel_size
         self.scale = None
@@ -22,8 +30,12 @@ class Domain(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get(self, slot):
-        """Returns the data in the specified slot"""
+    def get(self, slot: int, copy=False):
+        """Returns the data in the specified slot.
+
+        param: slot: slot from which to return the data
+        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible. Note that this data may be overwritten by the next call to domain.
+        """
         pass
 
     @abstractmethod
@@ -83,8 +95,16 @@ class Domain(metaclass=ABCMeta):
                                                  dtype=torch.float64)).reshape(
             shapes[dim])
 
-    def coordinates(self, dim):
+    def coordinates(self, dim, type: str = 'linear'):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        return (torch.arange(self.shape[dim], device=self.device, dtype=torch.float64) * self.pixel_size).reshape(
-            shapes[dim])
+        x = torch.arange(self.shape[dim], device=self.device, dtype=torch.float64) * self.pixel_size
+        if type == 'periodic':
+            x -= self.pixel_size * (self.shape[dim] // 2)
+            x = torch.fft.ifftshift(x)  # todo: or fftshift?
+        elif type == 'centered':
+            x -= self.pixel_size * (self.shape[dim] // 2)
+        else:
+            raise ValueError(f"Unknown type {type}")
+
+        return x.reshape(shapes[dim])

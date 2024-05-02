@@ -3,14 +3,11 @@ from wavesim.multidomain import MultiDomain
 from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
 from torch import tensor
-from . import allclose
+from . import allclose, random_vector, device, dtype
 import matplotlib.pyplot as plt
 import numpy as np
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
-
-device = "cuda"  # "cpu"  # "cuda:0"
-dtype = torch.complex128  # torch.complex64
 
 
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
@@ -33,11 +30,6 @@ def construct_source(n_size):
         [n_size[2] // 2, 0, n_size[2] - 1]])
 
     return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=dtype)
-
-
-def random_vector(n_size):
-    """Construct a random vector for testing operators"""
-    return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])

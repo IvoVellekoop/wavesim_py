@@ -303,19 +303,21 @@ def boundary_(x):
 
 
 # Used in tests
-def full_matrix(operator, d):
+def full_matrix(operator):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) 
-    :param operator: Operator to convert to a matrix
-    :param d: Dimensions of the operator
-    :return: Matrix representation of the operator """
-    nf = np.prod(d)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    m = torch.zeros(*(nf, nf), dtype=torch.complex64, device=device)
-    b = torch.zeros(tuple(d), dtype=torch.complex64, device=device)
-    b.view(-1)[0] = 1
+    :param operator: Operator to convert to a matrix. This function must be able to accept a 0 scalar, and return a vector of the size and data type of the domain.
+    """
+    y = operator(0.0)
+    n_size = y.shape
+    nf = np.prod(n_size)
+    M = torch.zeros((nf, nf), dtype=y.dtype, device=y.device)
+    b = torch.zeros(n_size, dtype=y.dtype, device=y.device)
     for i in range(nf):
-        m[:, i] = torch.ravel(operator(torch.roll(b, i)).to(device))
-    return m.cpu().numpy()
+        b.view(-1)[i] = 1
+        M[:, i] = torch.ravel(operator(b))
+        b.view(-1)[i] = 0
+
+    return M
 
 
 # Metrics

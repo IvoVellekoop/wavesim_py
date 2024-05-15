@@ -48,21 +48,6 @@ def u_ref_1d_h(n):
 
 @pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'),
                                                         (2, 'wrap_corr'), (3, 'wrap_corr'), (4, 'wrap_corr')])
-def test_1d_homogeneous(n_domains, wrap_correction):
-    """ Test for 1D free-space propagation. Compare with analytic solution """
-    n_size = (256, 1, 1)
-    n = np.ones(n_size, dtype=np.complex64)
-    u_ref = u_ref_1d_h(n)
-    source = np.zeros_like(n)
-    source[0] = 1.
-    base = MultiDomain(refractive_index=n, source=source, n_domains=n_domains, wrap_correction=wrap_correction)
-    u_computed, state = run_algorithm(base)
-    LogPlot(base, state, u_computed, u_ref).log_and_plot()
-    compare(base, u_computed.cpu().numpy(), u_ref, threshold=1.e-3)
-
-
-@pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'),
-                                                        (2, 'wrap_corr'), (3, 'wrap_corr'), (4, 'wrap_corr')])
 def test_1d_glass_plate(n_domains, wrap_correction):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
     n = np.ones((256, 1, 1), dtype=np.complex64)

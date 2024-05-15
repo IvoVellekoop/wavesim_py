@@ -46,7 +46,11 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
 
 @pytest.mark.parametrize("params", parameters)
 def test_operators(params):
-    """ Check that operator A = L + 1 - B  """
+    """ Check that operator definitions are consistent:
+        - forward = inverse_propagetor - medium: A= L + 1 - B
+        - preconditioned_operator = preconditioned(operator)
+        - richardson = x + α (Γ⁻¹b - Γ⁻¹A x)
+    """
     domain = construct_domain(**params)
     x = random_vector(domain.shape)
     B = domain_operator(domain, 'medium')
@@ -59,12 +63,34 @@ def test_operators(params):
     ΓA = domain_operator(domain, 'preconditioned_operator')
     Γy1 = Γ(y)
     Γy2 = ΓA(x)
+
+    α = 0.1
+    b = random_vector(domain.shape)
+    Γb = Γ(b)
+    domain.set_source(b)
+    M = domain_operator(domain, 'richardson', alpha=α)
+    M0 = M(0)
+    assert allclose(M0, α * Γb * domain.scale)  # todo: make domain.scale part of Γ
+
+    Mx = M(x)
+    residual = Γb * domain.scale - ΓA(x)
+    assert allclose(Mx, x + α * residual)
+
     assert allclose(Γy1, Γy2)
 
 
 @pytest.mark.parametrize("params", parameters)
 def test_accretivity(params):
-    """ Check that operator A = L + V is accretive, i.e., has a non-negative real part """
+    """ Checks norm and lower bound of real part for various operators
+
+     B (medium) should have real part between -0.05 and 1.0 (if we don't put the absorption in V0. If we do, the upper limit may be 1.95)
+        The operator B-1 should have a norm of less than 0.95
+
+    L + 1 (inverse propagator) should be accretive with a real part of at least 1.0
+    (L+1)^-1 (propagator) should be accretive with a real part of at least 0.0
+    A (forward) should be accretive with a real part of at least 0.0
+    ΓA (preconditioned_operator) should be such that 1-ΓA is a contraction (a norm of less than 1.0)
+     """
     domain = construct_domain(**params)
     assert_accretive(domain_operator(domain, 'medium'), 'B', real_min=0.05, real_max=1.0, norm_max=0.95,
                      norm_offset=1.0)
@@ -75,10 +101,10 @@ def test_accretivity(params):
 
 
 def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=None, norm_offset=None):
+    """Helper function to check if an operator is accretive, and to compute the norm around a given offset.
+    This function constructs a full matrix from the operator, so it only works if the domain is not too large.
+    """
     M = full_matrix(operator)
-    # plt.imshow(M.abs().log().cpu())
-    # plt.show()
-
     if norm_max is not None:
         if norm_offset is not None:
             M.diagonal().add_(-norm_offset)
@@ -99,21 +125,3 @@ def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=N
             acc = eigs.max()
             print(f'acc {acc:.2e}')
             assert acc <= real_max, f'operator {name} has eigenvalues that are too large, max λ_(A+A*) = {acc} > {real_max}'
-
-# @pytest.mark.parametrize("n_size, boundary_widths", param_n_boundaries)
-# @pytest.mark.parametrize("n_domains", [1])
-# @pytest.mark.parametrize("wrap_correction", [None, 'wrap_corr', 'L_omega'])
-# def test_1domain_wrap_options(accretivity):
-#     """ Check that operator A is accretive for 1-domain scenario for all wrapping correction options """
-#     # round(., 12) with numpy works. 3 with torch??
-#     assert round(accretivity, 3) >= 0, f'a is not accretive. {accretivity}'
-#
-#
-# @pytest.mark.parametrize("n_size, boundary_widths", param_n_boundaries)
-# @pytest.mark.parametrize("n_domains", [2])
-# @pytest.mark.parametrize("wrap_correction", ['wrap_corr'])
-# def test_ndomains(accretivity):
-#     """ Check that operator A is accretive when number of domains > 1
-#     (for n_domains > 1, wrap_correction = 'wrap_corr' by default)"""
-#     # round(., 12) with numpy works. 3 with torch??
-#     assert round(accretivity, 3) >= 0, f'a is not accretive. {accretivity}'

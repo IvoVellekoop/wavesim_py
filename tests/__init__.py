@@ -44,3 +44,10 @@ def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
 def random_vector(n_size):
     """Construct a random vector for testing operators"""
     return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)
+
+
+def random_refractive_index(n_size):
+    """Construct a random refractive index between 1 and 2, with a small positive imaginary part"""
+    n = random_vector(n_size) + 1.0
+    n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))
+    return n

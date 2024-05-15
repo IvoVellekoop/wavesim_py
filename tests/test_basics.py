@@ -3,7 +3,7 @@ from wavesim.multidomain import MultiDomain
 from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
 from torch import tensor
-from . import allclose, random_vector, device, dtype
+from . import allclose, random_vector, device, dtype, random_refractive_index
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -13,8 +13,7 @@ import numpy as np
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
     """ Construct a domain or multi-domain"""
     torch.manual_seed(12345)
-    n = torch.rand(n_size, dtype=dtype, device=device) + 1.0  # random refractive index between 1 and 2
-    n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))
+    n = random_refractive_index(n_size)
     if n_domains is None:  # single domain
         return HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
     else:

@@ -8,20 +8,17 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000):
     :return: u (computed field), state (object) """
 
     # Reset the field u to zero
-    domain.clear(0)
-
-    # Split the source into subdomains and store in the domain state
+    slot_x = 0
+    slot_tmp = 1
+    domain.clear(slot_x)
     domain.set_source(source)
-
-    # state = State(base)
-    residual_norm = 0.0
 
     for i in range(max_iterations):
         print(f'Iteration {i + 1}', end='\r')
-        residual_norm += preconditioned_iteration(domain, alpha, compute_norm2=True)
+        residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
 
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-    return domain.get(0)
+    return domain.get(slot_x)
 
 
 def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_tmp: int = 1, alpha=0.75,

@@ -104,6 +104,8 @@ class Domain(metaclass=ABCMeta):
             x = torch.fft.ifftshift(x)  # todo: or fftshift?
         elif type == 'centered':
             x -= self.pixel_size * (self.shape[dim] // 2)
+        elif type == 'linear':
+            pass
         else:
             raise ValueError(f"Unknown type {type}")
 

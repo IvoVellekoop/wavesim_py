@@ -56,13 +56,13 @@ def test_operators(params):
     B = domain_operator(domain, 'medium')
     L1 = domain_operator(domain, 'inverse_propagator')
     A = domain_operator(domain, 'forward')
-    y = A(x)
-    assert allclose(y, L1(x) - B(x))
+    Ax = A(x)
+    assert allclose(Ax, L1(x) - B(x))
 
     Γ = domain_operator(domain, 'preconditioner')
     ΓA = domain_operator(domain, 'preconditioned_operator')
-    Γy1 = Γ(y)
-    Γy2 = ΓA(x)
+    ΓAx = ΓA(x)
+    assert allclose(ΓAx, Γ(Ax))
 
     α = 0.1
     b = random_vector(domain.shape)
@@ -73,10 +73,8 @@ def test_operators(params):
     assert allclose(M0, α * Γb * domain.scale)  # todo: make domain.scale part of Γ
 
     Mx = M(x)
-    residual = Γb * domain.scale - ΓA(x)
+    residual = Γb * domain.scale - ΓAx
     assert allclose(Mx, x + α * residual)
-
-    assert allclose(Γy1, Γy2)
 
 
 @pytest.mark.parametrize("params", parameters)
@@ -92,6 +90,9 @@ def test_accretivity(params):
     ΓA (preconditioned_operator) should be such that 1-ΓA is a contraction (a norm of less than 1.0)
      """
     domain = construct_domain(**params)
+    if params['n_domains'] is not None:
+        print(domain.domains[0, 0, 0].Vwrap)
+    print(domain.scale)
     assert_accretive(domain_operator(domain, 'medium'), 'B', real_min=0.05, real_max=1.0, norm_max=0.95,
                      norm_offset=1.0)
     assert_accretive(domain_operator(domain, 'inverse_propagator'), 'L + 1', real_min=1.0)

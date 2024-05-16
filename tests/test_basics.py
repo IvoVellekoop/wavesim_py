@@ -148,7 +148,8 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
         result = domain.get(0)
         laplace_kernel = - (k[0] ** 2 + k[1] ** 2 + k[2] ** 2) / domain.pixel_size ** 2
         correct_result = (1.0 + domain.scale * (laplace_kernel + domain.shift)) * plane_wave  # L+1 =  scale·∇² + 1.
-        assert allclose(result, correct_result)
+        # note: the result is not exactly the same because wavesim is using the real-space kernel, and we compare to the Fourier-space kernel
+        assert allclose(result, correct_result, rtol=0.01)
 
 
 def test_basic_wrapping():

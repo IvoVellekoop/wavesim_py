@@ -105,8 +105,9 @@ class HelmholtzDomain(Domain):
 
         # compute n²·k₀² (the raw scattering potential)
         # also compute the bounding box holding the values of the scattering potential in the complex plane.
+        # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size
         refractive_index.mul_(refractive_index)
-        refractive_index.mul_((2.0 * torch.pi / self.pixel_size) ** 2)
+        refractive_index.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
         r_min, r_max = torch.aminmax(refractive_index.real)
         i_min, i_max = torch.aminmax(refractive_index.imag)
         self.V_bounds = tensor((r_min, r_max, i_min, i_max))
@@ -135,10 +136,9 @@ class HelmholtzDomain(Domain):
                 _make_wrap_matrix(self._x[1][-1, -1, :], n_boundary) if not self._periodic[2] else None,
             ]
 
-        # compute the norm of Vwrap. Then add the norms of all matrices (in rms sense, because the matrices operate on different parts of the data)
+        # compute the norm of Vwrap. Worst case: just add all norms
         # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
-        self.Vwrap_norm = np.sqrt(
-            2.0 * sum([torch.linalg.norm(W, ord=2).item() ** 2 for W in self.Vwrap if W is not None]))
+        self.Vwrap_norm = 2.0 * sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
 
     ## Functions implementing the domain interface
     # add_source()
@@ -329,14 +329,14 @@ class HelmholtzDomain(Domain):
 
         # new way: uses exact Laplace kernel in real space, and returns Fourier transform of that
         x = self.coordinates(dim, 'periodic')
-        if len(x) == 1:
+        if x.numel() == 1:
             return tensor(0.0, device=self.device, dtype=torch.float64)
 
         x = x * torch.pi / self.pixel_size
         c = torch.cos(x)
         s = torch.sin(x)
         x_kernel = 2.0 * c / x ** 2 - 2.0 * s / x ** 3 + s / x
-        x_kernel[0] = 1.0 / 3.0  # remove singularity at x=0
+        x_kernel[0, 0, 0] = 1.0 / 3.0  # remove singularity at x=0
         x_kernel *= -torch.pi ** 2 / self.pixel_size ** 2
         f_kernel = torch.fft.fftn(x_kernel)
         return f_kernel.real
@@ -355,7 +355,7 @@ def _make_wrap_matrix(L_kernel, n_boundary):
 
     # define a single point source at (0,0,0) and compute the (wrapped) convolution
     # with the forward kernel (L+1)
-    kernel_section = L_kernel.real
+    kernel_section = L_kernel.real.ravel()
 
     # construct a non-cyclic convolution matrix that computes the wrapping artifacts only
     wrap_matrix = torch.zeros((n_boundary, n_boundary), dtype=kernel_section.dtype, device=kernel_section.device)

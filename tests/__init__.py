@@ -47,7 +47,14 @@ def random_vector(n_size):
 
 
 def random_refractive_index(n_size):
-    """Construct a random refractive index between 1 and 2, with a small positive imaginary part"""
-    n = random_vector(n_size) + 1.0
-    n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))
+    """Construct a random refractive index between 1 and 2 with a small positive imaginary part
+
+    The sign of the imaginary part is such that the imaginary part of n² is positive
+    """
+    n = (1.0 + torch.rand(n_size, device=device, dtype=dtype) +
+         0.1j * torch.rand(n_size, device=device, dtype=dtype))
+
+    # make sure that the imaginary part of n² is positive
+    mask = (n ** 2).imag < 0
+    n.imag[mask] *= -1.0
     return n

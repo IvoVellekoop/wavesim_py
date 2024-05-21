@@ -21,7 +21,7 @@ class Domain(metaclass=ABCMeta):
         self.device = device
 
     @abstractmethod
-    def add_source(self, slot):
+    def add_source(self, slot, weight: float):
         pass
 
     @abstractmethod

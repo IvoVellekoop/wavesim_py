@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 from torch import tensor
+
+from utilities import is_zero
 from .domain import Domain
 
 
@@ -19,7 +21,7 @@ class HelmholtzDomain(Domain):
                  refractive_index,
                  pixel_size: float,
                  periodic: tuple[bool, bool, bool],
-                 n_boundary: int,
+                 n_boundary: int = 0,
                  n_slots=2,
                  stand_alone=True,
                  Vwrap=None,
@@ -149,9 +151,9 @@ class HelmholtzDomain(Domain):
     # mix()
     # propagator()
     # set_source()
-    def add_source(self, slot: int):
+    def add_source(self, slot: int, weight: float):
         if self._source is not None:
-            torch.add(self._x[slot], self._source, out=self._x[slot])
+            torch.add(self._x[slot], self._source, out=self._x[slot], alpha=weight)
 
     def clear(self, slot: int):
         """Clears the data in the specified slot"""
@@ -178,7 +180,8 @@ class HelmholtzDomain(Domain):
         Although it would be possible to use flatten(), this would create a
         copy when the array is not contiguous, causing a hidden performance hit.
         """
-        return torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1))
+        retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1))
+        return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
     def medium(self, slot_in: int, slot_out: int):
         """Applies the operator 1-Vscat.
@@ -232,7 +235,7 @@ class HelmholtzDomain(Domain):
         """Sets the source term for this domain.
         """
         self._source = None
-        if source is None:
+        if source is None or is_zero(source):
             return
 
         source = source.to(self.device)
@@ -241,9 +244,8 @@ class HelmholtzDomain(Domain):
             if len(source.indices()) == 0:
                 return
 
-        self._source = self.scale * source.to(self.device, self._x[0].dtype)
+        self._source = source.to(self.device, self._x[0].dtype)
 
-    ## Functions specific for subdomains
     def initialize_shift(self, shift) -> float:
         """Shifts the scattering potential and propagator kernel, then returns the norm of the shifted operator."""
         self.inverse_propagator_kernel.add_(shift)

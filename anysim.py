@@ -1,5 +1,5 @@
-import torch
 from wavesim.domain import Domain
+from utilities import is_zero
 
 
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000):
@@ -14,8 +14,8 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000):
     domain.set_source(source)
 
     for i in range(max_iterations):
-        print(f'Iteration {i + 1}', end='\r')
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
+        print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}')
 
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
     return domain.get(slot_x)
@@ -35,12 +35,12 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
         x -> x + α (y - A x)
 
     Preconditioned Richardson iteration:
-        x -> x + α (Γ⁻¹ y - Γ⁻¹ A x)
-            = x + α B (L+1)⁻¹ (y - A x)
-            = x + α B (Α+Β)⁻¹ (y - A x)
-            = x + α B (Α+Β)⁻¹ (y - [A+B] x + B x)
-            = x + α B [(Α+Β)⁻¹ (y + B x) - x]
-            = [x - α B x] + α B (Α+Β)⁻¹ (y + B x)
+        x -> x + α Γ⁻¹ (y - A x)
+            = x + α c B (L+1)⁻¹ (y - A x)
+            = x + α c B (L+1)⁻¹ (y - c⁻¹ [L+V] x)
+            = x + α c B (L+1)⁻¹ (y + c⁻¹ [1-V] x - c⁻¹ [L+1] x)
+            = x + α B [(L+1)⁻¹ (c y + B x) - x]
+            = [x - α B x] + α B (L+1)⁻¹ (c y + B x)
 
     :param: base: domain or multi-domain to operate on
     :param: alpha: relaxation parameter for the RIchardson iteration
@@ -51,17 +51,17 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
 
     domain.medium(slot_in, slot_tmp)  # [tmp] = B·x
     domain.mix(1.0, slot_in, -alpha, slot_tmp, slot_in)  # [in] = x - α B x
-    domain.add_source(slot_tmp)  # [tmp] = B·x + y
-    domain.propagator(slot_tmp, slot_tmp)  # [tmp] = (L+1)⁻¹ (B·x + y)
-    domain.medium(slot_tmp, slot_tmp)  # [tmp] = B (L+1)⁻¹ (B·x + y)
+    domain.add_source(slot_tmp, domain.scale)  # [tmp] = B·x + c·y
+    domain.propagator(slot_tmp, slot_tmp)  # [tmp] = (L+1)⁻¹ (B·x + c·y)
+    domain.medium(slot_tmp, slot_tmp)  # [tmp] = B (L+1)⁻¹ (B·x + c·y)
     # optionally compute norm of residual of preconditioned system
     retval = domain.inner_product(slot_tmp, slot_tmp) if compute_norm2 else 0.0
-    domain.mix(1.0, slot_in, alpha, slot_tmp, slot_out)  # [out] = x - α B x + α B (L+1)⁻¹ (B·x + y)
+    domain.mix(1.0, slot_in, alpha, slot_tmp, slot_out)  # [out] = x - α B x + α B (L+1)⁻¹ (B·x + c·y)
     return retval
 
 
 def forward(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates the forward operator A= L + 1 - B
+    """ Evaluates the forward operator A= c⁻¹ (L + V)
 
     Args:
         domain: Domain object
@@ -73,11 +73,25 @@ def forward(domain: Domain, slot_in: int, slot_out: int):
 
     domain.medium(slot_in, slot_out)  # (1-V) x
     domain.inverse_propagator(slot_in, slot_in)  # (L+1) x
-    domain.mix(1.0, slot_in, -1.0, slot_out, slot_out)  # (L+V) x
+    domain.mix(1.0 / domain.scale, slot_in, -1.0 / domain.scale, slot_out, slot_out)  # c⁻¹ (L+V) x
 
 
 def preconditioned_operator(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates the preconditioned operator B(L+1)^-1 c A = B - B (L+1)^-1 B
+    """ Evaluates the preconditioned operator Γ⁻¹ A
+
+    Where Γ⁻¹ = c B (L+1)⁻¹
+
+    Note: the scale factor c that makes A accretive and V a contraction is
+       included in the preconditioner. The Richardson step size is _not_.
+
+    Operator A is the original non-scaled operator, and we have (L+V) = c A
+    Then:
+
+        Γ⁻¹ A    = c B (L+1)⁻¹ A
+                    = c B (L+1)⁻¹ c⁻¹ (L+V)
+                    = B (L+1)⁻¹ (L+V)
+                    = B (L+1)⁻¹ ([L+1] - [1-V])
+                    = B - B (L+1)⁻¹ B
 
     Args:
         domain: Domain object
@@ -88,25 +102,26 @@ def preconditioned_operator(domain: Domain, slot_in: int, slot_out: int):
         raise ValueError("slot_in and slot_out must be different")
 
     domain.medium(slot_in, slot_in)  # B x
-    domain.propagator(slot_in, slot_out)  # (L+1)^-1 B x
-    domain.medium(slot_out, slot_out)  # B (L+1)^-1 B x
-    domain.mix(1.0, slot_in, -1.0, slot_out, slot_out)  # B - B (L+1)^-1 B x
+    domain.propagator(slot_in, slot_out)  # (L+1)⁻¹ B x
+    domain.medium(slot_out, slot_out)  # B (L+1)⁻¹ B x
+    domain.mix(1.0, slot_in, -1.0, slot_out, slot_out)  # B - B (L+1)⁻¹ B x
 
 
 def preconditioner(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates Γ^-1 = B(L+1)^-1
+    """ Evaluates Γ⁻¹ = c B(L+1)⁻¹
 
     Args:
         domain: Domain object
         slot_in: slot holding input x. This slot will be overwritten!
         slot_out: output slot that will receive A x
     """
-    domain.propagator(slot_in, slot_in)  # (L+1)^-1 x
-    domain.medium(slot_in, slot_out)  # B (L+1)^-1 x
+    domain.propagator(slot_in, slot_in)  # (L+1)⁻¹ x
+    domain.medium(slot_in, slot_out)  # B (L+1)⁻¹ x
+    domain.mix(0.0, slot_out, domain.scale, slot_out, slot_out)  # c B (L+1)⁻¹ x
 
 
 def domain_operator(domain: Domain, function: str, **kwargs):
-    """Constructs an operator that takes a field and returns the medium operator 1-V applied to it
+    """Constructs various operators by combining calls to 'medium', 'propagator', etc.
 
     todo: this is currently very inefficient because of the overhead of copying data to and from the device
     """
@@ -127,9 +142,7 @@ def domain_operator(domain: Domain, function: str, **kwargs):
     }[function]
 
     def operator_(x):
-        if isinstance(x, float) or isinstance(x, int):
-            if x != 0:
-                raise ValueError("Cannot set a field to a scalar to a field, only scalar 0.0 is supported")
+        if is_zero(x):
             domain.clear(0)
         else:
             domain.set(0, x)

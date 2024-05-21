@@ -2,10 +2,8 @@
 import pytest
 
 from anysim import run_algorithm, domain_operator
-from wavesim.multidomain import MultiDomain
 from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
-from torch import tensor
 from . import allclose, random_vector, device, dtype, random_refractive_index
 
 
@@ -13,30 +11,36 @@ def test_no_propagation():
     """Basic test where the L-component is zero
     By manually removing the laplacian, we are solving the equation (2 π n / λ)² x = y
     """
-    n_size = (10, 10, 10)
-    n = random_refractive_index(n_size)
-    domain = HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=(True, True, True), n_boundary=0)
-    y = random_vector(domain.shape)
+    n = random_refractive_index((2, 3, 4))
+    domain = HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=(True, True, True))
+    x = random_vector(domain.shape)
 
     # manually disable the propagator, and test if, indeed, we are solving the system (2 π n / λ)² x = y
     L1 = 1.0 + domain.shift * domain.scale
     domain.propagator_kernel = 1.0 / L1
     domain.inverse_propagator_kernel = L1
-    yy = domain_operator(domain, 'inverse_propagator')(y)
-    assert allclose(yy, y * L1)
-    assert allclose(domain_operator(domain, 'propagator')(yy), y)
+    k2 = (2 * torch.pi * n * domain.pixel_size) ** 2
+    B = (1.0 - (k2 - domain.shift) * domain.scale)
+    assert allclose(domain_operator(domain, 'inverse_propagator')(x), x * L1)
+    assert allclose(domain_operator(domain, 'propagator')(x), x / L1)
+    assert allclose(domain_operator(domain, 'medium')(x), B * x)
 
-    By = domain_operator(domain, 'medium')(y)
-    By_correct = (1.0 - ((2 * torch.pi * n * domain.pixel_size) ** 2 - domain.shift) * domain.scale) * y
-    assert allclose(By, By_correct)
+    y = domain_operator(domain, 'forward')(x)
+    assert allclose(y, k2 * x)
 
-    A = domain_operator(domain, 'forward')
-    nny = A(y)
-    assert allclose(nny, (2 * torch.pi * n * domain.pixel_size) ** 2 * y * domain.scale)
+    domain.set_source(y)
+    alpha = 0.75
+    M = domain_operator(domain, 'richardson', alpha=alpha)
+    x_wavesim = M(0)
+    assert allclose(x_wavesim, (domain.scale * alpha / L1) * B * y)
 
-    # todo: the algorithm currently diverges!!
+    for _ in range(500):
+        x_wavesim = M(x_wavesim)
+
+    assert allclose(x_wavesim, x)
+
     x_wavesim = run_algorithm(domain, y)
-    assert allclose(y * (domain.pixel_size / n / 2 / torch.pi) ** 2, x_wavesim)
+    assert allclose(x_wavesim, x)
 
 # @pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'),
 #                                                         (2, 'wrap_corr'), (3, 'wrap_corr'), (4, 'wrap_corr')])

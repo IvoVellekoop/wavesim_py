@@ -80,9 +80,9 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
     assert allclose(domain.get(0), 0.0)
     source = construct_source(n_size)
     domain.set_source(source)
-    domain.add_source(0)
-    domain.add_source(0)
-    assert allclose(domain.get(0), 2.0 * source * domain.scale)
+    domain.add_source(0, 0.9)
+    domain.add_source(0, 1.1)
+    assert allclose(domain.get(0), 2.0 * source)
     x[0, 0, 0] = 1
     y[0, 0, 0] = 2
     # test mixing: α x + β y
@@ -164,7 +164,7 @@ def test_basic_wrapping():
                          n_boundary=n_boundary, periodic=(False, True, True))
     domain.clear(0)
     domain.set_source(source)
-    domain.add_source(0)
+    domain.add_source(0, 1.0)
     left = torch.squeeze(domain.domains[0, 0, 0].get(0))
     right = torch.squeeze(domain.domains[1, 0, 0].get(0))
     total = torch.squeeze(domain.get(0))
@@ -222,11 +222,11 @@ def test_wrapped_propagator():
         L1 = 1
         domain.clear(0)
         domain.set_source(source)
-        domain.add_source(0)
+        domain.add_source(0, 1.0)
         domain.inverse_propagator(0, L1)  # (L+1) y
         domain.medium(0, B)  # (1-V) y
         domain.mix(1.0, L1, -1.0, B, 0)  # (L+V) y
-        x[i] = domain.get(0) / domain.scale ** 2
+        x[i] = domain.get(0) / domain.scale
 
     # first non-compensated point
     pos = domain_multi.domains[0].shape[0] - n_boundary - 1

@@ -57,7 +57,7 @@ def test_operators(params):
     L1 = domain_operator(domain, 'inverse_propagator')
     A = domain_operator(domain, 'forward')
     Ax = A(x)
-    assert allclose(Ax, L1(x) - B(x))
+    assert allclose(domain.scale * Ax, L1(x) - B(x))
 
     Γ = domain_operator(domain, 'preconditioner')
     ΓA = domain_operator(domain, 'preconditioned_operator')
@@ -69,12 +69,10 @@ def test_operators(params):
     Γb = Γ(b)
     domain.set_source(b)
     M = domain_operator(domain, 'richardson', alpha=α)
-    M0 = M(0)
-    assert allclose(M0, α * Γb * domain.scale)  # todo: make domain.scale part of Γ
+    assert allclose(M(0), α * Γb)
 
-    Mx = M(x)
-    residual = Γb * domain.scale - ΓAx
-    assert allclose(Mx, x + α * residual)
+    residual = Γb - ΓAx
+    assert allclose(M(x), x + α * residual)
 
 
 @pytest.mark.parametrize("params", parameters)
@@ -90,22 +88,24 @@ def test_accretivity(params):
     ΓA (preconditioned_operator) should be such that 1-ΓA is a contraction (a norm of less than 1.0)
      """
     domain = construct_domain(**params)
-    if params['n_domains'] is not None:
-        print(domain.domains[0, 0, 0].Vwrap)
-    print(domain.scale)
+    domain.set_source(0)
     assert_accretive(domain_operator(domain, 'medium'), 'B', real_min=0.05, real_max=1.0, norm_max=0.95,
                      norm_offset=1.0)
     assert_accretive(domain_operator(domain, 'inverse_propagator'), 'L + 1', real_min=1.0)
     assert_accretive(domain_operator(domain, 'propagator'), '(L + 1)^-1', real_min=0.0)
-    assert_accretive(domain_operator(domain, 'forward'), 'A', real_min=0.0)
     assert_accretive(domain_operator(domain, 'preconditioned_operator'), 'ΓA', norm_max=1.0, norm_offset=1.0)
+    assert_accretive(domain_operator(domain, 'richardson', alpha=0.75), '1- α ΓA', norm_max=1.0)
+    assert_accretive(domain_operator(domain, 'forward'), 'A', real_min=0.0, pre_factor=domain.scale)
 
 
-def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=None, norm_offset=None):
+def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=None, norm_offset=None, pre_factor=None):
     """Helper function to check if an operator is accretive, and to compute the norm around a given offset.
     This function constructs a full matrix from the operator, so it only works if the domain is not too large.
     """
     M = full_matrix(operator)
+    if pre_factor is not None:
+        M *= pre_factor
+
     if norm_max is not None:
         if norm_offset is not None:
             M.diagonal().add_(-norm_offset)

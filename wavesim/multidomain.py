@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import tensor
-from utilities import partition, combine, list_to_array
+from utilities import partition, combine, list_to_array, is_zero
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
 
@@ -100,10 +100,10 @@ class MultiDomain(Domain):
     # mix()
     # propagator()
     # set_source()
-    def add_source(self, slot: int):
+    def add_source(self, slot: int, weight: float):
         """ Add the source to the field in slot """
         for domain in self.domains.flat:
-            domain.add_source(slot)
+            domain.add_source(slot, weight)
 
     def clear(self, slot: int):
         """ Clear the field in the specified slot """
@@ -189,7 +189,9 @@ class MultiDomain(Domain):
 
     def set_source(self, source):
         """ Split the source into subdomains and store in the subdomain states """
-        for domain, source in zip(self.domains.flat, partition(source, self.n_domains).flat):
-            domain.set_source(source)
-
-    ## other functions (may become part of utilities?)
+        if source is None or is_zero(source):
+            for domain in self.domains.flat:
+                domain.set_source(None)
+        else:
+            for domain, source in zip(self.domains.flat, partition(source, self.n_domains).flat):
+                domain.set_source(source)

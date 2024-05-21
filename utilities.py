@@ -343,3 +343,18 @@ def relative_error(e, e_true):
     :param e_true: True field
     :return: Relative Error """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+
+
+def is_zero(x):
+    """ Check if x is zero
+
+    Some functions allow specifying 0 or 0.0 instead of a torch tensor, to indicate that the array should be cleared.
+    This function returns True if x is a scalar 0 or 0.0. It raises an error if x is a scalar that is not equal to 0 or 0.0,
+    and returns False otherwise.
+    """
+    if isinstance(x, float) or isinstance(x, int):
+        if x != 0:
+            raise ValueError("Cannot set a field to a scalar to a field, only scalar 0.0 is supported")
+        return True
+    else:
+        return False

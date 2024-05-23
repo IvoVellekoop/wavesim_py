@@ -186,7 +186,9 @@ class HelmholtzDomain(Domain):
     def medium(self, slot_in: int, slot_out: int):
         """Applies the operator 1-Vscat.
 
-        Note: does not apply the wrapping correction.
+        Note: does not apply the wrapping correction. When part of a multi-domain,
+        the wrapping correction is applied by the medium() function of the multi-domain object
+        and this function should not be called directly.
         """
         torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
 
@@ -296,7 +298,8 @@ class HelmholtzDomain(Domain):
             # moveaxis moves the non-contracted dimension to the correct position
             # todo: convert to an in-place operation using the 'out' parameter
             self.edges[edge] = torch.moveaxis(
-                torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ])), 0,
+                torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
+                                out=self.edges[edge]), 0,
                 dim)
 
         return self.edges

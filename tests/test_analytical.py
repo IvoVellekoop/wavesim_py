@@ -4,7 +4,7 @@ import pytest
 from anysim import run_algorithm, domain_operator
 from wavesim.helmholtzdomain import HelmholtzDomain
 import torch
-from . import allclose, random_vector, device, dtype, random_refractive_index
+from . import allclose, random_vector, random_refractive_index
 
 
 def test_no_propagation():
@@ -41,6 +41,23 @@ def test_no_propagation():
 
     x_wavesim = run_algorithm(domain, y)
     assert allclose(x_wavesim, x)
+
+
+def u_ref_1d_h(n):
+    """ Compute analytic solution for 1D case """
+    base_ = MultiDomain(refractive_index=n, setup_operators=False)
+
+    x = np.arange(0, base_.n_roi[0] * base_.pixel_size, base_.pixel_size, dtype=np.complex64)
+    x = np.pad(x, (64, 64), mode='constant')
+    h = base_.pixel_size
+    k = (1. * 2. * np.pi) / 1.
+    phi = k * x
+    u_theory = 1.0j * h / (2 * k) * np.exp(1.0j * phi) - h / (4 * np.pi * k) * (
+            np.exp(1.0j * phi) * (np.exp(1.0j * (k - np.pi / h) * x) - np.exp(1.0j * (k + np.pi / h) * x)) - np.exp(
+        -1.0j * phi) * (-np.exp(-1.0j * (k - np.pi / h) * x) + np.exp(-1.0j * (k + np.pi / h) * x)))
+    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
+    u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
+    return u_theory[64:-64]
 
 # @pytest.mark.parametrize("n_domains, wrap_correction", [(1, None), (1, 'wrap_corr'), (1, 'L_omega'),
 #                                                         (2, 'wrap_corr'), (3, 'wrap_corr'), (4, 'wrap_corr')])

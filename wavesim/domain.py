@@ -1,6 +1,4 @@
 import torch
-import numpy as np
-from torch import tensor
 from abc import ABCMeta, abstractmethod
 
 
@@ -57,8 +55,6 @@ class Domain(metaclass=ABCMeta):
     @abstractmethod
     def medium(self, slot_in, slot_out):
         """Applies the operator 1-Vscat.
-
-        Note: does not apply the wrapping correction.
         """
         pass
 

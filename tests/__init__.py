@@ -1,7 +1,6 @@
 import torch
-from torch import tensor
 
-device = "cuda"  # "cpu"  # "cuda:0"
+# device = "cuda"  # "cpu"  # "cuda:0"
 dtype = torch.complex64
 
 
@@ -14,9 +13,9 @@ def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
 
     # make sure that a and b are tensors of the same dtype and device
     if not torch.is_tensor(a):
-        a = tensor(a, dtype=b.dtype)
+        a = torch.tensor(a, dtype=b.dtype)
     if not torch.is_tensor(b):
-        b = tensor(b, dtype=a.dtype)
+        b = torch.tensor(b, dtype=a.dtype)
     if a.dtype != b.dtype:
         a = a.type(b.dtype)
     if a.device != b.device:
@@ -41,12 +40,12 @@ def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
         return False
 
 
-def random_vector(n_size):
+def random_vector(n_size, device='cuda', dtype=dtype):
     """Construct a random vector for testing operators"""
     return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)
 
 
-def random_refractive_index(n_size):
+def random_refractive_index(n_size, device='cuda', dtype=dtype):
     """Construct a random refractive index between 1 and 2 with a small positive imaginary part
 
     The sign of the imaginary part is such that the imaginary part of n² is positive

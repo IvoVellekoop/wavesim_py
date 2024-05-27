@@ -5,6 +5,9 @@ from utilities import is_zero
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000):
     """ AnySim update
     :param domain: Helmholtz base parameters
+    :param source: source field
+    :param alpha: relaxation parameter for the Richardson iteration
+    :param max_iterations: maximum number of iterations
     :return: u (computed field), state (object) """
 
     # Reset the field u to zero
@@ -28,8 +31,10 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
     Args:
         domain: Domain object
         slot_in: slot holding input x. This slot will be overwritten!
-        slot_tmp: slot for temporary storage. Cannot be equal to slot_in, may be equal to slot_out
         slot_out: output slot that will receive the result
+        slot_tmp: slot for temporary storage. Cannot be equal to slot_in, may be equal to slot_out
+        alpha: relaxation parameter for the Richardson iteration
+        compute_norm2: when True, returns the squared norm of the residual. Otherwise, returns 0.0
 
     Richardson iteration:
         x -> x + α (y - A x)
@@ -43,7 +48,7 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
             = [x - α B x] + α B (L+1)⁻¹ (c y + B x)
 
     :param: base: domain or multi-domain to operate on
-    :param: alpha: relaxation parameter for the RIchardson iteration
+    :param: alpha: relaxation parameter for the Richardson iteration
     :param: compute_norm2: when True, returns the squared norm of the residual. Otherwise, returns 0.0
     """
     if slot_tmp == slot_in:

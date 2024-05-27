@@ -1,7 +1,4 @@
 import torch
-import numpy as np
-from torch import tensor
-
 from utilities import is_zero
 from .domain import Domain
 
@@ -49,7 +46,7 @@ class HelmholtzDomain(Domain):
                 shift and scale factors.
 
          """
-        refractive_index = tensor(refractive_index)
+        refractive_index = torch.tensor(refractive_index)
         super().__init__(pixel_size, refractive_index.shape, refractive_index.device)
 
         # validate input arguments
@@ -112,7 +109,7 @@ class HelmholtzDomain(Domain):
         refractive_index.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
         r_min, r_max = torch.aminmax(refractive_index.real)
         i_min, i_max = torch.aminmax(refractive_index.imag)
-        self.V_bounds = tensor((r_min, r_max, i_min, i_max))
+        self.V_bounds = torch.tensor((r_min, r_max, i_min, i_max))
 
         if stand_alone:
             # When in stand-alone mode, compute scaling factors now.
@@ -180,7 +177,7 @@ class HelmholtzDomain(Domain):
         Although it would be possible to use flatten(), this would create a
         copy when the array is not contiguous, causing a hidden performance hit.
         """
-        retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1))
+        retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
     def medium(self, slot_in: int, slot_out: int):
@@ -322,7 +319,8 @@ class HelmholtzDomain(Domain):
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is None:
                 self._x[slot][self.edge_slices[edge]] -= transfer_corrections[edge]
             elif transfer_corrections[edge] is not None and wrap_corrections[edge] is not None:
-                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge] - transfer_corrections[edge]
+                self._x[slot][self.edge_slices[edge]] += wrap_corrections[edge] - transfer_corrections[edge].to(
+                    self.device)
             else:
                 pass
 
@@ -335,7 +333,7 @@ class HelmholtzDomain(Domain):
         # new way: uses exact Laplace kernel in real space, and returns Fourier transform of that
         x = self.coordinates(dim, 'periodic')
         if x.numel() == 1:
-            return tensor(0.0, device=self.device, dtype=torch.float64)
+            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
         x = x * torch.pi / self.pixel_size
         c = torch.cos(x)

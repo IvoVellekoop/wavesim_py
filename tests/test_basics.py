@@ -1,11 +1,8 @@
 import pytest
+import torch
 from wavesim.multidomain import MultiDomain
 from wavesim.helmholtzdomain import HelmholtzDomain
-import torch
-from torch import tensor
-from . import allclose, random_vector, device, dtype, random_refractive_index
-import matplotlib.pyplot as plt
-import numpy as np
+from . import allclose, random_vector, random_refractive_index, dtype
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
 
@@ -23,12 +20,12 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
 
 def construct_source(n_size):
     """ Construct a sparse-matrix source with some points at the corners and in the center"""
-    locations = tensor([
+    locations = torch.tensor([
         [n_size[0] // 2, 0, 0],
         [n_size[1] // 2, 0, 0],
         [n_size[2] // 2, 0, n_size[2] - 1]])
 
-    return torch.sparse_coo_tensor(locations, tensor([1, 1, 1]), n_size, dtype=dtype)
+    return torch.sparse_coo_tensor(locations, torch.tensor([1, 1, 1]), n_size, dtype=dtype)
 
 
 @pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
@@ -61,8 +58,8 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
                             2.0 * torch.pi / (n_size[dim] * domain.pixel_size))
 
     # construct a random vector for testing operators
-    x = random_vector(n_size)
-    y = random_vector(n_size)
+    x = random_vector(n_size, device=domain.device)
+    y = random_vector(n_size, device=domain.device)
 
     # perform some very basic checks
     # mainly, this tests if the partitioning and composition works correctly
@@ -134,15 +131,15 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
 
     # for the non-decomposed case, test if the propagator gives the correct value
     if n_domains is None:
-        n_size = tensor(n_size, dtype=torch.float64)
+        n_size = torch.tensor(n_size, dtype=torch.float64)
         # choose |k| <  Nyquist, make sure k is at exact grid point in Fourier space
-        k_relative = tensor((0.2, -0.15, 0.4), dtype=torch.float64)
+        k_relative = torch.tensor((0.2, -0.15, 0.4), dtype=torch.float64)
         k = 2 * torch.pi * torch.round(k_relative * n_size) / n_size  # in 1/pixels
         k[n_size == 1] = 0.0
         plane_wave = torch.exp(1j * (
-                k[0] * torch.arange(n_size[0], device=device).reshape(-1, 1, 1) +
-                k[1] * torch.arange(n_size[1], device=device).reshape(1, -1, 1) +
-                k[2] * torch.arange(n_size[2], device=device).reshape(1, 1, -1)))
+                k[0] * torch.arange(n_size[0], device=domain.device).reshape(-1, 1, 1) +
+                k[1] * torch.arange(n_size[1], device=domain.device).reshape(1, -1, 1) +
+                k[2] * torch.arange(n_size[2], device=domain.device).reshape(1, 1, -1)))
         domain.set(0, plane_wave)
         domain.inverse_propagator(0, 0)
         result = domain.get(0)
@@ -159,7 +156,8 @@ def test_basic_wrapping():
     """
     n_size = (10, 1, 1)
     n_boundary = 2
-    source = torch.sparse_coo_tensor(tensor([[(n_size[0] - 1) // 2, 0, 0]]).T, tensor([1.0]), n_size, dtype=dtype)
+    source = torch.sparse_coo_tensor(torch.tensor([[(n_size[0] - 1) // 2, 0, 0]]).T, torch.tensor([1.0]), n_size,
+                                     dtype=dtype)
     domain = MultiDomain(refractive_index=torch.ones(n_size, dtype=dtype), pixel_size=0.25, n_domains=(2, 1, 1),
                          n_boundary=n_boundary, periodic=(False, True, True))
     domain.clear(0)
@@ -168,7 +166,7 @@ def test_basic_wrapping():
     left = torch.squeeze(domain.domains[0, 0, 0].get(0))
     right = torch.squeeze(domain.domains[1, 0, 0].get(0))
     total = torch.squeeze(domain.get(0))
-    assert allclose(torch.concat([left, right]), total)
+    assert allclose(torch.concat([left.to(domain.device), right.to(domain.device)]), total)
     assert torch.all(right == 0.0)
     assert torch.all(left[:-2] == 0.0)
     assert left[-1] != 0.0
@@ -210,7 +208,7 @@ def test_wrapped_propagator():
     n_boundary = 16
     domain_single = construct_domain(n_size, n_domains=None, n_boundary=n_boundary, periodic=(True, True, True))
     domain_multi = construct_domain(n_size, n_domains=(3, 1, 1), n_boundary=n_boundary, periodic=(True, True, True))
-    source = torch.sparse_coo_tensor(tensor([[0, 0, 0]]).T, tensor([1.0]), n_size, dtype=dtype)
+    source = torch.sparse_coo_tensor(torch.tensor([[0, 0, 0]]).T, torch.tensor([1.0]), n_size, dtype=dtype)
 
     x = [None, None]
     for i, domain in enumerate([domain_single, domain_multi]):
@@ -230,5 +228,5 @@ def test_wrapped_propagator():
 
     # first non-compensated point
     pos = domain_multi.domains[0].shape[0] - n_boundary - 1
-    atol = x[0][pos, 0, 0].abs()
+    atol = x[0][pos, 0, 0].abs().item()
     assert allclose(x[0], x[1], atol=atol)

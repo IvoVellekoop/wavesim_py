@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch import tensor
 from utilities import partition, combine, list_to_array, is_zero
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
@@ -73,8 +72,8 @@ class MultiDomain(Domain):
         limits = np.array([domain.V_bounds for domain in self.domains.flat])
         r_min = np.min(limits[:, 0])
         r_max = np.max(limits[:, 1])
-        i_min = np.min(limits[:, 2])
-        i_max = np.max(limits[:, 3])
+        # i_min = np.min(limits[:, 2])
+        # i_max = np.max(limits[:, 3])
         center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
 
         # shift L and V to minimize norm of V

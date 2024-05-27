@@ -1,12 +1,10 @@
 import pytest
+import torch
 from anysim import domain_operator
 from utilities import full_matrix
-import torch
-from torch import tensor
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from . import random_vector, device, dtype, allclose
-import matplotlib.pyplot as plt
+from . import random_vector, allclose, dtype
 
 """ Performs checks on the operators represented as matrices (accretivity, norm). """
 
@@ -35,8 +33,8 @@ parameters = [
 def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True)):
     """ Construct a domain or multi-domain"""
     torch.manual_seed(12345)
-    n = torch.rand(n_size, dtype=dtype, device=device) + 1.0  # random refractive index between 1 and 2
-    n.imag = 0.1 * torch.maximum(n.imag, tensor(0.0))  # a positive imaginary part of n corresponds to absorption
+    n = torch.rand(n_size, device='cuda', dtype=dtype) + 1.0  # random refractive index between 1 and 2
+    n.imag = 0.1 * torch.maximum(n.imag, torch.tensor(0.0))  # a positive imaginary part of n corresponds to absorption
     if n_domains is None:  # single domain
         return HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
     else:
@@ -52,7 +50,7 @@ def test_operators(params):
         - richardson = x + α (Γ⁻¹b - Γ⁻¹A x)
     """
     domain = construct_domain(**params)
-    x = random_vector(domain.shape)
+    x = random_vector(domain.shape, device=domain.device)
     B = domain_operator(domain, 'medium')
     L1 = domain_operator(domain, 'inverse_propagator')
     A = domain_operator(domain, 'forward')

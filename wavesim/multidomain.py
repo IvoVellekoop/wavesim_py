@@ -50,6 +50,7 @@ class MultiDomain(Domain):
         # we use the first GPU as primary device
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
+        refractive_index = torch.tensor(refractive_index)
         super().__init__(pixel_size, refractive_index.shape, torch.device(devices[0]))
         self.periodic = np.array(periodic)
 

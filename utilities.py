@@ -111,97 +111,33 @@ def combine(domains: np.ndarray, device=None) -> Tensor:
     return result_tensor
 
 
-def preprocess(n, source, wavelength, ppw, boundary_widths, n_domains, omega):
+def preprocess(refractive_index, source, boundary_widths=10):
     """ Preprocess the input parameters for the simulation
-    :param n: Refractive index distribution 
+    :param refractive_index: Refractive index distribution 
     :param source: Direct source term instead of amplitude and location
-    :param wavelength: Wavelength in um (micron)
-    :param ppw: Points per wavelength
-    :param boundary_widths: Width of absorbing boundaries
-    :param n_domains: Number of subdomains to decompose into, in each dimension
-    :param omega: Compute the fft over omega times the domain size
-    :return: Preprocessed parameters for the HelmholtzBase class """
-    n = check_input_dims(n.astype(np.complex64))  # Ensure n is a 3-d array
-    n_dims = get_dims(n)  # Number of dimensions in simulation
-    n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
+    :return: Preprocessed refractive index (with boundaries and absorption) and padded source """
+    refractive_index = check_input_dims(refractive_index.astype(np.complex64))  # Ensure refractive_index is a 3-d array
+    n_dims = get_dims(refractive_index)  # Number of dimensions in simulation
+    n_roi = np.array(refractive_index.shape)  # Num of points in ROI (Region of Interest)
 
     boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
     # Separate into _pre (before) and _post (after) boundaries, as _post can be changed to satisfy domain
     # decomposition conditions (max subdomain size, all subdomains same size, domain size is int)
-    boundary_pre = np.floor(boundary_widths)
-    boundary_post = np.ceil(boundary_widths)
-
-    # determine number of subdomains based on max size, ensure that all are of the same size (pad if not),
-    # modify boundary_post and n_ext, and cast parameters to int
-    n_ext = n_roi + boundary_pre + boundary_post  # n_roi + boundaries on either side(s)
-    n_domains = check_input_len(n_domains, 1, n_dims)  # Ensure n_domains is a 3-element array with 1s after n_dims
-    if (n_domains == 1).all():  # If 1 domain, implies no domain decomposition
-        domain_size = n_ext.copy()
-    else:  # Else, domain decomposition
-        # Modify such that decompose into domains only when total_size*bytes (or bits?) > t * (memory of one GPU/device)
-        # If decomposing, size of one domain * bytes (or bits) < t * (memory of one GPU)
-        # Here t a factor, say 0.8? Try different values
-        # To set maximum domain_size based on n_dims 
-        max_domain_size = np.array([100000, 100000, 500])
-        if min(n_ext) <= max_domain_size[n_dims - 1]:
-            n_domains = np.ones(3)
-
-        # Modify n_domains and domain_size to optimum values. Enables different number of domains in each dimension
-        # round n_ext to nearest 10 and get new n_domains based on min(n_ext)
-        n_domains = np.ceil(n_ext / (min(np.round(n_ext[:n_dims], -1)) / n_domains))  # Update n_domains
-        domain_size = n_ext / n_domains  # Update domain_size
-
-        # Increase boundary_post in dimension(s) to satisfy n_domains and domain_size conditions
-        # Difference between original n_ext and new n_ext based on modified domain_size
-        boundary_add = n_domains[:n_dims] * domain_size[np.argmin(n_ext[:n_dims])] - n_ext[:n_dims]
-        boundary_add = boundary_add - np.min(boundary_add)  # Shift all elements of boundary_add to non-negative values
-        boundary_post[:n_dims] += boundary_add  # Increase boundary_post
-        n_ext = n_roi + boundary_pre + boundary_post  # Update n_ext
-        domain_size = n_ext / n_domains  # Update domain_size
-
-        # Increase boundary_post in dimension(s) until the subdomain size is int
-        while (domain_size % 1 != 0).any() or (boundary_post % 1 != 0).any():
-            boundary_post = np.round(boundary_post + n_domains * (np.ceil(domain_size) - domain_size), 2)
-            n_ext = n_roi + boundary_pre + boundary_post
-            domain_size = np.round(n_ext / n_domains, 2)
-
-        assert np.all(domain_size[:n_dims] == domain_size[0])  # Assert all subdomains are of the same size
-        # assert (domain_size[:n_dims] <= max_domain_size[n_dims-1]).all()  # Assert size(subdomains) <= max_domain_size
-        assert (domain_size % 1 == 0).all()  # Assert domain_size is an integer
-        assert (boundary_post % 1 == 0).all()  # Assert boundary_post is an integer
-        assert (boundary_post >= np.ceil(boundary_widths)).all()  # Assert boundary_post is not smaller than initial
-
-    # Cast below 4 parameters to int because they are used in padding, indexing/slicing, creation of arrays
-    boundary_pre = boundary_pre.astype(int)
-    boundary_post = boundary_post.astype(int)
-    n_domains = n_domains.astype(int)
-    domain_size = domain_size.astype(int)
+    boundary_pre = np.floor(boundary_widths).astype(int)
+    boundary_post = np.ceil(boundary_widths).astype(int)
 
     # Pad source to the size of n_ext = n_roi + boundary_pre + boundary_post
     source = check_input_dims(source)  # Ensure source term is a 3-d array
-    if source.shape != n.shape:  # If source term is not given, pad to the size of
-        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
+    if source.shape != refractive_index.shape:  # If source term is not given, pad to the size of
+        source = pad_boundaries(source, (0, 0, 0), np.array(refractive_index.shape) - np.array(source.shape),
                                 mode='constant')
     source = torch.tensor(source, dtype=torch.complex64)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode='constant')  # pad source term (scale later)
 
-    k0 = (1. * 2. * np.pi) / wavelength  # wave-vector k = 2*pi/lambda, where lambda = 1.0 um (micron)
-    n_sq = add_absorption(n ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to n^2
-    v_raw = (k0 ** 2) * n_sq  # raw potential v = k^2 * n^2
+    refractive_index = add_absorption(refractive_index ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to refractive_index^2
+    # refractive_index = torch.tensor(refractive_index, dtype=torch.complex64)
 
-    # compute tiny non-zero minimum value to prevent division by zero in homogeneous media
-    pixel_size = wavelength / ppw  # Grid pixel size in um (micron)
-    mu_min = ((10.0 / (boundary_widths[:n_dims] * pixel_size)) if (
-            boundary_widths != 0).any() else check_input_len(0, 0, n_dims)).astype(np.float32)
-    mu_min = max(np.max(mu_min), np.max(1.e-3 / (n_ext[:n_dims] * pixel_size)))
-    v_min = 0.5 * np.imag((k0 + 1j * np.max(mu_min)) ** 2)
-
-    # compute the fft over omega times the domain size
-    omega = check_input_len(omega, 1, n_dims)  # Ensure omega is a 3-element array with 1s after n_dims
-
-    return (n_roi, source, n_dims, boundary_widths, boundary_pre, boundary_post,
-            n_domains, domain_size, omega, v_min, v_raw)
-    # return locals()
+    return refractive_index, source
 
 
 def check_input_dims(x):

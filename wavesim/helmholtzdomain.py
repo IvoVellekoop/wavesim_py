@@ -105,7 +105,7 @@ class HelmholtzDomain(Domain):
         # compute n²·k₀² (the raw scattering potential)
         # also compute the bounding box holding the values of the scattering potential in the complex plane.
         # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size
-        refractive_index.mul_(refractive_index)
+        # refractive_index.mul_(refractive_index)
         refractive_index.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
         r_min, r_max = torch.aminmax(refractive_index.real)
         i_min, i_max = torch.aminmax(refractive_index.imag)

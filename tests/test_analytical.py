@@ -15,7 +15,7 @@ def test_no_propagation():
     By manually removing the laplacian, we are solving the equation (2 π n / λ)² x = y
     """
     n = random_refractive_index((2, 3, 4))
-    domain = HelmholtzDomain(refractive_index=(n**2), pixel_size=0.25, periodic=(True, True, True))
+    domain = HelmholtzDomain(permittivity=(n ** 2), pixel_size=0.25, periodic=(True, True, True))
     x = random_vector(domain.shape)
 
     # manually disable the propagator, and test if, indeed, we are solving the system (2 π n / λ)² x = y
@@ -73,13 +73,13 @@ def u_ref_1d_h(n_size0, pixel_size):
 def test_1d_homogeneous(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     n_size = (1000, 1, 1)
-    refractive_index = np.ones(n_size, dtype=np.complex64)
-    source = np.zeros_like(refractive_index)
+    n = np.ones(n_size, dtype=np.complex64)
+    source = np.zeros_like(n)
     source[0] = 1.
     boundary_widths = 50
-    refractive_index, source = preprocess(refractive_index, source, boundary_widths)
-    domain = HelmholtzDomain(refractive_index=refractive_index, pixel_size=0.25, periodic=periodic)
-    # domain = MultiDomain(refractive_index=refractive_index, pixel_size=0.25, periodic=periodic, n_domains=n_domains)
+    n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
+    domain = HelmholtzDomain(permittivity=n, pixel_size=0.25, periodic=periodic)
+    # domain = MultiDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_domains=n_domains)
     u_computed = run_algorithm(domain, -source, max_iterations=1000)
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     u_ref = u_ref_1d_h(n_size[0], domain.pixel_size)

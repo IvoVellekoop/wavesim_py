@@ -10,7 +10,7 @@ class MultiDomain(Domain):
      and setting up wrapping and transfer corrections """
 
     def __init__(self,
-                 refractive_index,
+                 permittivity,
                  pixel_size: float,
                  periodic: tuple[bool, bool, bool],
                  n_domains: tuple[int, int, int] = (1, 1, 1),
@@ -19,7 +19,7 @@ class MultiDomain(Domain):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
         Arguments:
-            refractive_index: Refractive index distribution, must be 3-d.
+            permittivity: Permittivity distribution, must be 3-d.
             pixel_size: Grid spacing in wavelengths.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
@@ -41,8 +41,8 @@ class MultiDomain(Domain):
         #   preprocess(n, pixel_size, n_domains))
 
         # validata input parameters
-        if not refractive_index.ndim == 3:
-            raise ValueError("The refractive index must be a 3D array")
+        if not permittivity.ndim == 3:
+            raise ValueError("The permittivity must be a 3D array")
         if not len(n_domains) == 3:
             raise ValueError("The number of domains must be a 3-tuple")
 
@@ -50,21 +50,21 @@ class MultiDomain(Domain):
         # we use the first GPU as primary device
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
-        refractive_index = torch.tensor(refractive_index)
-        super().__init__(pixel_size, refractive_index.shape, torch.device(devices[0]))
+        permittivity = torch.tensor(permittivity)
+        super().__init__(pixel_size, permittivity.shape, torch.device(devices[0]))
         self.periodic = np.array(periodic)
 
         # compute domain boundaries in each dimension
         self.domains = np.empty(n_domains, dtype=HelmholtzDomain)
         self.n_domains = n_domains
 
-        # distribute the refractive index map over the subdomains.
-        ri_domains = partition(refractive_index, self.n_domains)
+        # distribute the permittivity map over the subdomains.
+        ri_domains = partition(permittivity, self.n_domains)
         subdomain_periodic = [periodic[i] and n_domains[i] == 1 for i in range(3)]
         Vwrap = None
         for domain_index, ri_domain in enumerate(ri_domains.flat):
             ri_domain = torch.tensor(ri_domain, device=devices[domain_index % len(devices)])
-            self.domains.flat[domain_index] = HelmholtzDomain(refractive_index=ri_domain, pixel_size=pixel_size,
+            self.domains.flat[domain_index] = HelmholtzDomain(permittivity=ri_domain, pixel_size=pixel_size,
                                                               n_boundary=n_boundary, periodic=subdomain_periodic,
                                                               stand_alone=False, Vwrap=Vwrap)
             Vwrap = self.domains.flat[domain_index].Vwrap  # re-use wrapping matrix

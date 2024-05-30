@@ -36,9 +36,9 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
     n = torch.rand(n_size, device='cuda', dtype=dtype) + 1.0  # random refractive index between 1 and 2
     n.imag = 0.1 * torch.maximum(n.imag, torch.tensor(0.0))  # a positive imaginary part of n corresponds to absorption
     if n_domains is None:  # single domain
-        return HelmholtzDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
+        return HelmholtzDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
     else:
-        return MultiDomain(refractive_index=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary,
+        return MultiDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary,
                            n_domains=n_domains)
 
 

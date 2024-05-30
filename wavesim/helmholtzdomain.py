@@ -15,7 +15,7 @@ class HelmholtzDomain(Domain):
     """
 
     def __init__(self,
-                 refractive_index,
+                 permittivity,
                  pixel_size: float,
                  periodic: tuple[bool, bool, bool],
                  n_boundary: int = 0,
@@ -23,14 +23,14 @@ class HelmholtzDomain(Domain):
                  stand_alone=True,
                  Vwrap=None,
                  ):
-        """Construct a domain object with the given refractive index and allocate memory.
+        """Construct a domain object with the given permittivity and allocate memory.
 
-        Note: the refractive index array is stored in one of the temporary memory slots and will be overwritten during processing.
+        Note: the permittivity array is stored in one of the temporary memory slots and will be overwritten during processing.
             This means that no copy is kept (to save memory), and the data should not be used after calling this function.
-        Note: all operations performed on this domain will use the same pytorch device and data type as the refractive index array.
+        Note: all operations performed on this domain will use the same pytorch device and data type as the permittivity array.
 
         Attributes:
-            refractive_index: refractive index map. Must be a 3-dimensional array of complex float32 or float64.
+            permittivity: permittivity map. Must be a 3-dimensional array of complex float32 or float64.
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are used
                 for all operations.
             pixel_size: grid spacing (in wavelength units)
@@ -40,22 +40,22 @@ class HelmholtzDomain(Domain):
             Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
 
             stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
-                refractive index of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
+                permittivity of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
                  making it equivalent to the original Wavesim algorithm.
                  Set to False when part of a multi-domain, where the all subdomains need to be considered together to compute the
                 shift and scale factors.
 
          """
-        refractive_index = torch.tensor(refractive_index)
-        super().__init__(pixel_size, refractive_index.shape, refractive_index.device)
+        permittivity = torch.tensor(permittivity)
+        super().__init__(pixel_size, permittivity.shape, permittivity.device)
 
         # validate input arguments
         if n_slots < 2:
             raise ValueError("n_slots must be at least 2")
-        if refractive_index.ndim != 3 or not (
-                refractive_index.dtype == torch.complex64 or refractive_index.dtype == torch.complex128):
+        if permittivity.ndim != 3 or not (
+                permittivity.dtype == torch.complex64 or permittivity.dtype == torch.complex128):
             raise ValueError(
-                f"refractive_index must be 3-dimensional and complex float32 or float64, not {refractive_index.dtype}.")
+                f"Permittivity must be 3-dimensional and complex float32 or float64, not {permittivity.dtype}.")
         if any([n_boundary > 0.5 * self.shape[i] and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too large for the given domain size {self.shape}")
 
@@ -80,12 +80,12 @@ class HelmholtzDomain(Domain):
 
         self.edge_slices = [compute_slice(dd) for dd in range(6)]
         self.edges = [
-            None if self._periodic[0] else torch.zeros_like(refractive_index[self.edge_slices[0]]),
-            None if self._periodic[0] else torch.zeros_like(refractive_index[self.edge_slices[1]]),
-            None if self._periodic[1] else torch.zeros_like(refractive_index[self.edge_slices[2]]),
-            None if self._periodic[1] else torch.zeros_like(refractive_index[self.edge_slices[3]]),
-            None if self._periodic[2] else torch.zeros_like(refractive_index[self.edge_slices[4]]),
-            None if self._periodic[2] else torch.zeros_like(refractive_index[self.edge_slices[5]]),
+            None if self._periodic[0] else torch.zeros_like(permittivity[self.edge_slices[0]]),
+            None if self._periodic[0] else torch.zeros_like(permittivity[self.edge_slices[1]]),
+            None if self._periodic[1] else torch.zeros_like(permittivity[self.edge_slices[2]]),
+            None if self._periodic[1] else torch.zeros_like(permittivity[self.edge_slices[3]]),
+            None if self._periodic[2] else torch.zeros_like(permittivity[self.edge_slices[4]]),
+            None if self._periodic[2] else torch.zeros_like(permittivity[self.edge_slices[5]]),
         ]
 
         # compute the un-scaled laplacian kernel and the un-scaled wrapping correction matrices
@@ -100,15 +100,14 @@ class HelmholtzDomain(Domain):
 
         # allocate storage for temporary data, re-use the memory we got for the raw scattering potential
         # as one of the locations (which will be overwritten later)
-        self._x = [refractive_index] + [torch.zeros_like(refractive_index) for _ in range(n_slots - 1)]
+        self._x = [permittivity] + [torch.zeros_like(permittivity) for _ in range(n_slots - 1)]
 
         # compute n²·k₀² (the raw scattering potential)
         # also compute the bounding box holding the values of the scattering potential in the complex plane.
         # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size
-        # refractive_index.mul_(refractive_index)
-        refractive_index.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
-        r_min, r_max = torch.aminmax(refractive_index.real)
-        i_min, i_max = torch.aminmax(refractive_index.imag)
+        permittivity.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
+        r_min, r_max = torch.aminmax(permittivity.real)
+        i_min, i_max = torch.aminmax(permittivity.imag)
         self.V_bounds = torch.tensor((r_min, r_max, i_min, i_max))
 
         if stand_alone:

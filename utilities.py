@@ -111,14 +111,14 @@ def combine(domains: np.ndarray, device=None) -> Tensor:
     return result_tensor
 
 
-def preprocess(refractive_index, source, boundary_widths=10):
+def preprocess(n, source, boundary_widths=10):
     """ Preprocess the input parameters for the simulation
-    :param refractive_index: Refractive index distribution 
+    :param n: Refractive index distribution 
     :param source: Direct source term instead of amplitude and location
-    :return: Preprocessed refractive index (with boundaries and absorption) and padded source """
-    refractive_index = check_input_dims(refractive_index.astype(np.complex64))  # Ensure refractive_index is a 3-d array
-    n_dims = get_dims(refractive_index)  # Number of dimensions in simulation
-    n_roi = np.array(refractive_index.shape)  # Num of points in ROI (Region of Interest)
+    :return: Preprocessed permittivity (with boundaries and absorption) and source (with boundaries) """
+    n = check_input_dims(n.astype(np.complex64))  # Ensure n is a 3-d array
+    n_dims = get_dims(n)  # Number of dimensions in simulation
+    n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
     boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
     # Separate into _pre (before) and _post (after) boundaries, as _post can be changed to satisfy domain
@@ -128,16 +128,16 @@ def preprocess(refractive_index, source, boundary_widths=10):
 
     # Pad source to the size of n_ext = n_roi + boundary_pre + boundary_post
     source = check_input_dims(source)  # Ensure source term is a 3-d array
-    if source.shape != refractive_index.shape:  # If source term is not given, pad to the size of
-        source = pad_boundaries(source, (0, 0, 0), np.array(refractive_index.shape) - np.array(source.shape),
+    if source.shape != n.shape:  # If source term is not given, pad to the size of
+        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
                                 mode='constant')
     source = torch.tensor(source, dtype=torch.complex64)
     source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode='constant')  # pad source term (scale later)
 
-    refractive_index = add_absorption(refractive_index ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to refractive_index^2
-    # refractive_index = torch.tensor(refractive_index, dtype=torch.complex64)
+    n = add_absorption(n ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to n^2
+    # n = torch.tensor(n, dtype=torch.complex64)
 
-    return refractive_index, source
+    return n, source
 
 
 def check_input_dims(x):
@@ -183,10 +183,10 @@ def squeeze_(n):
     return n
 
 
-# Add absorption to the refractive index squared
+# Add absorption to the perimittivity (refractive index squared)
 def add_absorption(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Add (weighted) absorption to the refractive index squared 
-    :param m: array (Refractive index squared)
+    """ Add (weighted) absorption to the permittivity 
+    :param m: array (permittivity)
     :param boundary_pre: Boundary before
     :param boundary_post: Boundary after
     :param n_roi: Number of points in the region of interest

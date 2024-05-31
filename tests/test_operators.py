@@ -45,7 +45,7 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
 @pytest.mark.parametrize("params", parameters)
 def test_operators(params):
     """ Check that operator definitions are consistent:
-        - forward = inverse_propagetor - medium: A= L + 1 - B
+        - forward = inverse_propagator - medium: A= L + 1 - B
         - preconditioned_operator = preconditioned(operator)
         - richardson = x + α (Γ⁻¹b - Γ⁻¹A x)
     """
@@ -77,7 +77,8 @@ def test_operators(params):
 def test_accretivity(params):
     """ Checks norm and lower bound of real part for various operators
 
-     B (medium) should have real part between -0.05 and 1.0 (if we don't put the absorption in V0. If we do, the upper limit may be 1.95)
+     B (medium) should have real part between -0.05 and 1.0 (if we don't put the absorption in V0. If we do, the upper
+     limit may be 1.95)
         The operator B-1 should have a norm of less than 0.95
 
     L + 1 (inverse propagator) should be accretive with a real part of at least 1.0
@@ -123,4 +124,5 @@ def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=N
         if real_max is not None:
             acc = eigs.max()
             print(f'acc {acc:.2e}')
-            assert acc <= real_max, f'operator {name} has eigenvalues that are too large, max λ_(A+A*) = {acc} > {real_max}'
+            assert acc <= real_max, (f'operator {name} has eigenvalues that are too large, '
+                                     f'max λ_(A+A*) = {acc} > {real_max}')

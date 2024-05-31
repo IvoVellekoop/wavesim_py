@@ -25,14 +25,16 @@ class HelmholtzDomain(Domain):
                  ):
         """Construct a domain object with the given permittivity and allocate memory.
 
-        Note: the permittivity array is stored in one of the temporary memory slots and will be overwritten during processing.
-            This means that no copy is kept (to save memory), and the data should not be used after calling this function.
-        Note: all operations performed on this domain will use the same pytorch device and data type as the permittivity array.
+        Note: the permittivity array is stored in one of the temporary memory slots and will be overwritten during
+              processing. This means that no copy is kept (to save memory), and the data should not be used after
+              calling this function.
+        Note: all operations performed on this domain will use the same pytorch device and data type as the
+              permittivity array.
 
         Attributes:
             permittivity: permittivity map. Must be a 3-dimensional array of complex float32 or float64.
-                Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are used
-                for all operations.
+                Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
+                used for all operations.
             pixel_size: grid spacing (in wavelength units)
             periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.
             n_boundary: Number of pixels used for the boundary correction.
@@ -42,8 +44,8 @@ class HelmholtzDomain(Domain):
             stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
                 permittivity of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
                  making it equivalent to the original Wavesim algorithm.
-                 Set to False when part of a multi-domain, where the all subdomains need to be considered together to compute the
-                shift and scale factors.
+                 Set to False when part of a multi-domain, where the all subdomains need to be considered together to
+                 compute the shift and scale factors.
 
          """
         permittivity = torch.tensor(permittivity)
@@ -61,8 +63,8 @@ class HelmholtzDomain(Domain):
 
         self._n_boundary = n_boundary
         self._Bscat = None
-        self._periodic = periodic if n_boundary > 0 else [True, True,
-                                                          True]  # allow manually disabling wrapping corrections by setting n_boundary=0
+        self._periodic = periodic if n_boundary > 0 else \
+            [True, True, True]  # allow manually disabling wrapping corrections by setting n_boundary=0
         self._source = None
         self._stand_alone = stand_alone
 
@@ -117,7 +119,7 @@ class HelmholtzDomain(Domain):
             V_norm = self.initialize_shift(center)
             self.initialize_scale(-0.95j / V_norm)
         elif Vwrap is not None:
-            # Use the provided wrapping matrices. This is used to ensure all subdomains in a domain use the same wrapping matrix
+            # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
         else:
             # Compute the wrapping correction matrices if none were provided
@@ -159,7 +161,8 @@ class HelmholtzDomain(Domain):
         """Returns the data in the specified slot.
 
         param: slot: slot from which to return the data
-        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible. Note that this data may be overwritten by the next call to domain.
+        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+                     Note that this data may be overwritten by the next call to domain.
         """
         data = self._x[slot]
         return data.detach().clone() if copy else data
@@ -254,8 +257,8 @@ class HelmholtzDomain(Domain):
     def initialize_scale(self, scale: complex):
         """Scales all operators.
 
-        Computes Bscat (from the temporary storage 0), the propagator kernel (from the temporary value in propagator_kernel),
-        and scales Vwrap.
+        Computes Bscat (from the temporary storage 0), the propagator kernel (from the temporary value in
+        propagator_kernel), and scales Vwrap.
         Attributes:
             scale: Scaling factor of the problem. Its magnitude is chosen such that the
                 operator V = scale · (the scattering potential + the wrapping correction)
@@ -303,14 +306,16 @@ class HelmholtzDomain(Domain):
     def apply_corrections(self, wrap_corrections, transfer_corrections, slot: int):
         """Apply  -1·wrapping/transfer corrections
 
-        Transfer corrections correspond to a contribution from neighboring domains. They are added to the current domain.
+        Transfer corrections correspond to a contribution from neighboring domains, and are added to the current domain.
         Wrap corrections correct for the periodicity of the fft. They are subtracted from the domain
-        In this case, there is an additional factor of -1 because this function is called from `medium`, which applies 1-V instead of V.
+        In this case, there is an additional factor of -1 because this function is called from `medium`, which applies
+        1-V instead of V.
         Therefore, transfer corrections are now subtracted, and wrap corrections are added.
 
         :param slot: slot index for the data to which the corrections are applied. Operation is always in-place
         :param wrap_corrections: list of 6 corrections for wrap-around (may contain None for periodic boundary)
-        :param transfer_corrections: list of 6 corrections coming from neighboring segments (may contain None for end of domain)
+        :param transfer_corrections: list of 6 corrections coming from neighboring segments (may contain None for
+                                     end of domain)
         """
         for edge in range(6):
             if wrap_corrections[edge] is not None and transfer_corrections[edge] is None:

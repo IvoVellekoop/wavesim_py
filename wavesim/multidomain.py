@@ -24,13 +24,14 @@ class MultiDomain(Domain):
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
             n_domains: number of domains to split the simulation into.
-                the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones.
-                the future, the domain size may be adjusted to have an efficient fourier transform.
+                the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other
+                ones. In the future, the domain size may be adjusted to have an efficient fourier transform.
                 is (1,1,1), no domain decomposition.
             n_boundary: Number of points used in the wrapping and domain transfer correction. Default is 8.
             device: 'cpu' to use the cpu, 'cuda' to distribute the simulation over all available cuda devices, 'cuda:x'
-                to use a specific cuda device, a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the simulation over these devices
-                in a round-robin fashion, or None, which is equivalent to 'cuda' if cuda devices are available, and 'cpu' if they are not.
+                to use a specific cuda device, a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the
+                simulation over these devices in a round-robin fashion, or None, which is equivalent to 'cuda' if
+                cuda devices are available, and 'cpu' if they are not.
                 todo: implement
         """
 
@@ -111,7 +112,8 @@ class MultiDomain(Domain):
             domain.clear(slot)
 
     def get(self, slot: int, copy=False, device=None):
-        """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in one big array
+        """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in
+        one big array
 
          :param: device: device on which to store the data. Defaults to the primary device
         """

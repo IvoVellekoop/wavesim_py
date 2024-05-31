@@ -12,7 +12,8 @@ def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
     size = np.array(array.shape)
     if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 3:
         raise ValueError(
-            f"Number of domains {n_domains} must be larger than 1 and less than or equal to the size of the array {array.shape}")
+            f"Number of domains {n_domains} must be larger than 1 and "
+            f"less than or equal to the size of the array {array.shape}")
 
     # Calculate the size of each domain
     large_domain_size = np.ceil(size / n_domains).astype(int)
@@ -115,26 +116,23 @@ def preprocess(n, source, boundary_widths=10):
     """ Preprocess the input parameters for the simulation
     :param n: Refractive index distribution 
     :param source: Direct source term instead of amplitude and location
+    :param boundary_widths: Boundary widths (in pixels)
     :return: Preprocessed permittivity (with boundaries and absorption) and source (with boundaries) """
     n = check_input_dims(n.astype(np.complex64))  # Ensure n is a 3-d array
     n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
-    boundary_widths = check_input_len(boundary_widths, 0, n_dims)  # Ensure it's a 3-element array with 0s after n_dims
-    # Separate into _pre (before) and _post (after) boundaries, as _post can be changed to satisfy domain
-    # decomposition conditions (max subdomain size, all subdomains same size, domain size is int)
-    boundary_pre = np.floor(boundary_widths).astype(int)
-    boundary_post = np.ceil(boundary_widths).astype(int)
+    # Ensure boundary_widths is a 3-element array of ints with 0s after n_dims
+    boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
 
     # Pad source to the size of n_ext = n_roi + boundary_pre + boundary_post
     source = check_input_dims(source)  # Ensure source term is a 3-d array
-    if source.shape != n.shape:  # If source term is not given, pad to the size of
-        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape),
-                                mode='constant')
+    if source.shape != n.shape:  # If source term is not given, pad to the size of n
+        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape), mode='constant')
     source = torch.tensor(source, dtype=torch.complex64)
-    source = pad_boundaries_torch(source, boundary_pre, boundary_post, mode='constant')  # pad source term (scale later)
+    source = pad_boundaries(source, boundary_widths, mode='constant')  # pad source term (scale later)
 
-    n = add_absorption(n ** 2, boundary_pre, boundary_post, n_roi, n_dims)  # add absorption to n^2
+    n = add_absorption(n ** 2, boundary_widths, n_roi, n_dims)  # add absorption to n^2
     # n = torch.tensor(n, dtype=torch.complex64)
 
     return n, source
@@ -183,52 +181,50 @@ def squeeze_(n):
     return n
 
 
-# Add absorption to the perimittivity (refractive index squared)
-def add_absorption(m, boundary_pre, boundary_post, n_roi, n_dims):
-    """ Add (weighted) absorption to the permittivity 
+def add_absorption(m, boundary_widths, n_roi, n_dims):
+    """ Add (weighted) absorption to the permittivity (refractive index squared)
     :param m: array (permittivity)
-    :param boundary_pre: Boundary before
-    :param boundary_post: Boundary after
+    :param boundary_widths: Boundary widths
     :param n_roi: Number of points in the region of interest
     :param n_dims: Number of dimensions
     :return: m with absorption """
     w = np.ones_like(m)  # Weighting function (1 everywhere)
-    w = pad_boundaries(w, boundary_pre, boundary_post, mode='linear_ramp')  # pad w using linear_ramp
+    w = pad_boundaries(w, boundary_widths, mode='linear_ramp')  # pad w using linear_ramp
     a = 1 - w  # for absorption, inverse weighting 1 - w
     for i in range(n_dims):
-        left_boundary = boundary_(boundary_pre[i])  # boundary_ is a linear window function
-        right_boundary = np.flip(boundary_(boundary_post[i]))  # flip is a vertical flip
+        left_boundary = boundary_(boundary_widths[i])  # boundary_ is a linear window function
+        right_boundary = np.flip(left_boundary)  # flip is a vertical flip
         full_filter = np.concatenate((left_boundary, np.ones(n_roi[i], dtype=np.float32), right_boundary))
         a = np.moveaxis(a, i, -1) * full_filter  # transpose to last dimension, apply filter
         a = np.moveaxis(a, -1, i)  # transpose back to original position
     a = 1j * a  # absorption is imaginary
 
-    m = pad_boundaries(m, boundary_pre, boundary_post, mode='edge')  # pad m using edge values
+    m = pad_boundaries(m, boundary_widths, mode='edge')  # pad m using edge values
     m = w * m + a  # add absorption to m
     return m
 
 
-def pad_boundaries(x, boundary_pre, boundary_post, mode):
-    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions using numpy pad
+def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
+    """ Pad 'x' with boundaries in all dimensions using numpy pad (if x is np.ndarray) or PyTorch nn.functional.pad
+    (if x is torch.Tensor).
+    If boundary_post is specified separately, pad with boundary_widths (before) and boundary_post (after)
     :param x: Input array
-    :param boundary_pre: Boundary before
-    :param boundary_post: Boundary after
+    :param boundary_widths: Boundary widths for padding before and after (or just before if boundary_post not None)
+    :param boundary_post: Boundary widths for padding after
     :param mode: Padding mode
     :return: Padded array """
-    pad_width = tuple(zip(boundary_pre, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
-    return np.pad(x, pad_width, mode)
+    if boundary_post is None:
+        boundary_post = boundary_widths
 
-
-def pad_boundaries_torch(x, boundary_pre, boundary_post, mode):
-    """ Pad 'x' with boundary_pre (before) and boundary_post (after) in all dimensions using PyTorch functional.pad
-    :param x: Input tensor
-    :param boundary_pre: Boundary before
-    :param boundary_post: Boundary after
-    :param mode: Padding mode
-    :return: Padded tensor """
-    t = zip(boundary_pre[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
-    pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
-    return torch.nn.functional.pad(x, pad_width, mode)
+    if isinstance(x, np.ndarray):
+        pad_width = tuple(zip(boundary_widths, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
+        return np.pad(x, pad_width, mode)
+    elif isinstance(x, torch.Tensor):
+        t = zip(boundary_widths[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
+        pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
+        return torch.nn.functional.pad(x, pad_width, mode)
+    else:
+        raise ValueError("Input must be a numpy array or a torch tensor")
 
 
 def boundary_(x):
@@ -241,7 +237,8 @@ def boundary_(x):
 # Used in tests
 def full_matrix(operator):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) 
-    :param operator: Operator to convert to a matrix. This function must be able to accept a 0 scalar, and return a vector of the size and data type of the domain.
+    :param operator: Operator to convert to a matrix. This function must be able to accept a 0 scalar, and
+                     return a vector of the size and data type of the domain.
     """
     y = operator(0.0)
     n_size = y.shape
@@ -285,8 +282,8 @@ def is_zero(x):
     """ Check if x is zero
 
     Some functions allow specifying 0 or 0.0 instead of a torch tensor, to indicate that the array should be cleared.
-    This function returns True if x is a scalar 0 or 0.0. It raises an error if x is a scalar that is not equal to 0 or 0.0,
-    and returns False otherwise.
+    This function returns True if x is a scalar 0 or 0.0. It raises an error if x is a scalar that is not equal to 0 or
+    0.0, and returns False otherwise.
     """
     if isinstance(x, float) or isinstance(x, int):
         if x != 0:

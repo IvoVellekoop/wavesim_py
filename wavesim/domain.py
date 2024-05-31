@@ -32,7 +32,8 @@ class Domain(metaclass=ABCMeta):
         """Returns the data in the specified slot.
 
         param: slot: slot from which to return the data
-        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible. Note that this data may be overwritten by the next call to domain.
+        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+                     Note that this data may be overwritten by the next call to domain.
         """
         pass
 

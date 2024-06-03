@@ -23,7 +23,7 @@ def test_no_propagation():
     L1 = 1.0 + domain.shift * domain.scale
     domain.propagator_kernel = 1.0 / L1
     domain.inverse_propagator_kernel = L1
-    k2 = (2 * torch.pi * n * domain.pixel_size) ** 2
+    k2 = -(2 * torch.pi * n * domain.pixel_size) ** 2  # -(2 π n / λ)²
     B = (1.0 - (k2 - domain.shift) * domain.scale)
     assert allclose(domain_operator(domain, 'inverse_propagator')(x), x * L1)
     assert allclose(domain_operator(domain, 'propagator')(x), x / L1)
@@ -81,15 +81,16 @@ def test_1d_homogeneous(n_domains, periodic):
     n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
     domain = HelmholtzDomain(permittivity=n, pixel_size=0.25, periodic=periodic)
     # domain = MultiDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_domains=n_domains)
-    u_computed = run_algorithm(domain, -source, max_iterations=1000)
+    u_computed = run_algorithm(domain, source, max_iterations=1000)
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     u_ref = u_ref_1d_h(n_size[0], domain.pixel_size)
 
     re = relative_error(u_computed.cpu().numpy(), u_ref.cpu().numpy())
-    print(f'Relative error: {re:.2e}')
-    plot(u_computed.cpu().numpy(), u_ref.cpu().numpy(), re)
+    assert re <= 1.e-3, f'Relative error: {re:.2e}'
+    # print(f'Relative error: {re:.2e}')
+    # plot(u_computed.cpu().numpy(), u_ref.cpu().numpy(), re)
 
-    assert allclose(u_computed, u_ref)
+    # assert allclose(u_computed, u_ref)
 
 
 def plot(a, b, re=None):

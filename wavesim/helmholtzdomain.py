@@ -107,7 +107,7 @@ class HelmholtzDomain(Domain):
         # compute n²·k₀² (the raw scattering potential)
         # also compute the bounding box holding the values of the scattering potential in the complex plane.
         # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size
-        permittivity.mul_((2.0 * torch.pi * self.pixel_size) ** 2)
+        permittivity.mul_(-(2.0 * torch.pi * self.pixel_size) ** 2)
         r_min, r_max = torch.aminmax(permittivity.real)
         i_min, i_max = torch.aminmax(permittivity.imag)
         self.V_bounds = torch.tensor((r_min, r_max, i_min, i_max))
@@ -117,7 +117,7 @@ class HelmholtzDomain(Domain):
             self.Vwrap = [None, None, None]
             center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
-            self.initialize_scale(-0.95j / V_norm)
+            self.initialize_scale(0.95j / V_norm)
         elif Vwrap is not None:
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
@@ -346,7 +346,7 @@ class HelmholtzDomain(Domain):
         x_kernel[0, 0, 0] = 1.0 / 3.0  # remove singularity at x=0
         x_kernel *= -torch.pi ** 2 / self.pixel_size ** 2
         f_kernel = torch.fft.fftn(x_kernel)
-        return f_kernel.real
+        return -f_kernel.real
 
 
 def _make_wrap_matrix(L_kernel, n_boundary):

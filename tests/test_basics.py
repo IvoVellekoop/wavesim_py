@@ -12,9 +12,9 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
     torch.manual_seed(12345)
     n = random_refractive_index(n_size)
     if n_domains is None:  # single domain
-        return HelmholtzDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary)
+        return HelmholtzDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary)
     else:
-        return MultiDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_boundary=n_boundary,
+        return MultiDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary,
                            n_domains=n_domains)
 
 
@@ -159,7 +159,7 @@ def test_basic_wrapping():
     n_boundary = 2
     source = torch.sparse_coo_tensor(torch.tensor([[(n_size[0] - 1) // 2, 0, 0]]).T, torch.tensor([1.0]), n_size,
                                      dtype=dtype)
-    domain = MultiDomain(permittivity=torch.ones(n_size, dtype=dtype), pixel_size=0.25, n_domains=(2, 1, 1),
+    domain = MultiDomain(permittivity=torch.ones(n_size, dtype=dtype), n_domains=(2, 1, 1),
                          n_boundary=n_boundary, periodic=(False, True, True))
     domain.clear(0)
     domain.set_source(source)

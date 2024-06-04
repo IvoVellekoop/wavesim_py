@@ -11,8 +11,9 @@ class MultiDomain(Domain):
 
     def __init__(self,
                  permittivity,
-                 pixel_size: float,
                  periodic: tuple[bool, bool, bool],
+                 pixel_size: float = 0.25,
+                 wavelength: float = None,
                  n_domains: tuple[int, int, int] = (1, 1, 1),
                  n_boundary: int = 8,
                  device: str = None):
@@ -20,9 +21,10 @@ class MultiDomain(Domain):
 
         Arguments:
             permittivity: Permittivity distribution, must be 3-d.
-            pixel_size: Grid spacing in wavelengths.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
+            pixel_size: Grid spacing in wavelengths.
+            wavelength: wavelength in micrometer (um).
             n_domains: number of domains to split the simulation into.
                 the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other
                 ones. In the future, the domain size may be adjusted to have an efficient fourier transform.
@@ -60,12 +62,13 @@ class MultiDomain(Domain):
         self.n_domains = n_domains
 
         # distribute the permittivity map over the subdomains.
-        ri_domains = partition(permittivity, self.n_domains)
+        p_domains = partition(permittivity, self.n_domains)
         subdomain_periodic = [periodic[i] and n_domains[i] == 1 for i in range(3)]
         Vwrap = None
-        for domain_index, ri_domain in enumerate(ri_domains.flat):
-            ri_domain = torch.tensor(ri_domain, device=devices[domain_index % len(devices)])
-            self.domains.flat[domain_index] = HelmholtzDomain(permittivity=ri_domain, pixel_size=pixel_size,
+        for domain_index, p_domain in enumerate(p_domains.flat):
+            p_domain = torch.tensor(p_domain, device=devices[domain_index % len(devices)])
+            self.domains.flat[domain_index] = HelmholtzDomain(permittivity=p_domain, 
+                                                              pixel_size=pixel_size, wavelength=wavelength,
                                                               n_boundary=n_boundary, periodic=subdomain_periodic,
                                                               stand_alone=False, Vwrap=Vwrap)
             Vwrap = self.domains.flat[domain_index].Vwrap  # re-use wrapping matrix

@@ -16,7 +16,7 @@ def test_no_propagation():
     By manually removing the laplacian, we are solving the equation (2 π n / λ)² x = y
     """
     n = random_refractive_index((2, 3, 4))
-    domain = HelmholtzDomain(permittivity=(n ** 2), pixel_size=0.25, periodic=(True, True, True))
+    domain = HelmholtzDomain(permittivity=(n ** 2), periodic=(True, True, True))
     x = random_vector(domain.shape)
 
     # manually disable the propagator, and test if, indeed, we are solving the system (2 π n / λ)² x = y
@@ -43,16 +43,19 @@ def test_no_propagation():
 
     assert allclose(x_wavesim, x)
 
-    x_wavesim = run_algorithm(domain, y)
+    x_wavesim = run_algorithm(domain, y, threshold=1.e-16)
     assert allclose(x_wavesim, x)
 
 
-def u_ref_1d_h(n_size0, pixel_size):
+def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
     """ Compute analytic solution for 1D case """
     x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
     x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
     h = pixel_size
-    k = 1. * 2. * np.pi * pixel_size  # wavenumber
+    if wavelength is None:
+        k = 1. * 2. * np.pi * pixel_size  # wavenumber
+    else:
+        k = 1. * 2. * np.pi / wavelength # wavenumber
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (
@@ -79,17 +82,19 @@ def test_1d_homogeneous(n_domains, periodic):
     source[0] = 1.
     boundary_widths = 50
     n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
-    domain = HelmholtzDomain(permittivity=n, pixel_size=0.25, periodic=periodic)
-    # domain = MultiDomain(permittivity=n, pixel_size=0.25, periodic=periodic, n_domains=n_domains)
-    u_computed = run_algorithm(domain, source, max_iterations=1000)
+
+    wavelength = 1.
+    domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
+    # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=n_domains)
+    u_computed = run_algorithm(domain, source, max_iterations=10000)
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
-    u_ref = u_ref_1d_h(n_size[0], domain.pixel_size)
+    u_ref = u_ref_1d_h(n_size[0], domain.pixel_size, wavelength)
 
     re = relative_error(u_computed.cpu().numpy(), u_ref.cpu().numpy())
-    assert re <= 1.e-3, f'Relative error: {re:.2e}'
-    # print(f'Relative error: {re:.2e}')
+    print(f'Relative error: {re:.2e}')
     # plot(u_computed.cpu().numpy(), u_ref.cpu().numpy(), re)
 
+    assert re <= 1.e-3, f'Relative error: {re:.2e}'
     # assert allclose(u_computed, u_ref)
 
 

@@ -16,8 +16,9 @@ class HelmholtzDomain(Domain):
 
     def __init__(self,
                  permittivity,
-                 pixel_size: float,
                  periodic: tuple[bool, bool, bool],
+                 pixel_size: float = 0.25,
+                 wavelength: float = None,
                  n_boundary: int = 0,
                  n_slots=2,
                  stand_alone=True,
@@ -35,8 +36,9 @@ class HelmholtzDomain(Domain):
             permittivity: permittivity map. Must be a 3-dimensional array of complex float32 or float64.
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
                 used for all operations.
-            pixel_size: grid spacing (in wavelength units)
-            periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.
+            periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.            
+            pixel_size: grid spacing (in wavelength units).
+            wavelength: wavelength in micrometer (um).
             n_boundary: Number of pixels used for the boundary correction.
             n_slots: number of arrays used for storing the field and temporary data.
             Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
@@ -106,8 +108,11 @@ class HelmholtzDomain(Domain):
 
         # compute n²·k₀² (the raw scattering potential)
         # also compute the bounding box holding the values of the scattering potential in the complex plane.
-        # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size
-        permittivity.mul_(-(2.0 * torch.pi * self.pixel_size) ** 2)
+        # note: wavelength [pixels] = 1/self.pixel_size, so k=n·2π·self.pixel_size if wavelength is None
+        if wavelength is None:
+            permittivity.mul_(-(2.0 * torch.pi * self.pixel_size) ** 2)
+        else:
+            permittivity.mul_(-(2.0 * torch.pi / wavelength) ** 2)
         r_min, r_max = torch.aminmax(permittivity.real)
         i_min, i_max = torch.aminmax(permittivity.imag)
         self.V_bounds = torch.tensor((r_min, r_max, i_min, i_max))

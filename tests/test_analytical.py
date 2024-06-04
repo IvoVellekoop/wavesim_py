@@ -64,7 +64,7 @@ def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
                 )
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
-    return torch.tensor(u_theory[n_size0:-n_size0])
+    return u_theory[n_size0:-n_size0]
 
 
 @pytest.mark.parametrize("n_domains, periodic", [
@@ -90,12 +90,12 @@ def test_1d_homogeneous(n_domains, periodic):
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     u_ref = u_ref_1d_h(n_size[0], domain.pixel_size, wavelength)
 
-    re = relative_error(u_computed.cpu().numpy(), u_ref.cpu().numpy())
+    re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
-    # plot(u_computed.cpu().numpy(), u_ref.cpu().numpy(), re)
+    # plot(u_computed.cpu().numpy(), u_ref, re)
 
     assert re <= 1.e-3, f'Relative error: {re:.2e}'
-    # assert allclose(u_computed, u_ref)
+    assert allclose(u_computed, u_ref, atol=1.e-3, rtol=1.e-3)
 
 
 def plot(a, b, re=None):

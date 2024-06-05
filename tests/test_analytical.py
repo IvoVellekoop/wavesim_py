@@ -52,10 +52,11 @@ def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
     x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
     x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
     h = pixel_size
+    # wavenumber (k)
     if wavelength is None:
-        k = 1. * 2. * np.pi * pixel_size  # wavenumber
+        k = 1. * 2. * np.pi * pixel_size
     else:
-        k = 1. * 2. * np.pi / wavelength # wavenumber
+        k = 1. * 2. * np.pi / wavelength
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (

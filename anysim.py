@@ -8,6 +8,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     :param source: source field
     :param alpha: relaxation parameter for the Richardson iteration
     :param max_iterations: maximum number of iterations
+    :param threshold: threshold for the residual norm
     :return: u (computed field), state (object) """
 
     # Reset the field u to zero
@@ -28,8 +29,8 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
         residual_norm = residual_norm * init_norm_inv  # norm(B(x - (L+1)⁻¹ (B·x + c·y))) / norm(B(L+1)⁻¹y)
         print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}', end='\r')
         if residual_norm < threshold:
-            print(f'\n')
             break
+    print(f'\n')
 
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
     return domain.get(slot_x)

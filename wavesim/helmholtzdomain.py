@@ -50,8 +50,12 @@ class HelmholtzDomain(Domain):
                  compute the shift and scale factors.
 
          """
-        permittivity = torch.tensor(permittivity)
-        super().__init__(pixel_size, permittivity.shape, permittivity.device)
+        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        if not torch.is_tensor(permittivity):
+            permittivity = torch.tensor(permittivity, device=device)
+        elif permittivity.device != device:
+            permittivity.to(device)
+        super().__init__(pixel_size, permittivity.shape, device)
 
         # validate input arguments
         if n_slots < 2:

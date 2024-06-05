@@ -291,3 +291,20 @@ def is_zero(x):
         return True
     else:
         return False
+
+
+def normalize(x, min_val=None, max_val=None, a=0, b=1):
+    """ Normalize x to the range [a, b]
+    :param x: Input array
+    :param min_val: Minimum value (of x)
+    :param max_val: Maximum value (of x)
+    :param a: Lower bound for normalization
+    :param b: Upper bound for normalization
+    :return: Normalized x
+    """
+    if min_val is None:
+        min_val = np.min(x)
+    if max_val is None:
+        max_val = np.max(x)
+    normalized_x = (x - min_val) / (max_val - min_val) * (b - a) + a
+    return normalized_x

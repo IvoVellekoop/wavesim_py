@@ -53,7 +53,8 @@ class MultiDomain(Domain):
         # we use the first GPU as primary device
         devices = [f'cuda:{device_id}' for device_id in
                    range(torch.cuda.device_count())] if torch.cuda.is_available() else ['cpu']
-        permittivity = torch.tensor(permittivity)
+        if not torch.is_tensor(permittivity):
+            permittivity = torch.tensor(permittivity)
         super().__init__(pixel_size, permittivity.shape, torch.device(devices[0]))
         self.periodic = np.array(periodic)
 

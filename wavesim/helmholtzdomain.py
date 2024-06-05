@@ -55,7 +55,7 @@ class HelmholtzDomain(Domain):
             permittivity = torch.tensor(permittivity, device=device)
         elif permittivity.device != device:
             permittivity.to(device)
-        super().__init__(pixel_size, permittivity.shape, device)
+        super().__init__(pixel_size, permittivity.shape, permittivity.device)
 
         # validate input arguments
         if n_slots < 2:

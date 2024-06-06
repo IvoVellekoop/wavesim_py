@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.io import loadmat
-from PIL.Image import BILINEAR, fromarray, open
 import sys
 sys.path.append(".")
 from anysim import run_algorithm

@@ -48,7 +48,7 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 periodic = (False, True, True)  # wrapping correction
 domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
 
-u_computed = run_algorithm(domain, source, max_iterations=2000)
+u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
 u_ref = u_ref_1d_h(n_size[0], domain.pixel_size, wavelength)
 

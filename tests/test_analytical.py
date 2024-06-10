@@ -86,7 +86,7 @@ def test_no_propagation():
 
     assert allclose(x_wavesim, x)
 
-    x_wavesim = run_algorithm(domain, y, threshold=1.e-16)
+    x_wavesim = run_algorithm(domain, y, threshold=1.e-16)[0]
     assert allclose(x_wavesim, x)
 
 
@@ -146,7 +146,7 @@ def test_1d_analytical(n_domains, periodic):
     wavelength = 1.
     # domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
     domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
-    u_computed = run_algorithm(domain, source, max_iterations=10000)
+    u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
 

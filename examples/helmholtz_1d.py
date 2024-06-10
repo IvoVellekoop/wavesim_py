@@ -26,7 +26,7 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 # periodic = (False, True, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=(2, 1, 1))
 
-u_computed = run_algorithm(domain, source, max_iterations=2000)
+u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
 u_ref = np.squeeze(loadmat('matlab_results.mat')['u'])

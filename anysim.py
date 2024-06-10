@@ -33,7 +33,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     print(f'\n')
 
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-    return domain.get(slot_x)
+    return domain.get(slot_x), (i + 1), residual_norm
 
 
 def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_tmp: int = 1, alpha=0.75,

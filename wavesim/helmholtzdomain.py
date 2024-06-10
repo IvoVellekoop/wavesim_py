@@ -145,9 +145,8 @@ class HelmholtzDomain(Domain):
                 _make_wrap_matrix(self._x[1][-1, -1, :], n_boundary) if not self._periodic[2] else None,
             ]
 
-        # compute the norm of Vwrap. Worst case: just add all norms
-        # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
-        self.Vwrap_norm = 2.0 * sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
+        # # compute the norm of Vwrap. Worst case: just add all norms
+        self.Vwrap_norm = sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
 
     ## Functions implementing the domain interface
     # add_source()

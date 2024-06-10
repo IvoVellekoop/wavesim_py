@@ -89,6 +89,9 @@ class MultiDomain(Domain):
             Vscat_norm = np.maximum(Vscat_norm, domain.initialize_shift(center))
             Vwrap_norm = np.maximum(Vwrap_norm, domain.Vwrap_norm)
 
+        # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
+        Vwrap_norm = 2 * Vwrap_norm if max(n_domains)>1 else Vwrap_norm
+
         # compute the scaling factor
         # apply the scaling to compute the final form of all operators in the iteration
         self.shift = center

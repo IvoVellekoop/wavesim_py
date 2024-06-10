@@ -11,7 +11,7 @@ from . import allclose, random_vector, random_refractive_index
 from utilities import preprocess, relative_error
 
 
-def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
+def analytical_solution(n_size0, pixel_size, wavelength=None):
     """ Compute analytic solution for 1D case """
     x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
     x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
@@ -131,13 +131,12 @@ def test_residual(size, boundary_widths, periodic):
 @pytest.mark.parametrize("n_domains, periodic", [
     ((1, 1, 1), (True, True, True)),  # periodic boundaries, wrapped field.
     ((1, 1, 1), (False, True, True)),  # wrapping correction (here and beyond)
-    # ((2, 1, 1), (False, True, True)), 
-    # ((3, 1, 1), (False, True, True)), 
-    # ((4, 1, 1), (False, True, True))
+    ((2, 1, 1), (False, True, True)), 
+    ((3, 1, 1), (False, True, True)), 
 ])
-def test_1d_homogeneous(n_domains, periodic):
+def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
-    n_size = (1000, 1, 1)
+    n_size = (256, 1, 1)
     n = np.ones(n_size, dtype=np.complex64)
     source = np.zeros_like(n)
     source[0] = 1.
@@ -145,11 +144,11 @@ def test_1d_homogeneous(n_domains, periodic):
     n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
 
     wavelength = 1.
-    domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-    # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=n_domains)
+    # domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
+    domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
     u_computed = run_algorithm(domain, source, max_iterations=10000)
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
-    u_ref = u_ref_1d_h(n_size[0], domain.pixel_size, wavelength)
+    u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')

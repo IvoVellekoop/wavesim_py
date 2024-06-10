@@ -16,14 +16,17 @@ source = np.zeros_like(n)
 source[tuple(int(d / 2 - 1) for d in n.shape)] = 1.
 boundary_widths = 50
 n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
-
 wavelength = 1.
-n_domains = (1, 1, 1)
+
+# 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
-# periodic = (False, True, True)  # wrapping correction (here and beyond)
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
 
-u_computed = run_algorithm(domain, source)
+# # to test domain decomposition
+# periodic = (False, False, False)  # wrapping correction
+# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(2, 1, 1))
+
+u_computed = run_algorithm(domain, source, max_iterations=2000)
 u_computed = u_computed.squeeze()[*([slice(boundary_widths,-boundary_widths)]*3)]
 
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
@@ -32,3 +35,6 @@ u_ref = np.squeeze(loadmat('matlab_results.mat')[f'u3d_{n_roi[0]}_{n_roi[1]}_{n_
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')
 plot(u_computed.cpu().numpy(), u_ref, re)
+
+threshold = 1.e-3
+assert re < threshold, f"Relative error {re} higher than {threshold}"

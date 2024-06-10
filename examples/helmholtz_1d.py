@@ -17,16 +17,23 @@ boundary_widths = 50
 n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
 
 wavelength = 1.
-n_domains = (1, 1, 1)
+
+# 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
-# periodic = (False, True, True)  # wrapping correction (here and beyond)
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=n_domains)
-u_computed = run_algorithm(domain, source)
+
+# # to test domain decomposition
+# periodic = (False, True, True)  # wrapping correction
+# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=(2, 1, 1))
+
+u_computed = run_algorithm(domain, source, max_iterations=2000)
 u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
 u_ref = np.squeeze(loadmat('matlab_results.mat')['u'])
 
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')
+threshold = 1.e-3
+assert re < threshold, f"Relative error higher than {threshold}"
+
 plot(u_computed.cpu().numpy(), u_ref, re)

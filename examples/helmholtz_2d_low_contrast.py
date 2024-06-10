@@ -25,12 +25,17 @@ n, source = preprocess(n, source, boundary_widths)  # add boundary conditions an
 
 wavelength = 0.532
 pixel_size = wavelength / (3 * abs(n_fat))
-n_domains = (1, 1, 1)
+
+# 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
-# periodic = (False, True, True)  # wrapping correction (here and beyond)
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=n_domains)
-u_computed = run_algorithm(domain, source)
+
+# # to test domain decomposition
+# periodic = (False, False, True)  # wrapping correction
+# domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength, 
+#                      n_domains=(2, 2, 1))
+
+u_computed = run_algorithm(domain, source, max_iterations=10000)
 u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
 u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_lc'])
@@ -38,3 +43,6 @@ u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_lc'])
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')
 plot(u_computed.cpu().numpy(), u_ref, re)
+
+threshold = 1.e-3
+assert re < threshold, f"Relative error higher than {threshold}"

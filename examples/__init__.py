@@ -11,15 +11,15 @@ def plot(x, x_ref, re=None):
     
     if x.ndim == 1 and x_ref.ndim == 1:
         plt.subplot(211)
-        plt.plot(x.real, label='Computed')
         plt.plot(x_ref.real, label='Analytic')
+        plt.plot(x.real, label='Computed')
         plt.legend()
         plt.title(f'Real part (RE = {relative_error(x.real, x_ref.real):.2e})')
         plt.grid()
 
         plt.subplot(212)
-        plt.plot(x.imag, label='Computed')
         plt.plot(x_ref.imag, label='Analytic')
+        plt.plot(x.imag, label='Computed')
         plt.legend()
         plt.title(f'Imaginary part (RE = {relative_error(x.imag, x_ref.imag):.2e})')
         plt.grid()
@@ -44,12 +44,12 @@ def plot(x, x_ref, re=None):
 
         plt.figure(figsize=(10, 5))
         plt.subplot(121)
-        plt.imshow(x, cmap='hot_r', vmin=a, vmax=b)
+        plt.imshow(x_ref, cmap='hot_r', vmin=a, vmax=b)
         plt.colorbar(fraction=0.046, pad=0.04)
         plt.title('Reference')
 
         plt.subplot(122)
-        plt.imshow(x_ref, cmap='hot_r', vmin=a, vmax=b)
+        plt.imshow(x, cmap='hot_r', vmin=a, vmax=b)
         plt.colorbar(fraction=0.046, pad=0.04)
         plt.title('Computed')
 

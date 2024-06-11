@@ -9,7 +9,7 @@ from utilities import preprocess
 
 
 # generate a refractive index map
-n_size = (360, 360, 360)  # Size of the simulation domain
+n_size = (760, 360, 360)  # Size of the simulation domain
 np.random.seed(0)
 n = np.random.normal(1.3, 0.1, n_size) + 1j * np.maximum(np.random.normal(0.05, 0.02, n_size), 0.0)
 
@@ -23,13 +23,13 @@ n, source = preprocess(n, source, boundary_widths)  # add boundary conditions an
 # other parameters
 wavelength = 1.
 pixel_size = 0.25
-periodic = (True, True, True)  # periodic boundary conditions, no wrapping correction.
-# periodic = (False, False, False)  # wrapping corrections
-n_domains = (1, 1, 1)  # number of domains in each direction
+# periodic = (True, True, True)  # periodic boundary conditions, no wrapping correction.
+periodic = (False, True, True)  # wrapping corrections
+n_domains = (2, 1, 1)  # number of domains in each direction
 
 # set up scaling, and medium, propagation, and if required, correction (wrapping and transfer) operators
-domain = HelmholtzDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic)
-# domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_domains=n_domains)
+# domain = HelmholtzDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic)
+domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_domains=n_domains)
 
 start = time()
 u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000)  # Field u and state object with information about the run

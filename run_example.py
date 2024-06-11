@@ -32,7 +32,7 @@ domain = HelmholtzDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel
 # domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_domains=n_domains)
 
 start = time()
-u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=100)  # Field u and state object with information about the run
+u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000)  # Field u and state object with information about the run
 end = time() - start
 print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
 

@@ -51,6 +51,7 @@ class HelmholtzDomain(Domain):
 
          """
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        print(torch.cuda.get_device_name())
         if not torch.is_tensor(permittivity):
             permittivity = torch.tensor(permittivity, device=device)
         elif permittivity.device != device:

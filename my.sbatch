@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1                  # number of gpus 1, remove if you don't use gpu's
 #SBATCH --mem=6gb                     # Job memory request
 #SBATCH --mail-type=END,FAIL          # email status changes (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --time=0:01:00                # time limit 1h
+#SBATCH --time=1:00:00                # time limit 1h
 
 # show actual node in output file, usefull for diagnostics
 hostname
@@ -34,12 +34,11 @@ echo "Starting worker: "
 
 caseName=${PWD##*/} # to distinguish several log files
 # Run the job -- make sure that it terminates itself before time is up
-python run_example.py > log_file.txt
+python run_example.py
 
 # Copy output back to the master, comment with # if not used
-cp log_file.txt ${SLURM_SUBMIT_DIR}
+# cp log_file.txt ${SLURM_SUBMIT_DIR}
 cp logs ${SLURM_SUBMIT_DIR}
-# mv output ${SLURM_SUBMIT_DIR}
 
 # Clean up on the node ! make sure you are still on the node...
 #rm *

@@ -38,7 +38,7 @@ python run_example.py
 
 # Copy output back to the master, comment with # if not used
 # cp log_file.txt ${SLURM_SUBMIT_DIR}
-cp logs ${SLURM_SUBMIT_DIR}
+cp -r logs ${SLURM_SUBMIT_DIR}
 
 # Clean up on the node ! make sure you are still on the node...
 #rm *

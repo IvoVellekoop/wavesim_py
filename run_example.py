@@ -9,7 +9,7 @@ from utilities import preprocess
 
 
 # generate a refractive index map
-n_size = (760, 360, 360)  # Size of the simulation domain
+n_size = (1560, 360, 360)  # Size of the simulation domain
 np.random.seed(0)
 n = np.random.normal(1.3, 0.1, n_size) + 1j * np.maximum(np.random.normal(0.05, 0.02, n_size), 0.0)
 

@@ -24,22 +24,23 @@ n, source = preprocess(n, source, boundary_widths)  # add boundary conditions an
 wavelength = 1.
 pixel_size = 0.25
 periodic = (True, True, True)  # periodic boundary conditions, no wrapping correction.
-# periodic = (False, True, True)  # wrapping corrections
+# periodic = (False, False, False)  # wrapping corrections
 n_domains = (1, 1, 1)  # number of domains in each direction
 
 # set up scaling, and medium, propagation, and if required, correction (wrapping and transfer) operators
 domain = HelmholtzDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic)
-# domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_boundary=50)
+# domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_domains=n_domains)
 
 start = time()
-u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000)  # Field u and state object with information about the run
+u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=100)  # Field u and state object with information about the run
 end = time() - start
-print(f'Time {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
+print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
 
 # %% Postprocessing
 
 # crop the field to the region of interest
 u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 2)]
+n_dims = u.ndim
 u = np.abs(u[:,:,u.shape[2]//2].cpu().numpy())
 
 output = (f'Size {n_size}; Boundaries {boundary_widths}; Domains {n_domains}; ' 
@@ -51,6 +52,14 @@ with open('./logs/output.txt', 'a') as file:
 
 extent = extent=np.array([0, n_size[0], n_size[1], 0])*pixel_size
 
+fig_name = './logs/size'
+for i in range(n_dims):
+    fig_name += f'{n_size[i]}_'
+fig_name += f'bw{boundary_widths}_domains'
+for i in range(n_dims):
+    fig_name += f'{n_domains[i]}'
+fig_name += f'_iters{iterations}.pdf'
+
 # plot the field
 plt.imshow(u, cmap='hot_r', extent=extent)
 plt.xlabel(r'$x~(\mu m)$')
@@ -58,5 +67,5 @@ plt.ylabel(r'$y~(\mu m)$')
 cbar = plt.colorbar(fraction=0.046, pad=0.04)
 cbar.ax.set_title(r'$|E|$')
 plt.tight_layout()
-plt.savefig('./logs/field.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
+plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')

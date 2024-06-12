@@ -10,7 +10,7 @@ import numpy as np
 
 
 # generate a refractive index map
-sim_size = np.array([400, 200, 200])  # Simulation size in micrometers
+sim_size = 1000 * np.array([1, 1, 1])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
@@ -45,10 +45,20 @@ print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_no
 
 # %% Postprocessing
 
+n_dims = len(n_size.squeeze())
+
 # crop the field to the region of interest
-u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 2)]
-n_dims = u.ndim
-u = np.abs(u[:,:,u.shape[2]//2].cpu().numpy())
+u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
+
+file_name = './logs/size'
+for i in range(n_dims):
+    file_name += f'{n_size[i]}_'
+file_name += f'bw{boundary_widths}_domains'
+for i in range(n_dims):
+    file_name += f'{n_domains[i]}'
+
+# save the field
+np.savez_compressed(f'{file_name}.npz', u=u)
 
 output = (f'Size {n_size}; Boundaries {boundary_widths}; Domains {n_domains}; ' 
           + f'Time {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e} \n')
@@ -59,20 +69,13 @@ with open('./logs/output.txt', 'a') as file:
 
 extent = extent=np.array([0, n_size[0], n_size[1], 0])*pixel_size
 
-fig_name = './logs/size'
-for i in range(n_dims):
-    fig_name += f'{n_size[i]}_'
-fig_name += f'bw{boundary_widths}_domains'
-for i in range(n_dims):
-    fig_name += f'{n_domains[i]}'
-fig_name += f'_iters{iterations}.pdf'
-
 # plot the field
+u = np.abs(u[:,:,u.shape[2]//2])
 plt.imshow(u, cmap='hot_r', extent=extent)
 plt.xlabel(r'$x~(\mu m)$')
 plt.ylabel(r'$y~(\mu m)$')
 cbar = plt.colorbar(fraction=0.046, pad=0.04)
 cbar.ax.set_title(r'$|E|$')
 plt.tight_layout()
-plt.savefig(fig_name, bbox_inches='tight', pad_inches=0.03, dpi=300)
+plt.savefig(f'{file_name}.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')

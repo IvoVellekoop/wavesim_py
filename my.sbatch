@@ -3,7 +3,7 @@
 #SBATCH -J anysim-3d                  # job name, don't use spaces, keep it short
 #SBATCH -c 1                          # number of cores, 1
 #SBATCH --gres=gpu:2                  # number of gpus 1, remove if you don't use gpu's
-# SBATCH --mem=6gb                     # Job memory request
+#SBATCH --mem=250gb                   # Job memory request
 #SBATCH --mail-type=END,FAIL          # email status changes (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --time=1:00:00                # time limit 1h
 

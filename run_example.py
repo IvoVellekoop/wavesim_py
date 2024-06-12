@@ -1,13 +1,12 @@
 import os
 import torch
 import numpy as np
-from time import time
+from time import time, sleep
 # import matplotlib.pyplot as plt
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from anysim import run_algorithm  # to run the anysim iteration
 from utilities import preprocess
-import numpy as np
 
 
 # generate a refractive index map
@@ -21,13 +20,14 @@ n_size = sim_size * wavelength / pixel_size  # Size of the simulation domain in 
 n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
 n_size = n_size.astype(int)  # Convert to integer for indexing
 
-torch.random.manual_seed(0)  # Set the random seed for reproducibility
+torch.manual_seed(0)  # Set the random seed for reproducibility
 n = (torch.normal(mean=1.3, std=0.1, size=tuple(n_size), dtype=torch.float32) 
      + 1j * abs(torch.normal(mean=0.05, std=0.02, size=tuple(n_size), dtype=torch.float32))).numpy()
 # np.random.seed(0)
 # n = (np.random.normal(1.3, 0.1, n_size).astype(np.float32) 
 #      + 1j * np.abs(np.random.normal(0.05, 0.02, n_size)).astype(np.float32))
-# assert n.imag.min() >= 0, 'Imaginary part of n is negative'
+
+assert n.imag.min() >= 0, 'Imaginary part of n is negative'
 
 # set up source, with size same as n, and a point source at the center of the domain
 source = np.zeros_like(n)  # Source term

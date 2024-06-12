@@ -118,7 +118,9 @@ def preprocess(n, source, boundary_widths=10):
     :param source: Direct source term instead of amplitude and location
     :param boundary_widths: Boundary widths (in pixels)
     :return: Preprocessed permittivity (with boundaries and absorption) and source (with boundaries) """
-    n = check_input_dims(n.astype(np.complex64))  # Ensure n is a 3-d array
+    n = check_input_dims(n)  # Ensure n is a 3-d array
+    if n.dtype != np.complex64:
+        n = n.astype(np.complex64)
     n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
@@ -219,7 +221,7 @@ def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
     if isinstance(x, np.ndarray):
         pad_width = tuple(zip(boundary_widths, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
         return np.pad(x, pad_width, mode)
-    elif isinstance(x, torch.Tensor):
+    elif torch.is_tensor(x):
         t = zip(boundary_widths[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
         pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
         return torch.nn.functional.pad(x, pad_width, mode)

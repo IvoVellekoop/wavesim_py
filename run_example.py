@@ -10,7 +10,7 @@ from utilities import preprocess
 
 
 # generate a refractive index map
-sim_size = 600 * np.array([1, 1, 1])  # Simulation size in micrometers
+sim_size = 200 * np.array([1, 1, 1])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20

@@ -33,7 +33,7 @@ class HelmholtzDomain(Domain):
               permittivity array.
 
         Attributes:
-            permittivity: permittivity map. Must be a 3-dimensional array of complex float32 or float64.
+            permittivity: permittivity (n²) map. Must be a 3-dimensional array of complex float32 or float64.
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
                 used for all operations.
             periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.            

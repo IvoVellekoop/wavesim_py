@@ -112,41 +112,23 @@ def combine(domains: np.ndarray, device=None) -> Tensor:
     return result_tensor
 
 
-def preprocess(n, source, boundary_widths=10):
+def preprocess(n, boundary_widths=10):
     """ Preprocess the input parameters for the simulation
     :param n: Refractive index distribution 
-    :param source: Direct source term instead of amplitude and location
     :param boundary_widths: Boundary widths (in pixels)
-    :return: Preprocessed permittivity (with boundaries and absorption) and source (with boundaries) """
-    n = check_input_dims(n)  # Ensure n is a 3-d array
-    if n.dtype != np.complex64:
-        n = n.astype(np.complex64)
+    :return: Preprocessed permittivity (n²) with boundaries and absorption"""
+    # if n.dtype != np.complex64:
+    #     n = n.astype(np.complex64)
     n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
     # Ensure boundary_widths is a 3-element array of ints with 0s after n_dims
     boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
 
-    # Pad source to the size of n_ext = n_roi + boundary_pre + boundary_post
-    source = check_input_dims(source)  # Ensure source term is a 3-d array
-    if source.shape != n.shape:  # If source term is not given, pad to the size of n
-        source = pad_boundaries(source, (0, 0, 0), np.array(n.shape) - np.array(source.shape), mode='constant')
-    source = torch.tensor(source, dtype=torch.complex64)
-    source = pad_boundaries(source, boundary_widths, mode='constant')  # pad source term (scale later)
-
     n = add_absorption(n ** 2, boundary_widths, n_roi, n_dims)  # add absorption to n^2
     # n = torch.tensor(n, dtype=torch.complex64)
 
-    return n, source
-
-
-def check_input_dims(x):
-    """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source)
-    :param x: Input array
-    :return: Array with 3 dimensions """
-    for _ in range(3 - x.ndim):
-        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 3
-    return x
+    return n
 
 
 def check_input_len(x, e, n_dims):

@@ -51,7 +51,10 @@ def list_to_array(input: list, depth: int) -> np.ndarray:
     ra = array.reshape(-1)
     assert ra.base is not None  # must be a view
     for i in range(ra.size):
-        ra[i] = input[i]
+        if input[i] is None or input[i].is_sparse or input[i].is_contiguous():
+            ra[i] = input[i]
+        else:
+            ra[i] = input[i].contiguous()
     return array
 
 
@@ -128,7 +131,7 @@ def preprocess(n, boundary_widths=10):
     n = add_absorption(n ** 2, boundary_widths, n_roi, n_dims)  # add absorption to n^2
     # n = torch.tensor(n, dtype=torch.complex64)
 
-    return n
+    return n, boundary_widths
 
 
 def check_input_len(x, e, n_dims):

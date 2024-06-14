@@ -100,11 +100,16 @@ def test_residual(size, boundary_widths, periodic):
         residual_norm = norm ( B(x - (L+1)⁻¹ (B·x + c·y)) )
         norm of preconditioned source = norm( B(L+1)⁻¹y) )
     """
-    np.random.seed(0)
-    n = np.random.normal(1.3, 0.1, size) + 1j * np.maximum(np.random.normal(0.05, 0.02, size), 0.0)
-    source = np.zeros_like(n)
-    source[0] = 1.
-    n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
+    torch.manual_seed(0)  # Set the random seed for reproducibility
+    n = (torch.normal(mean=1.3, std=0.1, size=size, dtype=torch.float32) 
+         + 1j * abs(torch.normal(mean=0.05, std=0.02, size=size, dtype=torch.float32))).numpy()
+    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n, boundary_widths)
+
+    indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(size)]]).T  # Location: center of the domain
+    values = torch.tensor([1.0])  # Amplitude: 1
+    n_ext = tuple(np.array(size) + 2*boundary_array)
+    source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     wavelength = 1.
     domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
@@ -127,7 +132,6 @@ def test_residual(size, boundary_widths, periodic):
     assert np.allclose(residual_norm, init_norm)
 
 
-
 @pytest.mark.parametrize("n_domains, periodic", [
     ((1, 1, 1), (True, True, True)),  # periodic boundaries, wrapped field.
     ((1, 1, 1), (False, True, True)),  # wrapping correction (here and beyond)
@@ -136,14 +140,18 @@ def test_residual(size, boundary_widths, periodic):
 ])
 def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
+    wavelength = 1.
     n_size = (256, 1, 1)
     n = np.ones(n_size, dtype=np.complex64)
-    source = np.zeros_like(n)
-    source[0] = 1.
     boundary_widths = 50
-    n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
+    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n, boundary_widths)
 
-    wavelength = 1.
+    indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
+    values = torch.tensor([1.0])  # Amplitude: 1
+    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
+
     # domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
     domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]

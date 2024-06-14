@@ -67,8 +67,9 @@ class MultiDomain(Domain):
         subdomain_periodic = [periodic[i] and n_domains[i] == 1 for i in range(3)]
         Vwrap = None
         for domain_index, p_domain in enumerate(p_domains.flat):
-            p_domain = torch.tensor(p_domain, device=devices[domain_index % len(devices)])
-            self.domains.flat[domain_index] = HelmholtzDomain(permittivity=p_domain, 
+            # p_domain = torch.tensor(p_domain, device=devices[domain_index % len(devices)])
+            self.domains.flat[domain_index] = HelmholtzDomain(permittivity=p_domain.to(devices[domain_index %
+                                                                                               len(devices)]),
                                                               pixel_size=pixel_size, wavelength=wavelength,
                                                               n_boundary=n_boundary, periodic=subdomain_periodic,
                                                               stand_alone=False, Vwrap=Vwrap)
@@ -90,7 +91,7 @@ class MultiDomain(Domain):
             Vwrap_norm = np.maximum(Vwrap_norm, domain.Vwrap_norm)
 
         # the factor 2 is because the same matrix is used twice (for domain transfer and wrapping correction)
-        Vwrap_norm = 2 * Vwrap_norm if max(n_domains)>1 else Vwrap_norm
+        Vwrap_norm = 2 * Vwrap_norm if max(n_domains) > 1 else Vwrap_norm
 
         # compute the scaling factor
         # apply the scaling to compute the final form of all operators in the iteration

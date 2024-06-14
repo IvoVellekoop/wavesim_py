@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 from scipy.io import loadmat
 import sys
@@ -9,20 +10,23 @@ from utilities import preprocess, relative_error
 from __init__ import plot
 
 """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
-n = np.ones((256, 1, 1), dtype=np.complex64)
-n[99:130] = 1.5
-source = np.zeros_like(n)
-source[0] = 1.
-boundary_widths = 50
-n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
-
 wavelength = 1.
+n_size = (256, 1, 1)
+n = np.ones(n_size, dtype=np.complex64)
+n[99:130] = 1.5
+boundary_widths = 50
+# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n, boundary_widths)
+
+indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
+values = torch.tensor([1.0])  # Amplitude: 1
+n_ext = tuple(np.array(n_size) + 2*boundary_array)
+source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
 # 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-
-# # to test domain decomposition
+# # OR. Uncomment to test domain decomposition
 # periodic = (False, True, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=(2, 1, 1))
 

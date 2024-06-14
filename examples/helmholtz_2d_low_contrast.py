@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 from scipy.io import loadmat
 from PIL.Image import BILINEAR, fromarray, open
@@ -6,7 +7,7 @@ sys.path.append(".")
 from anysim import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from utilities import preprocess, relative_error
+from utilities import pad_boundaries, preprocess, relative_error
 from __init__ import plot
 
 
@@ -19,9 +20,13 @@ n_fat = 1.46
 n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
 n_roi = int(oversampling * n_im.shape[0])
 n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
-source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
 boundary_widths = 50
-n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
+# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n, boundary_widths)
+
+source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
+source = pad_boundaries(source, boundary_array)
+source = torch.tensor(source, dtype=torch.complex64)
 
 wavelength = 0.532
 pixel_size = wavelength / (3 * abs(n_fat))
@@ -29,8 +34,7 @@ pixel_size = wavelength / (3 * abs(n_fat))
 # 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
-
-# # to test domain decomposition
+# # OR. Uncomment to test domain decomposition
 # periodic = (False, False, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength, 
 #                      n_domains=(2, 2, 1))

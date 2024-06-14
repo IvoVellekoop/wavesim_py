@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 from scipy.special import exp1
 import sys
@@ -31,22 +32,24 @@ def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
 
 
 """ 1D free-space propagation. Compare with analytic solution """
+wavelength = 1.
 n_size = (256, 1, 1)
 n = np.ones(n_size, dtype=np.complex64)
-source = np.zeros_like(n)
-source[0] = 1.
 boundary_widths = 50
-n, source = preprocess(n, source, boundary_widths)  # add boundary conditions and return permittivity and source
+# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n, boundary_widths)
 
-wavelength = 1.
+indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
+values = torch.tensor([1.0])  # Amplitude: 1
+n_ext = tuple(np.array(n_size) + 2*boundary_array)
+source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
 # 1-domain, periodic boundaries (without wrapping correction)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-
-# to test domain decomposition
-periodic = (False, True, True)  # wrapping correction
-domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
+# # OR. Uncomment to test domain decomposition
+# periodic = (False, True, True)  # wrapping correction
+# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
 
 u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]

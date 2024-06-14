@@ -120,8 +120,9 @@ def preprocess(n, boundary_widths=10):
     :param n: Refractive index distribution 
     :param boundary_widths: Boundary widths (in pixels)
     :return: Preprocessed permittivity (n²) with boundaries and absorption"""
-    # if n.dtype != np.complex64:
-    #     n = n.astype(np.complex64)
+    n = check_input_dims(n)  # Ensure n is a 3-d array
+    if n.dtype != np.complex64:
+        n = n.astype(np.complex64)
     n_dims = get_dims(n)  # Number of dimensions in simulation
     n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
 
@@ -132,6 +133,15 @@ def preprocess(n, boundary_widths=10):
     # n = torch.tensor(n, dtype=torch.complex64)
 
     return n, boundary_widths
+
+
+def check_input_dims(x):
+    """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source)
+    :param x: Input array
+    :return: Array with 3 dimensions """
+    for _ in range(3 - x.ndim):
+        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 3
+    return x
 
 
 def check_input_len(x, e, n_dims):
@@ -200,6 +210,8 @@ def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
     :param boundary_post: Boundary widths for padding after
     :param mode: Padding mode
     :return: Padded array """
+    x = check_input_dims(x)  # Ensure x is a 3-d array
+
     if boundary_post is None:
         boundary_post = boundary_widths
 

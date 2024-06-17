@@ -5,6 +5,7 @@ import sys
 sys.path.append(".")
 from utilities import normalize, relative_error
 
+
 def plot(x, x_ref, re=None):
     if re is None:
         re = relative_error(x, x_ref)
@@ -29,8 +30,8 @@ def plot(x, x_ref, re=None):
         plt.show()
     else:
         if x.ndim == 3 and x_ref.ndim == 3:
-            x = x[:,:,x.shape[2]//2]
-            x_ref = x_ref[:,:,x_ref.shape[2]//2]
+            x = x[:, :, x.shape[2]//2]
+            x_ref = x_ref[:, :, x_ref.shape[2]//2]
 
         x = np.abs(x)
         x_ref = np.abs(x_ref)
@@ -56,4 +57,3 @@ def plot(x, x_ref, re=None):
         plt.suptitle(f'Relative error (RE) = {re:.2e}')
         plt.tight_layout()
         plt.show()
-

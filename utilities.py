@@ -7,7 +7,7 @@ from itertools import chain
 
 
 def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
-    """ Split a 3-D array into a 3-D set of subarrays of approximately equal sizes."""
+    """ Split a 3-D array into a 3-D set of sub-arrays of approximately equal sizes."""
     n_domains = np.array(n_domains)
     size = np.array(array.shape)
     if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 3:
@@ -59,7 +59,7 @@ def list_to_array(input: list, depth: int) -> np.ndarray:
 
 
 def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
-    """ Split a COO-sparse tensor into a 3-D set of subarrays of approximately equal sizes."""
+    """ Split a COO-sparse tensor into a 3-D set of sub-arrays of approximately equal sizes."""
     coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
     domain_starts = np.cumsum((0,) + sizes)
     tensor = tensor.coalesce()

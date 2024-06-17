@@ -98,7 +98,7 @@ def test_residual(size, boundary_widths, periodic):
     """ Check that the residual_norm at first iteration == 1
         residual_norm is normalized with the preconditioned source
         residual_norm = norm ( B(x - (L+1)⁻¹ (B·x + c·y)) )
-        norm of preconditioned source = norm( B(L+1)⁻¹y) )
+        norm of preconditioned source = norm( B(L+1)⁻¹y )
     """
     torch.manual_seed(0)  # Set the random seed for reproducibility
     n = (torch.normal(mean=1.3, std=0.1, size=size, dtype=torch.float32) 

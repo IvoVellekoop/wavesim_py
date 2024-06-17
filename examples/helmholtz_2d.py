@@ -43,7 +43,7 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_siz
 #                      n_domains=(2, 2, 1))
 
 u_computed = run_algorithm(domain, source, max_iterations=int(1.e+5))[0]
-u_computed = u_computed.squeeze()[*([slice(boundary_widths,-boundary_widths)]*2)]
+u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
 
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
 u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_hc'])

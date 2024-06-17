@@ -10,7 +10,7 @@ from utilities import preprocess
 
 
 # generate a refractive index map
-sim_size = 270 * np.array([1, 1, 1])  # Simulation size in micrometers
+sim_size = 260 * np.array([1, 1, 1])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
@@ -33,7 +33,7 @@ n, boundary_array = preprocess(n, boundary_widths)
 assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
 
 # set up source, with size same as n + 2*boundary_widths, and a point source at the center of the domain
-indices = torch.tensor([[i // 2 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
+indices = torch.tensor([[v // 2 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
 values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple( np.array(n_size) + 2*boundary_array )
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)

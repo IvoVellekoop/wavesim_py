@@ -10,7 +10,7 @@ from utilities import preprocess
 
 
 # generate a refractive index map
-sim_size = 300 * np.array([1, 1, 1])  # Simulation size in micrometers
+sim_size = 250 * np.array([1, 1, 1])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
@@ -38,14 +38,14 @@ values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple( np.array(n_size) + 2*boundary_array )
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
-# other parameters
-# periodic = (True, True, True)  # periodic boundary conditions, no wrapping correction.
-periodic = (False, True, True)  # wrapping corrections
+# # 1-domain, periodic boundaries (without wrapping correction)
+# periodic = (True, True, True)  # periodic boundaries, wrapped field.
+# domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size)
+# OR. Uncomment to test domain decomposition
+periodic = (False, False, True)  # wrapping correction
 n_domains = (2, 1, 1)  # number of domains in each direction
-
-# set up scaling, and medium, propagation, and if required, correction (wrapping and transfer) operators
-# domain = HelmholtzDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic)
-domain = MultiDomain(permittivity=n, wavelength=wavelength, pixel_size=pixel_size, periodic=periodic, n_domains=n_domains)
+domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size, 
+                     n_domains=n_domains)
 
 start = time()
 u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000)  # Field u and state object with information about the run
@@ -68,15 +68,15 @@ if not os.path.exists('./logs'):
 with open('./logs/output.txt', 'a') as file:
     file.write(output)
 
+#%% crop and save the field
 # crop the field to the region of interest
 u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
 
 # save the field
 np.savez_compressed(f'{file_name}.npz', u=u)
 
+#%% plot the field
 # extent = extent=np.array([0, n_size[0], n_size[1], 0])*pixel_size
-
-# # plot the field
 # u = np.abs(u[:,:,u.shape[2]//2])
 # plt.imshow(u, cmap='hot_r', extent=extent)
 # plt.xlabel(r'$x~(\mu m)$')

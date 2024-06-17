@@ -80,7 +80,7 @@ def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
     return [extract_subarray(d) for d in range(len(sizes))]
 
 
-def combine(domains: np.ndarray, device=None) -> Tensor:
+def combine(domains: np.ndarray, device='cpu') -> Tensor:
     """ Concatenates a 3-d array of 3-d tensors"""
 
     # Calculate total size for each dimension
@@ -92,7 +92,7 @@ def combine(domains: np.ndarray, device=None) -> Tensor:
 
     # allocate memory
     template = domains[0, 0, 0]
-    result_tensor = torch.empty(size=total_size, dtype=template.dtype, device=device or template.device)
+    result_tensor = torch.empty(size=total_size, dtype=template.dtype, device=device)# or template.device)
 
     # Fill the pre-allocated tensor
     index0 = 0

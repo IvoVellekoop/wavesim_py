@@ -70,7 +70,7 @@ def test_operators(params):
     assert allclose(M(0), α * Γb)
 
     residual = Γb - ΓAx
-    assert allclose(M(x), x + α * residual)
+    assert allclose(M(x), x.to(residual.device) + α * residual)
 
 
 @pytest.mark.parametrize("params", parameters)

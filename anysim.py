@@ -1,6 +1,6 @@
 from wavesim.domain import Domain
 from utilities import is_zero
-
+from torch.cuda import empty_cache
 
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6):
     """ AnySim update
@@ -20,8 +20,9 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     # compute initial residual
     domain.add_source(slot_x, weight=1.)  # [x] = y
     preconditioner(domain, slot_x, slot_x)  # [x] = B(L+1)⁻¹y
-    init_norm_inv = 1 / domain.inner_product(slot_x, slot_x)  # inverse of initial norm, 1 / norm([x])
+    init_norm_inv = 1 / domain.inner_product(slot_x, slot_x)  # inverse of initial norm: 1 / norm([x])
     domain.clear(slot_x)  # Clear [x]
+    empty_cache()  # free up memory before starting the simulation
 
     for i in range(max_iterations):
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)

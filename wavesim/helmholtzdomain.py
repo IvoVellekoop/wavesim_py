@@ -23,6 +23,7 @@ class HelmholtzDomain(Domain):
                  n_slots=2,
                  stand_alone=True,
                  Vwrap=None,
+                 debug=False
                  ):
         """Construct a domain object with the given permittivity and allocate memory.
 
@@ -42,6 +43,7 @@ class HelmholtzDomain(Domain):
             n_boundary: Number of pixels used for the boundary correction.
             n_slots: number of arrays used for storing the field and temporary data.
             Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
+            debug: set to True to return inverse_propagator_kernel as output
 
             stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
                 permittivity of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
@@ -74,6 +76,7 @@ class HelmholtzDomain(Domain):
             [True, True, True]  # allow manually disabling wrapping corrections by setting n_boundary=0
         self._source = None
         self._stand_alone = stand_alone
+        self._debug = debug  # set to True to return inverse_propagator_kernel as output
 
         # allocate memory for the side pixels
         # note: at the moment, compute_corrections does not support in-place operations,
@@ -102,10 +105,10 @@ class HelmholtzDomain(Domain):
         # We temporarily store the kernel in `propagator_kernel`.
         # The shift and scale functions convert it to 1 / (scale·(L+shift)+1)
         # todo: convert to on-the-fly computation as in MATLAB code so that we don't need to store the kernel
-        self.inverse_propagator_kernel = 0.0j
+        self.propagator_kernel = 0.0j
         for dim in range(3):
-            self.inverse_propagator_kernel = self.inverse_propagator_kernel + self._laplace_kernel(dim)
-        self.propagator_kernel = None  # will be set in initialize_scale
+            self.propagator_kernel = self.propagator_kernel + self._laplace_kernel(dim)
+        # self.propagator_kernel = None  # will be set in initialize_scale
 
         # allocate storage for temporary data, re-use the memory we got for the raw scattering potential
         # as one of the locations (which will be overwritten later)
@@ -132,6 +135,7 @@ class HelmholtzDomain(Domain):
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
         else:
+            self.inverse_propagator_kernel = self.propagator_kernel.clone()
             # Compute the wrapping correction matrices if none were provided
             # These matrices must be computed before initialize_scale, since they
             # affect the overall scaling.
@@ -258,7 +262,7 @@ class HelmholtzDomain(Domain):
 
     def initialize_shift(self, shift) -> float:
         """Shifts the scattering potential and propagator kernel, then returns the norm of the shifted operator."""
-        self.inverse_propagator_kernel.add_(shift)
+        self.propagator_kernel.add_(shift)
         self._x[0].add_(-shift)  # currently holds the scattering potential
         self.shift = shift
         return self._x[0].view(-1).abs().max().item()
@@ -276,12 +280,18 @@ class HelmholtzDomain(Domain):
 
         # B = 1 - scale·(n² k₀² - shift). Scaling and shifting was already applied. 1-... not yet
         self.scale = scale
-        self._Bscat = 1.0 - scale * self._x[0]
+        self._Bscat = self._x[0].clone()
+        self._Bscat.mul_(-scale)
+        self._Bscat.add_(1.0)
+        # self._Bscat = 1.0 - scale * self._x[0]
 
         # kernel = 1 / (scale·(L + shift) + 1). Shifting was already applied. scaling, +1 and reciprocal not yet
-        self.inverse_propagator_kernel.multiply_(scale)
-        self.inverse_propagator_kernel.add_(1.0)
-        self.propagator_kernel = 1.0 / self.inverse_propagator_kernel
+        self.propagator_kernel.multiply_(scale)
+        self.propagator_kernel.add_(1.0)
+        if self._debug == True:
+            self.inverse_propagator_kernel = self.propagator_kernel.clone()
+        self.propagator_kernel.reciprocal_()
+
         if self.Vwrap is not None:
             self.Vwrap = [scale * W if W is not None else None for W in self.Vwrap]
 
@@ -346,7 +356,7 @@ class HelmholtzDomain(Domain):
         # new way: uses exact Laplace kernel in real space, and returns Fourier transform of that
         x = self.coordinates(dim, 'periodic')
         if x.numel() == 1:
-            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+            return torch.tensor(0.0, device=self.device, dtype=torch.float32)
 
         x = x * torch.pi / self.pixel_size
         c = torch.cos(x)

@@ -95,7 +95,7 @@ class Domain(metaclass=ABCMeta):
     def coordinates(self, dim, type: str = 'linear'):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        x = torch.arange(self.shape[dim], device=self.device, dtype=torch.float64) * self.pixel_size
+        x = torch.arange(self.shape[dim], device=self.device, dtype=torch.float32) * self.pixel_size
         if type == 'periodic':
             x -= self.pixel_size * (self.shape[dim] // 2)
             x = torch.fft.ifftshift(x)  # todo: or fftshift?

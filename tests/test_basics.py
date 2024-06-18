@@ -12,10 +12,10 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
     torch.manual_seed(12345)
     n = random_refractive_index(n_size)
     if n_domains is None:  # single domain
-        return HelmholtzDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary)
+        return HelmholtzDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary, debug=True)
     else:
         return MultiDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary,
-                           n_domains=n_domains)
+                           n_domains=n_domains, debug=True)
 
 
 def construct_source(n_size):

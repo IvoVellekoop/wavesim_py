@@ -356,7 +356,7 @@ class HelmholtzDomain(Domain):
         # new way: uses exact Laplace kernel in real space, and returns Fourier transform of that
         x = self.coordinates(dim, 'periodic')
         if x.numel() == 1:
-            return torch.tensor(0.0, device=self.device, dtype=torch.float32)
+            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
         x = x * torch.pi / self.pixel_size
         c = torch.cos(x)
@@ -364,7 +364,7 @@ class HelmholtzDomain(Domain):
         x_kernel = 2.0 * c / x ** 2 - 2.0 * s / x ** 3 + s / x
         x_kernel[0, 0, 0] = 1.0 / 3.0  # remove singularity at x=0
         x_kernel *= -torch.pi ** 2 / self.pixel_size ** 2
-        f_kernel = torch.fft.fftn(x_kernel)
+        f_kernel = torch.fft.fftn(x_kernel).to(torch.complex64)
         return -f_kernel.real
 
 

@@ -1,4 +1,5 @@
 import torch
+from torch.cuda import empty_cache
 from utilities import is_zero
 from .domain import Domain
 
@@ -135,7 +136,7 @@ class HelmholtzDomain(Domain):
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
         else:
-            self.inverse_propagator_kernel = self.propagator_kernel.clone()
+            self.inverse_propagator_kernel = None  # self.propagator_kernel is the inverse propagator kernel (memory efficient)
             # Compute the wrapping correction matrices if none were provided
             # These matrices must be computed before initialize_scale, since they
             # affect the overall scaling.
@@ -242,7 +243,10 @@ class HelmholtzDomain(Domain):
         """
         # todo: convert to on-the-fly computation
         torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-        self._x[slot_out].mul_(self.inverse_propagator_kernel)
+        if self.inverse_propagator_kernel is None:  # self.propagator_kernel is the inverse propagator kernel (memory efficient)
+            self._x[slot_out].mul_(self.propagator_kernel)
+        else:
+            self._x[slot_out].mul_(self.inverse_propagator_kernel)
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def set_source(self, source):

@@ -311,14 +311,16 @@ class HelmholtzDomain(Domain):
             if self.Vwrap[dim] is None:
                 continue
 
-            # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of wrap matrix
+            # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of the wrap matrix
             # (of size n_correction) is always at axis=0. It should be at axis=dim,
             # moveaxis moves the non-contracted dimension to the correct position
-            # todo: convert to an in-place operation using the 'out' parameter
-            self.edges[edge] = torch.moveaxis(
-                torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
-                                out=self.edges[edge]), 0,
-                dim)
+            # self.edges[edge] = torch.moveaxis(
+            #    torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
+            #                    out=self.edges[edge]), 0,
+            #    dim)
+            view = torch.moveaxis(self.edges[edge], dim, 0)
+            torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
+                            out=view)
 
         return self.edges
 

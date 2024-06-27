@@ -1,9 +1,8 @@
-matplotlib~=3.8.2
+pytest~=8.2.1
 numpy~=1.26.4
-Pillow~=10.0.1
-pytest~=7.4.4
-pytest-xdist~=3.5.0
-scipy~=1.11.4
+scipy~=1.13.1
+pillow~=10.3.0
+matplotlib~=3.9.0
 --find-links https://download.pytorch.org/whl/cu118
-torch~=2.2.0
-torchvision~=0.17.0
+torch~=2.3.1+cu118
+torchvision~=0.18.1+cu118

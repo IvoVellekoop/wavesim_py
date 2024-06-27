@@ -40,12 +40,12 @@ def allclose(a, b, rtol=0.0, atol=0.0, ulptol=100):
         return False
 
 
-def random_vector(n_size, device='cuda', dtype=dtype):
+def random_vector(n_size, device='cuda' if torch.cuda.is_available() else 'cpu', dtype=dtype):
     """Construct a random vector for testing operators"""
     return torch.randn(n_size, device=device, dtype=dtype) + 1.0j * torch.randn(n_size, device=device, dtype=dtype)
 
 
-def random_refractive_index(n_size, device='cuda', dtype=dtype):
+def random_refractive_index(n_size, device='cuda' if torch.cuda.is_available() else 'cpu', dtype=dtype):
     """Construct a random refractive index between 1 and 2 with a small positive imaginary part
 
     The sign of the imaginary part is such that the imaginary part of n² is positive

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from anysim import domain_operator
+from wavesim_iteration import domain_operator
 from utilities import full_matrix
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain

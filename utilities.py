@@ -92,7 +92,7 @@ def combine(domains: np.ndarray, device='cpu') -> Tensor:
 
     # allocate memory
     template = domains[0, 0, 0]
-    result_tensor = torch.empty(size=total_size, dtype=template.dtype, device=device)# or template.device)
+    result_tensor = torch.empty(size=total_size, dtype=template.dtype, device=device)
 
     # Fill the pre-allocated tensor
     index0 = 0

@@ -1,5 +1,4 @@
 import torch
-from torch.cuda import empty_cache
 from utilities import is_zero
 from .domain import Domain
 
@@ -21,11 +20,11 @@ class HelmholtzDomain(Domain):
                  pixel_size: float = 0.25,
                  wavelength: float = None,
                  n_boundary: int = 0,
-                 n_slots = 2,
-                 stand_alone = True,
-                 Vwrap = None,
-                 debug = False,
-                 device = None
+                 n_slots=2,
+                 stand_alone=True,
+                 Vwrap=None,
+                 debug=False,
+                 device=None
                  ):
         """Construct a domain object with the given permittivity and allocate memory.
 
@@ -142,7 +141,9 @@ class HelmholtzDomain(Domain):
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
         else:
-            self.inverse_propagator_kernel = None  # self.propagator_kernel is the inverse propagator kernel (memory efficient)
+            self.inverse_propagator_kernel = None  # self.propagator_kernel is the inverse propagator kernel
+            # (memory efficient to store one instead of both)
+
             # Compute the wrapping correction matrices if none were provided
             # These matrices must be computed before initialize_scale, since they
             # affect the overall scaling.
@@ -249,7 +250,8 @@ class HelmholtzDomain(Domain):
         """
         # todo: convert to on-the-fly computation
         torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-        if self.inverse_propagator_kernel is None:  # self.propagator_kernel is the inverse propagator kernel (memory efficient)
+        if self.inverse_propagator_kernel is None:
+            # self.propagator_kernel is the inverse propagator kernel (memory efficient to store one instead of both)
             self._x[slot_out].mul_(self.propagator_kernel)
         else:
             self._x[slot_out].mul_(self.inverse_propagator_kernel)
@@ -298,7 +300,7 @@ class HelmholtzDomain(Domain):
         # kernel = 1 / (scale·(L + shift) + 1). Shifting was already applied. scaling, +1 and reciprocal not yet
         self.propagator_kernel.multiply_(scale)
         self.propagator_kernel.add_(1.0)
-        if self._debug == True:
+        if self._debug:
             self.inverse_propagator_kernel = self.propagator_kernel.clone()
         self.propagator_kernel.reciprocal_()
 

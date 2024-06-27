@@ -2,6 +2,7 @@ from wavesim.domain import Domain
 from utilities import is_zero
 from torch.cuda import empty_cache
 
+
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6):
     """ WaveSim update
     :param domain: Helmholtz base parameters
@@ -28,7 +29,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
         # normalize residual norm with preconditioned source (i.e., with norm of B(L+1)⁻¹y)
         residual_norm = residual_norm * init_norm_inv  # norm(B(x - (L+1)⁻¹ (B·x + c·y))) / norm(B(L+1)⁻¹y)
-        print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}')#, end='\r')
+        print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}')
         if residual_norm < threshold:
             break
 

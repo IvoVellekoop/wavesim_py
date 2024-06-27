@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from scipy.special import exp1
 import matplotlib.pyplot as plt
-from anysim import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
+from wavesim_iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from . import allclose, random_vector, random_refractive_index

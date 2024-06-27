@@ -3,7 +3,7 @@ import numpy as np
 from scipy.special import exp1
 import sys
 sys.path.append(".")
-from anysim import run_algorithm
+from wavesim_iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from utilities import preprocess, relative_error

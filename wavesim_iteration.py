@@ -3,7 +3,7 @@ from utilities import is_zero
 from torch.cuda import empty_cache
 
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6):
-    """ AnySim update
+    """ WaveSim update
     :param domain: Helmholtz base parameters
     :param source: source field
     :param alpha: relaxation parameter for the Richardson iteration

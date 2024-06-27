@@ -4,7 +4,7 @@ from scipy.io import loadmat
 from PIL.Image import BILINEAR, fromarray, open
 import sys
 sys.path.append(".")
-from anysim import run_algorithm
+from wavesim_iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from utilities import pad_boundaries, preprocess, relative_error

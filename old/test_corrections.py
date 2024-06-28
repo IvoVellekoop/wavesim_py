@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from collections import defaultdict
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix, max_abs_error, pad_boundaries_torch, relative_error, squeeze_
 from torch import complex64, rand, zeros_like
@@ -16,7 +16,8 @@ def test_compare_a(n_size, boundary_widths):
     source = np.zeros_like(n, dtype=np.complex64)
     source[0] = 1.
 
-    base_w = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='wrap_corr')
+    base_w = MultiDomain(refractive_index=n, source=source, boundary_widths=boundary_widths,
+                         wrap_correction='wrap_corr')
     patch = (0, 0, 0)
     x = rand(*base_w.s.shape, dtype=complex64, device=base_w.devices[patch])
     x_dict = defaultdict(list)
@@ -25,7 +26,8 @@ def test_compare_a(n_size, boundary_widths):
     b_w = base_w.medium(x_dict)[patch]
     a_w = (l_w_plus1 - b_w) / base_w.scaling[patch]
 
-    base_o = HelmholtzBase(n=n, source=source, boundary_widths=boundary_widths, wrap_correction='L_omega')
+    base_o = MultiDomain(refractive_index=n, source=source, boundary_widths=boundary_widths,
+                         wrap_correction='L_omega')
     x2 = pad_boundaries_torch(x, (0, 0, 0), tuple(np.array(base_o.s.shape) - np.array(base_w.s.shape)),
                               mode="constant")
     x2_dict = defaultdict(list)
@@ -57,8 +59,9 @@ def test_compare_a(n_size, boundary_widths):
 @pytest.mark.parametrize("corr_type", ['wrapping', 'transfer'])
 def test_symmetry(n_size, boundary_widths, n_domains, corr_type):
     n = np.ones(n_size, dtype=np.complex64)
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths, n_domains=n_domains, wrap_correction='wrap_corr',
-                         scaling=1.)
+    base = MultiDomain(refractive_index=n, boundary_widths=boundary_widths, n_domains=n_domains,
+                       wrap_correction='wrap_corr',
+                       scaling=1.)
     restrict, extend = domain_decomp_operators(base)
 
     def corr(x):

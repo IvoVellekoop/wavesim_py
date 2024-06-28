@@ -1,4 +1,4 @@
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from state import State
 from utilities import max_abs_error, relative_error
 
@@ -13,7 +13,7 @@ figsize = (8, 8)  # (14.32,8)
 
 
 class LogPlot:
-    def __init__(self, base: HelmholtzBase, state: State, u_computed: np.array([]), u_reference=None,
+    def __init__(self, base: MultiDomain, state: State, u_computed: np.array([]), u_reference=None,
                  animate_iters=False):
         """ Logging and Plotting Class """
         self.base = base

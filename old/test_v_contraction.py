@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from collections import defaultdict
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from anysim import domain_decomp_operators, map_domain
 from utilities import full_matrix
 
@@ -14,8 +14,8 @@ def v_contraction(n_size, boundary_widths, n_domains, wrap_correction):
     # n = np.ones(n_size, dtype=np.complex64)
     n = np.random.rand(*n_size).astype(np.float32)
     # n[tuple(i//2 for i in n_size)] = 1.5
-    base = HelmholtzBase(n=n, boundary_widths=boundary_widths,
-                         n_domains=n_domains, wrap_correction=wrap_correction)
+    base = MultiDomain(refractive_index=n, boundary_widths=boundary_widths,
+                       n_domains=n_domains, wrap_correction=wrap_correction)
     restrict, extend = domain_decomp_operators(base)
 
     # function that evaluates B = 1 - V

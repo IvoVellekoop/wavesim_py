@@ -2,12 +2,13 @@ import os
 import torch
 import numpy as np
 from time import time
-import matplotlib.pyplot as plt
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from wavesim_iteration import run_algorithm  # to run the anysim iteration
 from utilities import preprocess
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+torch.cuda.memory._record_memory_history(max_entries=100000)
 
 # generate a refractive index map
 sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers
@@ -51,13 +52,26 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size, 
 #                      n_domains=n_domains)
 
+
 start = time()
 # Field u and state object with information about the run
-u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000)
+u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=5)
 end = time() - start
 print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
 
-# %% Postprocessing
+try:
+    torch.cuda.memory._dump_snapshot(f"mem_snapshot.pickle")
+    # To view memory snapshot, got this link in a browser window: https://pytorch.org/memory_viz
+    # Then drag and drop the file "mem_snapshot.pickle" into the browser window.
+except Exception as e:
+    # logger.error(f"Failed to capture memory snapshot {e}")
+    print(f"Failed to capture memory snapshot {e}")
+
+# Stop recording memory snapshot history.
+torch.cuda.memory._record_memory_history(enabled=None)
+
+
+#%% Postprocessing
 
 file_name = './logs/size'
 for i in range(n_dims):
@@ -72,20 +86,3 @@ if not os.path.exists('./logs'):
     os.makedirs('./logs')
 with open('./logs/output.txt', 'a') as file:
     file.write(output)
-
-#%% crop and save the field
-# # crop the field to the region of interest
-# u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
-# np.savez_compressed(f'{file_name}.npz', u=u)  # save the field
-
-#%% plot the field
-# extent = extent=np.array([0, n_size[0], n_size[1], 0])*pixel_size
-# u = np.abs(u[:,:,u.shape[2]//2])
-# plt.imshow(u, cmap='hot_r', extent=extent)
-# plt.xlabel(r'$x~(\mu m)$')
-# plt.ylabel(r'$y~(\mu m)$')
-# cbar = plt.colorbar(fraction=0.046, pad=0.04)
-# cbar.ax.set_title(r'$|E|$')
-# plt.tight_layout()
-# plt.savefig(f'{file_name}.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
-# plt.close('all')

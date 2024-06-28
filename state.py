@@ -3,12 +3,12 @@ import numpy as np
 from torch import tensor
 from torch.linalg import norm
 from collections import defaultdict
-from helmholtzbase import HelmholtzBase
+from wavesim.multidomain import MultiDomain
 from utilities import squeeze_
 
 
 class State(object):
-    def __init__(self, base: HelmholtzBase):
+    def __init__(self, base: MultiDomain):
         self.base = base
         self.init_norm = None
         self.subdomain_residuals = defaultdict(list)  # Initialize empty dict of lists

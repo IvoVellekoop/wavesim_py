@@ -11,3 +11,5 @@
 .vscode
 __pycache__
 logs
+*.nsys-rep
+*.sqlite

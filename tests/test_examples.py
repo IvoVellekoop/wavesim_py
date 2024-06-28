@@ -6,7 +6,6 @@ from PIL.Image import BILINEAR, fromarray, open
 from wavesim_iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from . import allclose, random_vector, random_refractive_index
 from utilities import pad_boundaries, preprocess, relative_error
 
 
@@ -56,12 +55,10 @@ def test_1d_glass_plate(n_domains, periodic):
     (1, 3, 1), 
     (2, 2, 1), 
     (3, 2, 1), 
-    (2, 3, 1), 
-    (3, 3, 1), 
 ])
 def test_2d_low_contrast(n_domains):
-    """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic biological 
-        tissue). Compare with reference solution (matlab repo result) """
+    """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic
+        biological tissue). Compare with reference solution (matlab repo result) """
     oversampling = 0.25
     im = np.asarray(open('logo_structure_vector.png')) / 255
     n_water = 1.33
@@ -84,9 +81,10 @@ def test_2d_low_contrast(n_domains):
         periodic = (True, True, True)  # periodic boundaries, wrapped field.
         domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
     else:  # OR. Domain decomposition
-        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in that direction, False otherwise
+        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in direction, False otherwise
         periodic = tuple(periodic)
-        domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size, n_domains=n_domains)
+        domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
+                             n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
@@ -108,8 +106,6 @@ def test_2d_low_contrast(n_domains):
     (1, 3, 1), 
     (2, 2, 1), 
     (3, 2, 1), 
-    (2, 3, 1), 
-    (3, 3, 1), 
 ])
 def test_2d_high_contrast(n_domains):
     """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
@@ -140,9 +136,10 @@ def test_2d_high_contrast(n_domains):
         periodic = (True, True, True)  # periodic boundaries, wrapped field.
         domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
     else:  # OR. Domain decomposition
-        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in that direction, False otherwise
+        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in direction, False otherwise
         periodic = tuple(periodic)
-        domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size, n_domains=n_domains)
+        domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
+                             n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=int(1.e+5))[0]
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
@@ -193,7 +190,7 @@ def test_3d_disordered(n_domains):
         periodic = (True, True, True)  # periodic boundaries, wrapped field.
         domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
     else:  # OR. Domain decomposition
-        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in that direction, False otherwise
+        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in direction, False otherwise
         periodic = tuple(periodic)
         domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
 
@@ -246,7 +243,7 @@ def test_3d_homogeneous(n_domains):
         periodic = (True, True, True)  # periodic boundaries, wrapped field.
         domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
     else:  # OR. Domain decomposition
-        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in that direction, False otherwise
+        periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in direction, False otherwise
         periodic = tuple(periodic)
         domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
     

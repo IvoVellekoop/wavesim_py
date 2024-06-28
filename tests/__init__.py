@@ -1,6 +1,5 @@
 import torch
 
-# device = "cuda"  # "cpu"  # "cuda:0"
 dtype = torch.complex64
 
 

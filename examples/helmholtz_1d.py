@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from scipy.io import loadmat
@@ -8,6 +9,9 @@ from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from utilities import preprocess, relative_error
 from __init__ import plot
+
+if os.path.basename(os.getcwd()) == 'examples':
+    os.chdir('..')
 
 """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
 wavelength = 1.

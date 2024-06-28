@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from scipy.io import loadmat
@@ -10,6 +11,8 @@ from wavesim.multidomain import MultiDomain
 from utilities import pad_boundaries, preprocess, relative_error
 from __init__ import plot
 
+if os.path.basename(os.getcwd()) == 'examples':
+    os.chdir('..')
 
 """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic biological 
     tissue). Compare with reference solution (matlab repo result) """

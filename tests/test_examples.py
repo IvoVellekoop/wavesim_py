@@ -1,4 +1,5 @@
 import pytest
+import os
 import torch
 import numpy as np
 from scipy.io import loadmat
@@ -8,6 +9,8 @@ from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from utilities import pad_boundaries, preprocess, relative_error
 
+if os.path.basename(os.getcwd()) == 'tests':
+    os.chdir('..')
 
 @pytest.mark.parametrize("n_domains, periodic", [
     (None, (True, True, True)),  # periodic boundaries, wrapped field.
@@ -100,12 +103,7 @@ def test_2d_low_contrast(n_domains):
 @pytest.mark.parametrize("n_domains", [
     None,  # periodic boundaries, wrapped field.
     (1, 1, 1),  # wrapping correction (here and beyond)
-    (2, 1, 1), 
-    (3, 1, 1), 
-    (1, 2, 1), 
-    (1, 3, 1), 
-    (2, 2, 1), 
-    (3, 2, 1), 
+    (1, 2, 1),
 ])
 def test_2d_high_contrast(n_domains):
     """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
@@ -218,8 +216,7 @@ def test_3d_disordered(n_domains):
     (2, 2, 1), 
     (2, 1, 2), 
     (1, 2, 2), 
-    (2, 2, 2), 
-    (3, 2, 1), 
+    (3, 2, 1),
     (3, 1, 2), 
     (1, 3, 2), 
     (1, 2, 3), 

@@ -1,3 +1,63 @@
+# WaveSim
+
+### What is WaveSim?
+[WaveSim](https://www.wavesim.org/) is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method, WaveSim is based on the Modified Born Series approach. This method has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD. For more information (and to participate in the forum for discussions, queries, and requests), please visit our website [www.wavesim.org](https://www.wavesim.org/).
+
+### If you use WaveSim and publish your work, please cite us:
+
+* Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. _Journal of computational physics, 322_, 113-124. [[Link]](https://doi.org/10.1016/j.jcp.2016.06.034)
+* Osnabrugge, G., Benedictus, M., & Vellekoop, I. M. (2021). Ultra-thin boundary layer for high-accuracy simulations of light propagation. _Optics express, 29_(2), 1649-1658. [[Link]](https://doi.org/10.1364/OE.412833)
+
+## Installation
+
+WaveSim requires [Python 3.12](https://www.python.org/downloads/release/python-3120/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
+
+We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lighter counterpart of Anaconda) to install Python and the required packages (contained in [environment.yml](environment.yml)) within a conda environment. If you prefer to create a virtual environment without using Miniconda/Anaconda, you can use [requirements.txt](requirements.txt) for dependencies. The steps that follow are for a Miniconda installation.
+
+1. **Download Miniconda**, choosing the [Python 3.12 installer](https://docs.anaconda.com/miniconda/miniconda-other-installer-links/) for your operating system (Windows/macOS/Linux).
+
+2. **Install Miniconda**, following the [installation instructions](https://docs.anaconda.com/miniconda/miniconda-install/) for your OS. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later. (If you cannot immediately activate conda, close and re-open your terminal window to make the changes take effect).
+
+3. **Test your installation**. In the terminal, run the below command.
+
+        conda list
+   A list of installed packages appears if it has been installed correctly.
+
+6. **Set up a conda environment**. Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work.
+
+   If you see (base) before all the information before \$ on a command line, you are already in the base conda environment. If not, run
+
+        conda activate
+   Create a new environment by running
+
+        conda env create -f environment.yml
+   
+
+    * To update the current conda environment from a .yml file:
+    
+            conda env update --name anysim_cluster --file environment.yml --prune
+    
+    * To export the current environment to a .yml file:
+    
+            conda env export > <filename>.yml
+    
+    * To install any packages within an environment, first go into the environment and then install the package:
+    
+            conda activate <environment name>
+            conda install <package name>
+    
+    * If conda does not have the package, and googling it suggests installing it via pip, use this command to install it specifically within the current environment and not globally (always prefer conda over pip. Only go to pip if the package is not available through conda):
+    
+            python -m pip install <package name>
+    
+    * After updating conda, setting up a new environment, installing packages, it is a nice idea to clean up any installation packages or tarballs as they are not needed anymore:
+    
+            conda clean --all
+
+The [Miniconda environment management guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) has more details if you need them.
+
+---
+
 # Running the code
 
 test/test_examples.py contains 2 examples each of 1D, 2D, and 3D problems. The minimum 2 inputs that all require are n (refractive index distribution, a 3-dimensional array) and source (source term, of the same size as n). 
@@ -57,79 +117,6 @@ Number of points used in the wrapping correction in the wrap_correction='wrap_co
 
 ## setup_operators = True
 Boolean for whether to set up Medium (+corrections) and Propagator operators, and scaling
-
----
----
-# Installing Miniconda on a Linux system (or Windows Subsystem for Linux)
-
-Below are the instructions for setting up Miniconda (a much lighter counterpart of Anaconda) to work in conda environments, and the conda environment corresponding to this project.
-
-1. Download the appropriate (i.e. Linux/Windows/macOS) installer from https://docs.conda.io/en/latest/miniconda.html
-
-Assuming Linux for the step ahead. Instructions also available at https://conda.io/projects/conda/en/stable/user-guide/install/linux.html
-
-2. In the directory where the installer was downloaded, in the terminal window, run:
-
-        bash Miniconda3-latest-Linux-x86_64.sh
-
-3. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later.
-
-4. To make the changes take effect, close and then re-open your terminal window.
-
-5. Test your installation. In your terminal window or Anaconda Prompt, run the command
-
-        conda list
-
-A list of installed packages appears if it has been installed correctly.
-
----
-# Setting up a conda environment
-
-Instructions also available at https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
-
-Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work.
-
-1. If you see (base) before all the information before \$ on a command line, you are already in the base conda environment. If not, run:
-
-        conda activate
-
-2. Update conda:
-
-                conda update conda
-                conda update --all
-
-3. New conda environment from:
-
-    * scratch, just with commands
-        
-                conda create --name <environment name>
-
-        OR
-
-    * a .yml file in the current directory
-
-                conda env create -f environment.yml
-
-4. To update the current conda environment from a .yml file:
-
-        conda env update --name anysim_cluster --file environment.yml --prune
-
-4. To export current environment to a .yml file:
-
-        conda env export > <filename>.yml
-
-5. To install any packages within an environment, first go into the environment and then install the package:
-
-        conda activate <environment name>
-        conda install <package name>
-
-6. If conda does not have the package, and googling it suggests installing it via pip, use this command to install it specifically within the current environment and not globally (always prefer conda over pip. Only go to pip if the package is not available through conda):
-
-        python -m pip install <package name>
-
-7. After updating conda, setting up a new environment, installing packages, it is a nice idea to clean up any installation packages or tarballs as they are not needed anymore:
-
-        conda clean --all
 
 ---
 

@@ -1,16 +1,14 @@
-# WaveSim
+# What is [Wavesim](https://www.wavesim.org/)?
+[Wavesim](https://www.wavesim.org/) is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method, Wavesim is based on the Modified Born Series approach. This method has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD. For more information (and to participate in the forum for discussions, queries, and requests), please visit our website [www.wavesim.org](https://www.wavesim.org/).
 
-### What is WaveSim?
-[WaveSim](https://www.wavesim.org/) is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method, WaveSim is based on the Modified Born Series approach. This method has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD. For more information (and to participate in the forum for discussions, queries, and requests), please visit our website [www.wavesim.org](https://www.wavesim.org/).
-
-### If you use WaveSim and publish your work, please cite us:
+## If you use Wavesim and publish your work, please cite us:
 
 * Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. _Journal of computational physics, 322_, 113-124. [[Link]](https://doi.org/10.1016/j.jcp.2016.06.034)
 * Osnabrugge, G., Benedictus, M., & Vellekoop, I. M. (2021). Ultra-thin boundary layer for high-accuracy simulations of light propagation. _Optics express, 29_(2), 1649-1658. [[Link]](https://doi.org/10.1364/OE.412833)
 
-## Installation
+# Installation
 
-WaveSim requires [Python 3.12](https://www.python.org/downloads/release/python-3120/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
+Wavesim requires [Python 3.12](https://www.python.org/downloads/release/python-3120/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
 
 We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lighter counterpart of Anaconda) to install Python and the required packages (contained in [environment.yml](environment.yml)) within a conda environment. If you prefer to create a virtual environment without using Miniconda/Anaconda, you can use [requirements.txt](requirements.txt) for dependencies. The steps that follow are for a Miniconda installation.
 
@@ -18,41 +16,50 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
 
 2. **Install Miniconda**, following the [installation instructions](https://docs.anaconda.com/miniconda/miniconda-install/) for your OS. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later. (If you cannot immediately activate conda, close and re-open your terminal window to make the changes take effect).
 
-3. **Test your installation**. In the terminal, run the below command.
+3. **Test your installation**. Open Anaconda Prompt and run the below command. Alternatively, open an editor like [Visual Studio Code](https://code.visualstudio.com/) or [PyCharm](https://www.jetbrains.com/pycharm/), select the Python interpreter in the `miniconda3/` directory with the label `('base')`, and run the command:
 
-        conda list
+    ``` 
+    conda list
+    ``` 
+
    A list of installed packages appears if it has been installed correctly.
 
-6. **Set up a conda environment**. Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work.
+6. **Set up a conda environment**. Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work. Create a new environment using the [environment.yml](environment.yml) file provided by running
 
-   If you see (base) before all the information before \$ on a command line, you are already in the base conda environment. If not, run
-
-        conda activate
-   Create a new environment by running
-
-        conda env create -f environment.yml
+    ``` 
+    conda env create -f environment.yml
+    ``` 
    
-
     * To update the current conda environment from a .yml file:
     
-            conda env update --name anysim_cluster --file environment.yml --prune
+        ``` 
+        conda env update --name wavesim --file environment.yml --prune
+        ``` 
     
     * To export the current environment to a .yml file:
     
-            conda env export > <filename>.yml
+        ``` 
+        conda env export > <filename>.yml
+        ``` 
     
     * To install any packages within an environment, first go into the environment and then install the package:
     
-            conda activate <environment name>
-            conda install <package name>
+        ``` 
+        conda activate <environment name>
+        conda install <package name>
+        ``` 
     
     * If conda does not have the package, and googling it suggests installing it via pip, use this command to install it specifically within the current environment and not globally (always prefer conda over pip. Only go to pip if the package is not available through conda):
     
-            python -m pip install <package name>
+        ``` 
+        python -m pip install <package name>
+        ``` 
     
     * After updating conda, setting up a new environment, installing packages, it is a nice idea to clean up any installation packages or tarballs as they are not needed anymore:
     
-            conda clean --all
+        ``` 
+        conda clean --all
+        ``` 
 
 The [Miniconda environment management guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) has more details if you need them.
 

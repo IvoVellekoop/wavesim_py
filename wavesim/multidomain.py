@@ -16,8 +16,8 @@ class MultiDomain(Domain):
                  wavelength: float = None,
                  n_domains: tuple[int, int, int] = (1, 1, 1),
                  n_boundary: int = 8,
-                 debug: bool = False,
-                 device: str = None):
+                 device: str = None,
+                 debug: bool = False):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
         Arguments:
@@ -31,12 +31,12 @@ class MultiDomain(Domain):
                 ones. In the future, the domain size may be adjusted to have an efficient fourier transform.
                 is (1,1,1), no domain decomposition.
             n_boundary: Number of points used in the wrapping and domain transfer correction. Default is 8.
-            debug: set to True to return inverse_propagator_kernel as output
             device: 'cpu' to use the cpu, 'cuda' to distribute the simulation over all available cuda devices, 'cuda:x'
                 to use a specific cuda device, a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the
                 simulation over these devices in a round-robin fashion, or None, which is equivalent to 'cuda' if
                 cuda devices are available, and 'cpu' if they are not.
                 todo: implement
+            debug: set to True to return inverse_propagator_kernel as output
         """
 
         # Takes the input parameters and returns these in the appropriate format, with more parameters for setting up

@@ -23,9 +23,8 @@ class HelmholtzDomain(Domain):
                  n_slots=2,
                  stand_alone=True,
                  Vwrap=None,
-                 debug=False,
-                 device=None
-                 ):
+                 device=None,
+                 debug=False):
         """Construct a domain object with the given permittivity and allocate memory.
 
         Note: the permittivity array is stored in one of the temporary memory slots and will be overwritten during
@@ -49,12 +48,12 @@ class HelmholtzDomain(Domain):
                  Set to False when part of a multi-domain, where the all subdomains need to be considered together to
                  compute the shift and scale factors.
             Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
-            debug: set to True to return inverse_propagator_kernel as output.
             device: 'cpu' to use the cpu, 'cuda' to distribute the simulation over all available cuda devices, 
                     'cuda:x' to use a specific cuda device, 
                     a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the simulation over these 
                         devices in a round-robin fashion, or 
                     None, which is equivalent to 'cuda' if cuda devices are available, and 'cpu' if they are not.
+            debug: set to True to return inverse_propagator_kernel as output.
          """
         
         if device is None or device == 'cuda':

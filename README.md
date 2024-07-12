@@ -24,129 +24,74 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
 
    A list of installed packages appears if it has been installed correctly.
 
-6. **Set up a conda environment**. Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work. Create a new environment using the [environment.yml](environment.yml) file provided by running
-
-    ``` 
+4. **Set up a conda environment**. Avoid using the base environment altogether. It is a good backup environment to fall back on if and when the other environments are corrupted/don't work. Create a new environment using the [environment.yml](environment.yml) and activate.
+    ```
     conda env create -f environment.yml
-    ``` 
-   
-    * To update the current conda environment from a .yml file:
-    
-        ``` 
-        conda env update --name wavesim --file environment.yml --prune
-        ``` 
-    
-    * To export the current environment to a .yml file:
-    
-        ``` 
-        conda env export > <filename>.yml
-        ``` 
-    
-    * To install any packages within an environment, first go into the environment and then install the package:
-    
-        ``` 
-        conda activate <environment name>
-        conda install <package name>
-        ``` 
-    
-    * If conda does not have the package, and googling it suggests installing it via pip, use this command to install it specifically within the current environment and not globally (always prefer conda over pip. Only go to pip if the package is not available through conda):
-    
-        ``` 
-        python -m pip install <package name>
-        ``` 
-    
-    * After updating conda, setting up a new environment, installing packages, it is a nice idea to clean up any installation packages or tarballs as they are not needed anymore:
-    
-        ``` 
-        conda clean --all
-        ``` 
+    conda activate wavesim
+    ```
 
-The [Miniconda environment management guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) has more details if you need them.
-
----
+    The [Miniconda environment management guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) has more details if you need them.
 
 # Running the code
 
-test/test_examples.py contains 2 examples each of 1D, 2D, and 3D problems. The minimum 2 inputs that all require are n (refractive index distribution, a 3-dimensional array) and source (source term, of the same size as n). 
+Once the virtual environment is setup with all the required packages, you are ready to run the code. You can go through any of the scripts in the [examples directory](examples) for the basic steps needed to run a simulation. The directory contains 2 examples each of 1D, 2D, and 3D problems. 
+
+You can run the code with just three inputs:
+* `permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
+* `periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [True] or not [False], and
+* `source` (same size as permittivity)
+
+Below a simple example, [helmholtz_1d_analytical.py](examples/helmholtz_1d_analytical.py), is shown to explain these and the other optional inputs.
 
 ## Simple example (1D, homogeneous medium)
 
-        import numpy as np
-        from helmholtzbase import HelmholtzBase  # to set up medium, propagation operators, and scaling
-        from anysim import run_algorithm  # to run the anysim iteration
+    ```
+    import numpy as np
+    from wavesim.multidomain import MultiDomain     # to set up medium, propagation operators, and scaling
+    from wavesim_iteration import run_algorithm     # to run the wavesim iteration
+    from utilities import preprocess                # to pad refractive_index and square to give permittivity
 
-        n = np.ones((256, 1, 1))        # Refractive index distribution
-        source = np.zeros_like(n)       # Source term
-        source[0] = 1.                  # Amplitude 1. at location [0]
-        base = HelmholtzBase(n, source) # to set up medium and propagation operators, and scaling
-        u, state = run_algorithm(base)  # Field u and state object with information about the run
+    permittivity = np.ones((256, 1, 1))
+    periodic = (True, True, True)                   # periodic boundaries, wrapped field.
+    source = np.zeros_like(permittivity)
+    source[0] = 1.                                  # Amplitude 1 at location [0]
+    
+    domain = MultiDomain(permittivity, periodic)    # to set up the domain operators
+    u = run_algorithm(domain, source)               # Field u
+    ```
 
-All other parameters have defaults. Details about n, source, and the other parameters are given below, with the default values defined given in the headers:
+All other parameters have defaults. Details about permittivity, source, and the other parameters are given below (with the default values, if defined).
 
-## n = np.ones((1, 1, 1))
-3-dimensional array with refractive index distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, simply fill the first 1 or 2 dimensions with values > 1 and leave the other dimension(s) as 1.
+### MultiDomain()
 
-## source=np.zeros((1, 1, 1))
-Source term, a 3-dimensional array, with the same size as n, and default as 0 everywhere. Set up amplitude(s) at the desired location(s), following the same principle as n for 1, 2, or 3-dimensional problems.
+`permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 
-## wavelength = 1.
-Wavelength in um (micron)
+`periodic`: indicates for each dimension whether the simulation is periodic [True] or not [False]. For periodic dimensions, `periodic = [True, True, True]`, the field is wrapped around the domain.
 
-## ppw = 4
-points per wavelength
+`pixel_size: float = 0.25`: points per wavelength.
 
-## boundary_widths = (20, 20, 20)
-Width of absorbing boundaries. 3-element tuple indicating boundaries in x, y, and z dimensions.
+`wavelength: float = None`: wavelength: wavelength in micrometer (um).
 
-## n_domains = (1, 1, 1)
-Number of subdomains to decompose the problem into. 3-element tuple indicating number of domains in x, y, and z dimensions.
+`n_domains: tuple[int, int, int] = (1, 1, 1)`: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If `(1, 1, 1)`, indicates no domain decomposition.
 
-## wrap_correction = None
-None
-    (Eliminate wrap-around effects with absorbing boundaries), OR
+`n_boundary: int = 8`: number of points used in the wrapping and domain transfer correction. Applicable when `periodic` is False in a dimension, or `n_domains` > 1 in a dimension.
 
-'L_omega'
-    (Do the fast convolution over a much larger domain such that there are no wrap-around effects in the Laplacian), OR
+`device: str = None`: 
+*  `'cpu'` to use the cpu, 
+* `'cuda:x'` to use a specific cuda device
+* `'cuda'` or a list of strings, e.g., `['cuda:0', 'cuda:1']`, to distribute the simulation over the available/given cuda devices in a round-robin fashion
+* `None`, which is equivalent to `'cuda'` if cuda devices are available, and `'cpu'` if they are not.
 
-'wrap_corr'
-    (Add the wrapping correction term to the medium operator to correct for the wrap-around effects, allowing for smaller absorbing boundaries only to tackle reflections)
+`debug: bool = False`: set to `True` for testing to return inverse_propagator_kernel as output.
 
-wrap_correction defaults to 'wrap_corr' when n_domains > 1.
+### run_algorithm()
 
-## omega = 10
-Compute the fft over omega times the domain size. The fft is used for implementing the Laplacian in the wrap_correction='L_omega' case, or the wrapping corrections in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
+`domain`: the domain object created by MultiDomain
 
-## n_correction = 8
-Number of points used in the wrapping correction in the wrap_correction='wrap_corr' case, or in the communication between subdomains when n_domains > 1.
+`source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
 
-## max_iterations = 10000
-[int] Maximum number of iterations
+`alpha: float = 0.75`: relaxation parameter for the Richardson iteration
 
-## setup_operators = True
-Boolean for whether to set up Medium (+corrections) and Propagator operators, and scaling
+`max_iterations: int = 1000`: maximum number of iterations
 
----
-
-# If problem with specifying fonts in matplotlib.rc 
-
-Example of an error: "findfont: Generic family 'sans-serif' not found because none of the following families were found: Time New Roman"
-
-1. Check if 'mscorefonts' package installed in conda (using conda list). If not,
-
-        conda install -c conda-forge mscorefonts
-
-2. Clear matplotlib cache. An equally important step.
-
-        rm ~/.cache/matplotlib -rf
-
----
-
-# If problem with tex in matplotlib
-
-        sudo apt install texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
-
-        python -m pip install latex
-
-# For animations, ffmpeg package needed (below command for Linux)
-
-        sudo apt-get install ffmpeg
+`threshold: float = 1.e-6`: threshold for the residual norm for stopping the iteration

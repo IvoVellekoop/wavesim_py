@@ -52,10 +52,10 @@ Below a simple example, [helmholtz_1d_analytical.py](examples/helmholtz_1d_analy
     from utilities import preprocess                # to pad refractive_index and square to give permittivity
 
     permittivity = np.ones((256, 1, 1))
-    periodic = (True, True, True)                   # periodic boundaries, wrapped field.
+    periodic = (True, True, True)
     source = np.zeros_like(permittivity)
     source[0] = 1.                                  # Amplitude 1 at location [0]
-    
+
     domain = MultiDomain(permittivity, periodic)    # to set up the domain operators
     u = run_algorithm(domain, source)               # Field u
     ```
@@ -66,7 +66,7 @@ All other parameters have defaults. Details about permittivity, source, and the 
 
 `permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 
-`periodic`: indicates for each dimension whether the simulation is periodic [True] or not [False]. For periodic dimensions, `periodic = [True, True, True]`, the field is wrapped around the domain.
+`periodic`: indicates for each dimension whether the simulation is periodic [True] or not [False]. For periodic dimensions, i.e., `periodic = [True, True, True]`, the field is wrapped around the domain.
 
 `pixel_size: float = 0.25`: points per wavelength.
 

@@ -12,14 +12,15 @@ from utilities import pad_boundaries, preprocess, relative_error
 if os.path.basename(os.getcwd()) == 'tests':
     os.chdir('..')
 
+
 @pytest.mark.parametrize("n_domains, periodic", [
     (None, (True, True, True)),  # periodic boundaries, wrapped field.
     ((1, 1, 1), (False, True, True)),  # wrapping correction (here and beyond)
-    ((2, 1, 1), (False, True, True)), 
-    ((3, 1, 1), (False, True, True)), 
+    ((2, 1, 1), (False, True, True)),
+    ((3, 1, 1), (False, True, True)),
 ])
 def test_1d_glass_plate(n_domains, periodic):
-    """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
+    """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result). """
     wavelength = 1.
     n_size = (256, 1, 1)
     n = np.ones(n_size, dtype=np.complex64)
@@ -52,16 +53,16 @@ def test_1d_glass_plate(n_domains, periodic):
 @pytest.mark.parametrize("n_domains", [
     None,  # periodic boundaries, wrapped field.
     (1, 1, 1),  # wrapping correction (here and beyond)
-    (2, 1, 1), 
-    (3, 1, 1), 
-    (1, 2, 1), 
-    (1, 3, 1), 
-    (2, 2, 1), 
-    (3, 2, 1), 
+    (2, 1, 1),
+    (3, 1, 1),
+    (1, 2, 1),
+    (1, 3, 1),
+    (2, 2, 1),
+    (3, 2, 1),
 ])
 def test_2d_low_contrast(n_domains):
     """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic
-        biological tissue). Compare with reference solution (matlab repo result) """
+        biological tissue). Compare with reference solution (matlab repo result). """
     oversampling = 0.25
     im = np.asarray(open('logo_structure_vector.png')) / 255
     n_water = 1.33
@@ -107,7 +108,7 @@ def test_2d_low_contrast(n_domains):
 ])
 def test_2d_high_contrast(n_domains):
     """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
-        Compare with reference solution (matlab repo result) """
+        Compare with reference solution (matlab repo result). """
 
     oversampling = 0.25
     im = np.asarray(open('logo_structure_vector.png')) / 255
@@ -154,23 +155,23 @@ def test_2d_high_contrast(n_domains):
 @pytest.mark.parametrize("n_domains", [
     None,  # periodic boundaries, wrapped field.
     (1, 1, 1),  # wrapping correction (here and beyond)
-    (2, 1, 1), 
-    (3, 1, 1), 
-    (1, 2, 1), 
-    (1, 3, 1), 
-    (1, 1, 2), 
-    (1, 1, 2), 
-    (2, 2, 1), 
-    (2, 1, 2), 
-    (1, 2, 2), 
-    (2, 2, 2), 
-    (3, 2, 1), 
-    (3, 1, 2), 
-    (1, 3, 2), 
-    (1, 2, 3), 
+    (2, 1, 1),
+    (3, 1, 1),
+    (1, 2, 1),
+    (1, 3, 1),
+    (1, 1, 2),
+    (1, 1, 2),
+    (2, 2, 1),
+    (2, 1, 2),
+    (1, 2, 2),
+    (2, 2, 2),
+    (3, 2, 1),
+    (3, 1, 2),
+    (1, 3, 2),
+    (1, 2, 3),
 ])
 def test_3d_disordered(n_domains):
-    """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
+    """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
     wavelength = 1.
     n_size = (128, 48, 96)
     n = np.ascontiguousarray(loadmat('matlab_results.mat')['n3d_disordered'])
@@ -207,22 +208,22 @@ def test_3d_disordered(n_domains):
 @pytest.mark.parametrize("n_domains", [
     None,  # periodic boundaries, wrapped field.
     (1, 1, 1),  # wrapping correction (here and beyond)
-    (2, 1, 1), 
-    (3, 1, 1), 
-    (1, 2, 1), 
-    (1, 3, 1), 
-    (1, 1, 2), 
-    (1, 1, 2), 
-    (2, 2, 1), 
-    (2, 1, 2), 
-    (1, 2, 2), 
+    (2, 1, 1),
+    (3, 1, 1),
+    (1, 2, 1),
+    (1, 3, 1),
+    (1, 1, 2),
+    (1, 1, 2),
+    (2, 2, 1),
+    (2, 1, 2),
+    (1, 2, 2),
     (3, 2, 1),
-    (3, 1, 2), 
-    (1, 3, 2), 
-    (1, 2, 3), 
+    (3, 1, 2),
+    (1, 3, 2),
+    (1, 2, 3),
 ])
 def test_3d_homogeneous(n_domains):
-    """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
+    """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
     wavelength = 1.
     n_size = (128, 128, 128)
     n = np.ones(tuple(n_size), dtype=np.complex64)
@@ -243,7 +244,7 @@ def test_3d_homogeneous(n_domains):
         periodic = np.where(np.array(n_domains) == 1, True, False)  # True for 1 domain in direction, False otherwise
         periodic = tuple(periodic)
         domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
-    
+
     u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
 

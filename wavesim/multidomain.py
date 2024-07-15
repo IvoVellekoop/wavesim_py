@@ -106,7 +106,7 @@ class MultiDomain(Domain):
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
 
-    ## Functions implementing the domain interface
+    # Functions implementing the domain interface
     # add_source()
     # clear()
     # get()
@@ -144,8 +144,8 @@ class MultiDomain(Domain):
         """ Compute the inner product of the fields in slots a and b
 
         Note: use sqrt(inner_product(slot_a, slot_a)) to compute the norm of the field in slot_a.
-        There is a large but inconsistent difference in performance between
-        vdot and linalg.norm. Execution time can vary a factor of 3 or more between the two, depending on the input size
+        There is a large but inconsistent difference in performance between vdot and linalg.norm.
+        Execution time can vary a factor of 3 or more between the two, depending on the input size
         and whether the function is executed on the CPU or the GPU.
         """
         inner_product = 0.0
@@ -154,8 +154,7 @@ class MultiDomain(Domain):
         return inner_product
 
     def medium(self, slot_in: int, slot_out: int):
-        """ Apply the medium operator B, including wrapping corrections
-        """
+        """ Apply the medium operator B, including wrapping corrections."""
         domain_edges = [domain.compute_corrections(slot_in) for domain in self.domains.flat]
         domain_edges = list_to_array(domain_edges, 2).reshape(*self.domains.shape, 6)
 
@@ -192,19 +191,17 @@ class MultiDomain(Domain):
             domain.mix(weight_a, slot_a, weight_b, slot_b, slot_out)
 
     def propagator(self, slot_in: int, slot_out: int):
-        """ Apply propagator operators (L+1)^-1 to subdomains/patches of x
-        """
+        """ Apply propagator operators (L+1)^-1 to subdomains/patches of x."""
         for domain in self.domains.flat:
             domain.propagator(slot_in, slot_out)
 
     def inverse_propagator(self, slot_in: int, slot_out: int):
-        """ Apply inverse propagator operators L+1 to subdomains/patches of x
-        """
+        """ Apply inverse propagator operators L+1 to subdomains/patches of x."""
         for domain in self.domains.flat:
             domain.inverse_propagator(slot_in, slot_out)
 
     def set_source(self, source):
-        """ Split the source into subdomains and store in the subdomain states """
+        """ Split the source into subdomains and store in the subdomain states."""
         if source is None or is_zero(source):
             for domain in self.domains.flat:
                 domain.set_source(None)

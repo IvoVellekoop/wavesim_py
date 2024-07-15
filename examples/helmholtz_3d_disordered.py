@@ -13,7 +13,8 @@ from __init__ import plot
 if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
 
-""" Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result) """
+""" Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
+
 wavelength = 1.
 n_size = (128, 48, 96)
 n = np.ascontiguousarray(loadmat('matlab_results.mat')['n3d_disordered'])
@@ -32,7 +33,7 @@ periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
 # periodic = (False, False, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, 
+# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
 #                      n_domains=(2, 1, 1))
 
 u_computed = run_algorithm(domain, source, max_iterations=1000)[0]

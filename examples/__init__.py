@@ -1,15 +1,12 @@
+from utilities import normalize, relative_error
 import numpy as np
 import matplotlib.pyplot as plt
-
-import sys
-sys.path.append(".")
-from utilities import normalize, relative_error
 
 
 def plot(x, x_ref, re=None):
     if re is None:
         re = relative_error(x, x_ref)
-    
+
     if x.ndim == 1 and x_ref.ndim == 1:
         plt.subplot(211)
         plt.plot(x_ref.real, label='Analytic')

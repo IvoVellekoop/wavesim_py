@@ -15,7 +15,7 @@ if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
 
 """ Test for propagation in 2D structure made of iron, with high refractive index contrast.
-    Compare with reference solution (matlab repo result) """
+    Compare with reference solution (matlab repo result). """
 
 oversampling = 0.25
 im = np.asarray(open('logo_structure_vector.png')) / 255
@@ -43,7 +43,7 @@ periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
 # periodic = (False, False, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength, 
+# domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength,
 #                      n_domains=(2, 2, 1))
 
 u_computed = run_algorithm(domain, source, max_iterations=int(1.e+5))[0]

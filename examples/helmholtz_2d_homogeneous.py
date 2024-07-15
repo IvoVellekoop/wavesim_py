@@ -7,7 +7,6 @@ from wavesim_iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from utilities import preprocess, relative_error
-# from __init__ import plot_one
 
 """ Test for propagation in 2D homogeneous medium """
 
@@ -33,12 +32,12 @@ periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
 # periodic = (False, False, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, 
+# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
 #                      n_domains=(2, 1, 1))
 
 start = time.time()
 u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
-u_computed = u_computed.squeeze()[*([slice(boundary_widths,-boundary_widths)]*2)]
+u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
 print(f'Elapsed time: {time.time() - start:.2f} s')
 
 # plot_one(u_computed.cpu().numpy())

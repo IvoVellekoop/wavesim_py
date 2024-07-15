@@ -55,7 +55,7 @@ class HelmholtzDomain(Domain):
                     None, which is equivalent to 'cuda' if cuda devices are available, and 'cpu' if they are not.
             debug: set to True to return inverse_propagator_kernel as output.
          """
-        
+
         if device is None or device == 'cuda':
             device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
@@ -160,7 +160,7 @@ class HelmholtzDomain(Domain):
         # # compute the norm of Vwrap. Worst case: just add all norms
         self.Vwrap_norm = sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
 
-    ## Functions implementing the domain interface
+    # Functions implementing the domain interface
     # add_source()
     # clear()
     # get()
@@ -234,8 +234,7 @@ class HelmholtzDomain(Domain):
             out.add_(a, alpha=weight_a)
 
     def propagator(self, slot_in: int, slot_out: int):
-        """Applies the operator (L+1)^-1 x.
-        """
+        """Applies the operator (L+1)^-1 x."""
         # todo: convert to on-the-fly computation
         torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
         self._x[slot_out].mul_(self.propagator_kernel)
@@ -257,8 +256,7 @@ class HelmholtzDomain(Domain):
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def set_source(self, source):
-        """Sets the source term for this domain.
-        """
+        """Sets the source term for this domain."""
         self._source = None
         if source is None or is_zero(source):
             return

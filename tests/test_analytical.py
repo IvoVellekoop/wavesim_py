@@ -24,8 +24,8 @@ def analytical_solution(n_size0, pixel_size, wavelength=None):
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (
-                        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-                        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+                    np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+                    np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
                 )
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
@@ -101,7 +101,7 @@ def test_residual(size, boundary_widths, periodic):
         norm of preconditioned source = norm( B(L+1)⁻¹y )
     """
     torch.manual_seed(0)  # Set the random seed for reproducibility
-    n = (torch.normal(mean=1.3, std=0.1, size=size, dtype=torch.float32) 
+    n = (torch.normal(mean=1.3, std=0.1, size=size, dtype=torch.float32)
          + 1j * abs(torch.normal(mean=0.05, std=0.02, size=size, dtype=torch.float32))).numpy()
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n, boundary_widths)
@@ -114,7 +114,7 @@ def test_residual(size, boundary_widths, periodic):
     wavelength = 1.
     domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
     # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=1., n_domains=n_domains)
-    
+
     # Reset the field u to zero
     slot_x = 0
     slot_tmp = 1
@@ -135,8 +135,8 @@ def test_residual(size, boundary_widths, periodic):
 @pytest.mark.parametrize("n_domains, periodic", [
     ((1, 1, 1), (True, True, True)),  # periodic boundaries, wrapped field.
     ((1, 1, 1), (False, True, True)),  # wrapping correction (here and beyond)
-    ((2, 1, 1), (False, True, True)), 
-    ((3, 1, 1), (False, True, True)), 
+    ((2, 1, 1), (False, True, True)),
+    ((3, 1, 1), (False, True, True)),
 ])
 def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """

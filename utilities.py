@@ -11,17 +11,15 @@ def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
     n_domains = np.array(n_domains)
     size = np.array(array.shape)
     if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 3:
-        raise ValueError(
-            f"Number of domains {n_domains} must be larger than 1 and "
-            f"less than or equal to the size of the array {array.shape}")
+        raise ValueError(f"Number of domains {n_domains} must be larger than 1 and "
+                         f"less than or equal to the size of the array {array.shape}")
 
     # Calculate the size of each domain
     large_domain_size = np.ceil(size / n_domains).astype(int)
     small_domain_count = large_domain_size * n_domains - size
     large_domain_count = n_domains - small_domain_count
-    subdomain_sizes = [
-        (large_domain_size[dim],) * large_domain_count[dim] + (large_domain_size[dim] - 1,) * small_domain_count[
-            dim] for dim in range(3)]
+    subdomain_sizes = [(large_domain_size[dim],) * large_domain_count[dim] + (large_domain_size[dim] - 1,)
+                       * small_domain_count[dim] for dim in range(3)]
 
     split = _sparse_split if array.is_sparse else torch.split
 

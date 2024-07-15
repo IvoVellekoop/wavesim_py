@@ -3,7 +3,7 @@ import torch
 from utilities import partition, combine
 from . import allclose
 
-"""Test of the utility functions"""
+"""Test of the utility functions."""
 
 
 @pytest.mark.parametrize("size", [(5, 4, 6), (7, 15, 32), (3, 5, 6)])

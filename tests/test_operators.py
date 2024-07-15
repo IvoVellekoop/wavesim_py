@@ -6,7 +6,7 @@ from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from . import random_vector, allclose, dtype
 
-""" Performs checks on the operators represented as matrices (accretivity, norm). """
+""" Performs checks on the operators represented as matrices (accretivity, norm)."""
 
 parameters = [
     {'n_size': (1, 1, 12), 'n_domains': None, 'n_boundary': 0, 'periodic': (False, False, True)},
@@ -98,7 +98,7 @@ def test_accretivity(params):
 
 
 def assert_accretive(operator, name, *, real_min=None, real_max=None, norm_max=None, norm_offset=None, pre_factor=None):
-    """Helper function to check if an operator is accretive, and to compute the norm around a given offset.
+    """ Helper function to check if an operator is accretive, and to compute the norm around a given offset.
     This function constructs a full matrix from the operator, so it only works if the domain is not too large.
     """
     M = full_matrix(operator)

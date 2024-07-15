@@ -23,9 +23,9 @@ def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (
-                        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-                        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
-                )
+        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+    )
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
     return u_theory[n_size0:-n_size0]

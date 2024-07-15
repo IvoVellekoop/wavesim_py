@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 class Domain(metaclass=ABCMeta):
     """Base class for all simulation domains
 
-    This base class defines the interface for operations that are common for all simulation types, and for MultiDomains.
+    This base class defines the interface for operations that are common for all simulation types, and for MultiDomain.
     todo: the design using slots minimizes memory use, but it is a suboptimal design because it mixes mutable
         and immutable state. This design should be revisited so that the Domain is immutable,
         and the code that runs the algorithms performs the memory management.
@@ -55,8 +55,7 @@ class Domain(metaclass=ABCMeta):
 
     @abstractmethod
     def medium(self, slot_in, slot_out):
-        """Applies the operator 1-Vscat.
-        """
+        """Applies the operator 1-Vscat."""
         pass
 
     @abstractmethod
@@ -81,16 +80,14 @@ class Domain(metaclass=ABCMeta):
 
     @abstractmethod
     def set_source(self, source):
-        """Sets the source term for this domain.
-        """
+        """Sets the source term for this domain."""
         pass
 
     def coordinates_f(self, dim):
         """Returns the Fourier-space coordinates along the specified dimension"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
         return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device,
-                                                 dtype=torch.float64)).reshape(
-            shapes[dim])
+                                                 dtype=torch.float64)).reshape(shapes[dim])
 
     def coordinates(self, dim, type: str = 'linear'):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""

@@ -13,7 +13,7 @@ from __init__ import plot
 if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
 
-""" Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result) """
+""" Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result). """
 wavelength = 1.
 n_size = (256, 1, 1)
 n = np.ones(n_size, dtype=np.complex64)

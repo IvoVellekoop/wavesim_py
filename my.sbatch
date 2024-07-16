@@ -1,11 +1,11 @@
 #!/bin/bash
 # parameters for slurm
-#SBATCH -J anysim-3d                  # job name, don't use spaces, keep it short
-#SBATCH -c 1                          # number of cores, 1
-#SBATCH --gres=gpu:ampere:2         # number of gpus 1, remove if you don't use gpu's
-#SBATCH --mem=50gb                   # Job memory request
-#SBATCH --mail-type=END,FAIL          # email status changes (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --time=1:00:00                # time limit 1h
+#SBATCH -J wavesim-2gpu       # job name, don't use spaces, keep it short
+#SBATCH -c 1                  # number of cores, 1
+#SBATCH --gres=gpu:ampere:2   # number of gpus 1, remove if you don't use gpu's
+#SBATCH --mem=50gb            # Job memory request
+#SBATCH --mail-type=END,FAIL  # email status changes (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --time=1:00:00        # time limit 1h
 
 # show actual node in output file, usefull for diagnostics
 hostname

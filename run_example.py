@@ -5,7 +5,7 @@ from time import time
 import matplotlib.pyplot as plt
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from wavesim_iteration import run_algorithm  # to run the anysim iteration
+from wavesim_iteration import run_algorithm  # to run the wavesim iteration
 from utilities import preprocess
 
 
@@ -79,13 +79,14 @@ with open('./logs/output.txt', 'a') as file:
 # np.savez_compressed(f'{file_name}.npz', u=u)  # save the field
 
 # %% plot the field
-# extent = extent=np.array([0, n_size[0], n_size[1], 0])*pixel_size
-# u = np.abs(u[:,:,u.shape[2]//2])
+# extent = np.array([0, n_size[0], n_size[1], 0])*pixel_size
+# u = np.abs(u[:, :, u.shape[2]//2])
 # plt.imshow(u, cmap='hot_r', extent=extent)
 # plt.xlabel(r'$x~(\mu m)$')
 # plt.ylabel(r'$y~(\mu m)$')
 # cbar = plt.colorbar(fraction=0.046, pad=0.04)
 # cbar.ax.set_title(r'$|E|$')
 # plt.tight_layout()
-# plt.savefig(f'{file_name}.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
-# plt.close('all')
+# plt.show()
+# # plt.savefig(f'{file_name}.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
+# # plt.close('all')

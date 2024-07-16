@@ -3,7 +3,6 @@ import pytest
 import torch
 import numpy as np
 from scipy.special import exp1
-import matplotlib.pyplot as plt
 from wavesim_iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
@@ -30,28 +29,6 @@ def analytical_solution(n_size0, pixel_size, wavelength=None):
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
     return u_theory[n_size0:-n_size0]
-
-
-def plot(a, b, re=None):
-    if re is None:
-        re = relative_error(a, b)
-    plt.subplot(211)
-    plt.plot(a.real, label='Computed')
-    plt.plot(b.real, label='Analytic')
-    plt.legend()
-    plt.title(f'Real part (RE = {relative_error(a.real, b.real):.2e})')
-    plt.grid()
-
-    plt.subplot(212)
-    plt.plot(a.imag, label='Computed')
-    plt.plot(b.imag, label='Analytic')
-    plt.legend()
-    plt.title(f'Imaginary part (RE = {relative_error(a.imag, b.imag):.2e})')
-    plt.grid()
-
-    plt.suptitle(f'Relative error (RE) = {re:.2e}')
-    plt.tight_layout()
-    plt.show()
 
 
 def test_no_propagation():
@@ -160,7 +137,6 @@ def test_1d_analytical(n_domains, periodic):
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
-    # plot(u_computed.cpu().numpy(), u_ref, re)
 
     assert re <= 1.e-3, f'Relative error: {re:.2e}'
     assert allclose(u_computed, u_ref, atol=1.e-3, rtol=1.e-3)

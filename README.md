@@ -8,11 +8,11 @@
 
 # Installation
 
-Wavesim requires [Python 3.12](https://www.python.org/downloads/release/python-3120/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
+Wavesim requires [Python 3.11.0 and above](https://www.python.org/downloads/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
 
 We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lighter counterpart of Anaconda) to install Python and the required packages (contained in [environment.yml](environment.yml)) within a conda environment. If you prefer to create a virtual environment without using Miniconda/Anaconda, you can use [requirements.txt](requirements.txt) for dependencies. The steps that follow are for a Miniconda installation.
 
-1. **Download Miniconda**, choosing the [Python 3.12 installer](https://docs.anaconda.com/miniconda/miniconda-other-installer-links/) for your operating system (Windows/macOS/Linux).
+1. **Download Miniconda**, choosing the appropriate [Python installer](https://docs.anaconda.com/miniconda/) for your operating system (Windows/macOS/Linux).
 
 2. **Install Miniconda**, following the [installation instructions](https://docs.anaconda.com/miniconda/miniconda-install/) for your OS. Follow the prompts on the installer screens. If you are unsure about any setting, accept the defaults. You can change them later. (If you cannot immediately activate conda, close and re-open your terminal window to make the changes take effect).
 
@@ -34,7 +34,7 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
 
 # Running the code
 
-Once the virtual environment is setup with all the required packages, you are ready to run the code. You can go through any of the scripts in the [examples directory](examples) for the basic steps needed to run a simulation. The directory contains 2 examples each of 1D, 2D, and 3D problems. 
+Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the [examples directory](examples) for the basic steps needed to run a simulation. The directory contains two examples each of 1D, 2D, and 3D problems. 
 
 You can run the code with just three inputs:
 * `permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
@@ -45,24 +45,58 @@ Below a simple example, [helmholtz_1d_analytical.py](examples/helmholtz_1d_analy
 
 ## Simple example (1D, homogeneous medium)
 
+Import basic packages and internal functions
+
     ```
     import numpy as np
-    from wavesim.multidomain import MultiDomain     # to set up medium, propagation operators, and scaling
-    from wavesim_iteration import run_algorithm     # to run the wavesim iteration
-    from utilities import preprocess                # to pad refractive_index and square to give permittivity
+    from torch.nn.functional import pad
+    from wavesim_iteration import run_algorithm         # to run the wavesim iteration
+    from utilities import preprocess                    # to pad refractive_index and square to give permittivity
+    ```
 
-    permittivity = np.ones((256, 1, 1))
-    periodic = (True, True, True)
-    source = np.zeros_like(permittivity)
-    source[0] = 1.                                  # Amplitude 1 at location [0]
+To set up medium, propagation operators, and scaling and create a domain object
 
-    domain = MultiDomain(permittivity, periodic)    # to set up the domain operators
-    u = run_algorithm(domain, source)               # Field u
+    ```
+    from wavesim.helmholtzdomain import HelmholtzDomain # when number of domains = 1
+    from wavesim.multidomain import MultiDomain         # for domain decomposition, when number of domains >= 1
+    ```
+Set up problem parameters
+    
+    ```
+    wavelength = 1.                                     # wavelength in micrometer (um)
+    n_size = (256, 1, 1)                                # size of simulation domain (in pixels in x, y, and z direction)
+    n = np.ones(n_size, dtype=np.complex64)             # refractive index map
+    boundary_widths = 50                                # padding
+
+    # add boundary conditions and return permittivity (n²)
+    n = preprocess(n, boundary_widths)[0]               # n is actually n², but uses the same variable
+
+    # Source term
+    source = torch.zeros(n_size, dtype=torch.complex64) # create source array
+    source[0] = 1.                                      # Amplitude 1 at location [0]
+    # Pad source. torch needs padding width as a tuple with order (z1, z2, y1, y2, x1, x2) for x, y, and z axes. 1 indicates before, and 2 indicates after.
+    source = pad(source, pad = (0, 0, 
+                               0, 0, 
+                               boundary_widths, boundary_widths))
+
+    periodic = (True, True, True)                       # periodic boundaries, wrapped field.
+    ```
+
+Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
+
+    ```
+    domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength)  # This particular scenario is equivalent to setting HelmholtzDomain()
+    ```
+
+Run the wavesim iteration to get the field u
+
+    ```
+    u = run_algorithm(domain, source)[0]
     ```
 
 All other parameters have defaults. Details about permittivity, source, and the other parameters are given below (with the default values, if defined).
 
-### MultiDomain()
+### HelmholtzDomain() or MultiDomain()
 
 `permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 
@@ -70,7 +104,7 @@ All other parameters have defaults. Details about permittivity, source, and the 
 
 `pixel_size: float = 0.25`: points per wavelength.
 
-`wavelength: float = None`: wavelength: wavelength in micrometer (um).
+`wavelength: float = None`: wavelength: wavelength in micrometer (um). If not given, i.e. `= None`, it is calculated as `1/pixel_size = 4 um`.
 
 `n_domains: tuple[int, int, int] = (1, 1, 1)`: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If `(1, 1, 1)`, indicates no domain decomposition.
 
@@ -86,7 +120,7 @@ All other parameters have defaults. Details about permittivity, source, and the 
 
 ### run_algorithm()
 
-`domain`: the domain object created by MultiDomain
+`domain`: the domain object created by HelmholtzDomain() or MultiDomain()
 
 `source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
 

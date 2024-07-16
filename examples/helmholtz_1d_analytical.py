@@ -39,6 +39,7 @@ boundary_widths = 50
 # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
 n, boundary_array = preprocess(n, boundary_widths)
 
+# Source term. This way is more efficient than dense tensor
 indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
 values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple(np.array(n_size) + 2*boundary_array)

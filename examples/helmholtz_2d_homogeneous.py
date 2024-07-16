@@ -6,7 +6,7 @@ sys.path.append(".")
 from wavesim_iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from utilities import preprocess, relative_error
+from utilities import preprocess
 
 """ Test for propagation in 2D homogeneous medium """
 

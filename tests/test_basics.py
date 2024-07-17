@@ -1,7 +1,7 @@
 import pytest
 import torch
-from wavesim.multidomain import MultiDomain
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.multidomain import MultiDomain
 from . import allclose, random_vector, random_refractive_index, dtype
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """

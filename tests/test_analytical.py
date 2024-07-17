@@ -1,13 +1,14 @@
-"""Tests to compare the result of Wavesim to analytical results"""
 import pytest
 import torch
 import numpy as np
 from scipy.special import exp1
-from wavesim.iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
-from . import allclose, random_vector, random_refractive_index
+from wavesim.iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
 from wavesim.utilities import preprocess, relative_error
+from . import allclose, random_vector, random_refractive_index
+
+"""Tests to compare the result of Wavesim to analytical results"""
 
 
 def analytical_solution(n_size0, pixel_size, wavelength=None):

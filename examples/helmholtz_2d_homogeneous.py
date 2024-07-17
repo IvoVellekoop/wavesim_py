@@ -1,10 +1,10 @@
 import torch
 import numpy as np
+from time import time
 import sys
-import time
 sys.path.append(".")
-from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
 
 """ Test for propagation in 2D homogeneous medium """
@@ -34,9 +34,9 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
 #                      n_domains=(2, 1, 1))
 
-start = time.time()
+start = time()
 u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
-print(f'Elapsed time: {time.time() - start:.2f} s')
+print(f'Elapsed time: {time() - start:.2f} s')
 
 # plot_one(u_computed.cpu().numpy())

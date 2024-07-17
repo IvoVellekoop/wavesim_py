@@ -4,8 +4,8 @@ import numpy as np
 from scipy.io import loadmat
 import sys
 sys.path.append(".")
-from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess, relative_error
 from __init__ import plot
 

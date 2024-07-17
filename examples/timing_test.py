@@ -1,5 +1,5 @@
-import torch
 import time
+import torch
 
 ## Tests for the fastest way to calculate the Euclidean norm of a complex vector
 # It seems that on the CPU, 'norm' is consistently slower than 'vdot', but gives a slightly different, perhaps more accurate value.

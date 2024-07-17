@@ -1,6 +1,6 @@
-from wavesim.utilities import normalize, relative_error
 import numpy as np
 import matplotlib.pyplot as plt
+from wavesim.utilities import normalize, relative_error
 
 
 def plot(x, x_ref, re=None):

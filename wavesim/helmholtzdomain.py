@@ -1,6 +1,6 @@
 import torch
-from wavesim.utilities import is_zero
 from .domain import Domain
+from .utilities import is_zero
 
 
 class HelmholtzDomain(Domain):

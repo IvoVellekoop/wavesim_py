@@ -1,12 +1,10 @@
-from typing import Sequence
-
-import numpy as np
 import torch
-from torch import Tensor
+import numpy as np
+from typing import Sequence
 from itertools import chain
 
 
-def partition(array: Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
+def partition(array: torch.Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
     """ Split a 3-D array into a 3-D set of sub-arrays of approximately equal sizes."""
     n_domains = np.array(n_domains)
     size = np.array(array.shape)
@@ -56,7 +54,7 @@ def list_to_array(input: list, depth: int) -> np.ndarray:
     return array
 
 
-def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
+def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
     """ Split a COO-sparse tensor into a 3-D set of sub-arrays of approximately equal sizes."""
     coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
     domain_starts = np.cumsum((0,) + sizes)
@@ -64,7 +62,7 @@ def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
     indices = tensor.indices().cpu().numpy()
     domains = coordinate_to_domain[indices[dim, :]]
 
-    def extract_subarray(domain: int) -> Tensor:
+    def extract_subarray(domain: int) -> torch.Tensor:
         mask = domains == domain
         domain_indices = indices[:, mask]
         if len(domain_indices) == 0:
@@ -78,7 +76,7 @@ def _sparse_split(tensor: Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
     return [extract_subarray(d) for d in range(len(sizes))]
 
 
-def combine(domains: np.ndarray, device='cpu') -> Tensor:
+def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
     """ Concatenates a 3-d array of 3-d tensors"""
 
     # Calculate total size for each dimension
@@ -128,7 +126,6 @@ def preprocess(n, boundary_widths=10):
     boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
 
     n = add_absorption(n ** 2, boundary_widths, n_roi, n_dims)  # add absorption to n^2
-    # n = torch.tensor(n, dtype=torch.complex64)
 
     return n, boundary_widths
 

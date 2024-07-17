@@ -4,9 +4,9 @@ import torch
 import numpy as np
 from scipy.io import loadmat
 from PIL.Image import BILINEAR, fromarray, open
-from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
+from wavesim.iteration import run_algorithm
 from wavesim.utilities import pad_boundaries, preprocess, relative_error
 
 if os.path.basename(os.getcwd()) == 'tests':

@@ -1,9 +1,9 @@
 import pytest
 import torch
-from wavesim.iteration import domain_operator
-from wavesim.utilities import full_matrix
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
+from wavesim.iteration import domain_operator
+from wavesim.utilities import full_matrix
 from . import random_vector, allclose, dtype
 
 """ Performs checks on the operators represented as matrices (accretivity, norm)."""

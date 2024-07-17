@@ -1,8 +1,8 @@
-import numpy as np
 import torch
-from wavesim.utilities import partition, combine, list_to_array, is_zero
+import numpy as np
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
+from .utilities import partition, combine, list_to_array, is_zero
 
 
 class MultiDomain(Domain):

@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from time import time
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.iteration import run_algorithm  # to run the wavesim iteration
+from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
 
 

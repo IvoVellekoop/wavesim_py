@@ -1,5 +1,5 @@
-from wavesim.domain import Domain
-from utilities import is_zero
+from .domain import Domain
+from .utilities import is_zero
 from torch.cuda import empty_cache
 
 

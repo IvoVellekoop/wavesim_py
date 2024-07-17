@@ -3,8 +3,8 @@ import numpy as np
 from scipy.special import exp1
 import sys
 sys.path.append(".")
-from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess, relative_error
 from __init__ import plot
 

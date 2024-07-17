@@ -13,6 +13,8 @@ if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
 
 """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result). """
+
+
 wavelength = 1.
 n_size = (256, 1, 1)
 n = np.ones(n_size, dtype=np.complex64)
@@ -36,7 +38,7 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
-u_ref = np.squeeze(loadmat('matlab_results.mat')['u'])
+u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u'])
 
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')

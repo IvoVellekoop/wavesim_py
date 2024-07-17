@@ -42,7 +42,7 @@ def test_1d_glass_plate(n_domains, periodic):
     u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    u_ref = np.squeeze(loadmat('matlab_results.mat')['u'])
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u'])
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
@@ -64,7 +64,7 @@ def test_2d_low_contrast(n_domains):
     """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic
         biological tissue). Compare with reference solution (matlab repo result). """
     oversampling = 0.25
-    im = np.asarray(open('logo_structure_vector.png')) / 255
+    im = np.asarray(open('examples/logo_structure_vector.png')) / 255
     n_water = 1.33
     n_fat = 1.46
     n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
@@ -93,7 +93,7 @@ def test_2d_low_contrast(n_domains):
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_lc'])
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u2d_lc'])
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
@@ -111,7 +111,7 @@ def test_2d_high_contrast(n_domains):
         Compare with reference solution (matlab repo result). """
 
     oversampling = 0.25
-    im = np.asarray(open('logo_structure_vector.png')) / 255
+    im = np.asarray(open('examples/logo_structure_vector.png')) / 255
     n_iron = 2.8954 + 2.9179j
     n_contrast = n_iron - 1
     n_im = ((np.where(im[:, :, 2] > 0.25, 1, 0) * n_contrast) + 1)
@@ -119,7 +119,7 @@ def test_2d_high_contrast(n_domains):
     n = np.asarray(fromarray(n_im.real).resize((n_roi, n_roi), BILINEAR)) + 1j * np.asarray(
         fromarray(n_im.imag).resize((n_roi, n_roi), BILINEAR))
     # # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    # n = loadmat('matlab_results.mat')['n2d_hc']
+    # n = loadmat('examples/matlab_results.mat')['n2d_hc']
     boundary_widths = 50
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n, boundary_widths)
@@ -144,7 +144,7 @@ def test_2d_high_contrast(n_domains):
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_hc'])
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u2d_hc'])
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
@@ -174,7 +174,7 @@ def test_3d_disordered(n_domains):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
     wavelength = 1.
     n_size = (128, 48, 96)
-    n = np.ascontiguousarray(loadmat('matlab_results.mat')['n3d_disordered'])
+    n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])
     boundary_widths = 50
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n, boundary_widths)
@@ -197,7 +197,7 @@ def test_3d_disordered(n_domains):
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    u_ref = np.squeeze(loadmat('matlab_results.mat')['u3d_disordered'])
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u3d_disordered'])
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')
@@ -249,7 +249,7 @@ def test_3d_homogeneous(n_domains):
     u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    u_ref = np.squeeze(loadmat('matlab_results.mat')[f'u3d_{n_size[0]}_{n_size[1]}_{n_size[2]}_bw_20_24_32'])
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')[f'u3d_{n_size[0]}_{n_size[1]}_{n_size[2]}_bw_20_24_32'])
 
     re = relative_error(u_computed.cpu().numpy(), u_ref)
     print(f'Relative error: {re:.2e}')

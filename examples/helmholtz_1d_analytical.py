@@ -8,6 +8,8 @@ from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess, relative_error
 from __init__ import plot
 
+""" Test to compare the result of Wavesim to analytical results """
+
 
 def u_ref_1d_h(n_size0, pixel_size, wavelength=None):
     """ Compute analytic solution for 1D case """

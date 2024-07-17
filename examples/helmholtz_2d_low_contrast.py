@@ -16,8 +16,9 @@ if os.path.basename(os.getcwd()) == 'examples':
 """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic biological 
     tissue). Compare with reference solution (matlab repo result). """
 
+
 oversampling = 0.25
-im = np.asarray(open('logo_structure_vector.png')) / 255
+im = np.asarray(open('examples/logo_structure_vector.png')) / 255
 n_water = 1.33
 n_fat = 1.46
 n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
@@ -45,7 +46,7 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_siz
 u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
 u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
-u_ref = np.squeeze(loadmat('matlab_results.mat')['u2d_lc'])
+u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u2d_lc'])
 
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')

@@ -9,6 +9,7 @@ from wavesim.utilities import preprocess
 
 """ Test for propagation in 2D homogeneous medium """
 
+
 pixel_size = 0.25
 wavelength = 1.
 n_size = tuple((wavelength/pixel_size * np.array([50, 50, 1])).astype(int))

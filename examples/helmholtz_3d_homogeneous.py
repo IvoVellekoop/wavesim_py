@@ -14,6 +14,7 @@ if os.path.basename(os.getcwd()) == 'examples':
 
 """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
 
+
 wavelength = 1.
 n_size = (128, 128, 128)
 n = np.ones(tuple(n_size), dtype=np.complex64)
@@ -39,7 +40,7 @@ u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
 u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
 
 # load dictionary of results from matlab wavesim/anysim for comparison and validation
-u_ref = np.squeeze(loadmat('matlab_results.mat')[f'u3d_{n_size[0]}_{n_size[1]}_{n_size[2]}_bw_20_24_32'])
+u_ref = np.squeeze(loadmat('examples/matlab_results.mat')[f'u3d_{n_size[0]}_{n_size[1]}_{n_size[2]}_bw_20_24_32'])
 
 re = relative_error(u_computed.cpu().numpy(), u_ref)
 print(f'Relative error: {re:.2e}')

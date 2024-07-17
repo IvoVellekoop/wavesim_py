@@ -99,7 +99,7 @@ for i in range(n_dims):
 
 output = (f'Size {n_size}; Boundaries {boundary_widths}; Domains {n_domains}; '
           + f'Time {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e} \n')
-if not os.path.exists('./logs'):
-    os.makedirs('./logs')
-with open('./logs/output.txt', 'a') as file:
+if not os.path.exists('../logs'):
+    os.makedirs('../logs')
+with open('../logs/output.txt', 'a') as file:
     file.write(output)

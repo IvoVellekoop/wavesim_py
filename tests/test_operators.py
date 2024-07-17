@@ -1,7 +1,7 @@
 import pytest
 import torch
-from wavesim_iteration import domain_operator
-from utilities import full_matrix
+from wavesim.iteration import domain_operator
+from wavesim.utilities import full_matrix
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from . import random_vector, allclose, dtype

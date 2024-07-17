@@ -3,11 +3,11 @@ import pytest
 import torch
 import numpy as np
 from scipy.special import exp1
-from wavesim_iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
+from wavesim.iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from . import allclose, random_vector, random_refractive_index
-from utilities import preprocess, relative_error
+from wavesim.utilities import preprocess, relative_error
 
 
 def analytical_solution(n_size0, pixel_size, wavelength=None):

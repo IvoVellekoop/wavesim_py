@@ -1,4 +1,4 @@
-from utilities import normalize, relative_error
+from wavesim.utilities import normalize, relative_error
 import numpy as np
 import matplotlib.pyplot as plt
 

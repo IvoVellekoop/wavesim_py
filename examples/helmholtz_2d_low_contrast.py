@@ -5,10 +5,9 @@ from scipy.io import loadmat
 from PIL.Image import BILINEAR, fromarray, open
 import sys
 sys.path.append(".")
-from wavesim_iteration import run_algorithm
+from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.multidomain import MultiDomain
-from utilities import pad_boundaries, preprocess, relative_error
+from wavesim.utilities import pad_boundaries, preprocess, relative_error
 from __init__ import plot
 
 if os.path.basename(os.getcwd()) == 'examples':

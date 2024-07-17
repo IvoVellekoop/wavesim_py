@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from utilities import partition, combine, list_to_array, is_zero
+from wavesim.utilities import partition, combine, list_to_array, is_zero
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
 

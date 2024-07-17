@@ -3,10 +3,9 @@ import numpy as np
 import sys
 import time
 sys.path.append(".")
-from wavesim_iteration import run_algorithm
+from wavesim.iteration import run_algorithm
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.multidomain import MultiDomain
-from utilities import preprocess
+from wavesim.utilities import preprocess
 
 """ Test for propagation in 2D homogeneous medium """
 

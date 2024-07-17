@@ -1,5 +1,5 @@
 import torch
-from utilities import is_zero
+from wavesim.utilities import is_zero
 from .domain import Domain
 
 

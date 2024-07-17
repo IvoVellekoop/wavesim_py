@@ -2,11 +2,9 @@ import os
 import torch
 import numpy as np
 from time import time
-import matplotlib.pyplot as plt
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.multidomain import MultiDomain
-from wavesim_iteration import run_algorithm  # to run the wavesim iteration
-from utilities import preprocess
+from wavesim.iteration import run_algorithm  # to run the wavesim iteration
+from wavesim.utilities import preprocess
 
 
 # generate a refractive index map

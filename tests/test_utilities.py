@@ -1,6 +1,6 @@
 import pytest
 import torch
-from utilities import partition, combine
+from wavesim.utilities import partition, combine
 from . import allclose
 
 """Test of the utility functions."""

@@ -5,9 +5,8 @@ import torch
 import numpy as np
 from time import time
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.multidomain import MultiDomain
-from wavesim_iteration import run_algorithm  # to run the anysim iteration
-from utilities import preprocess
+from wavesim.iteration import run_algorithm  # to run the anysim iteration
+from wavesim.utilities import preprocess
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 

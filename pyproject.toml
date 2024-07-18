@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "wavesim"
+version = "0.1.0a1"
+description = "A library for simulating wave propagation using the modified Born series"
+authors = ["Ivo Vellekoop <i.m.vellekoop@utwente.nl>", "Swapnil Mache <s.mache@utwente.nl>"]
+readme = "README.md"
+repository = "https://github.com/IvoVellekoop/anysim_cluster"
+classifiers = [
+    'Programming Language :: Python :: 3',
+    'Operating System :: OS Independent',
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "explicit"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "<2.0.0"
+scipy = "^1.14.0"
+torch = {version = "2.3.1+cu121", source = "pytorch-gpu"}
+torchvision = {version = "0.18.1+cu121", source = "pytorch-gpu"}
+
+[tool.poetry.group.dev.dependencies]
+matplotlib = "^3.9.1"
+pytest = "^8.2.2"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=4.1.2"
+sphinx_mdinclude = ">= 0.5.0"
+sphinx-rtd-theme = ">= 2.0.0"
+sphinx-autodoc-typehints = ">= 1.11.0"
+sphinxcontrib-bibtex = ">= 2.6.0"
+sphinx-markdown-builder = ">= 0.6.6"
+sphinx-gallery = ">= 0.15.0"

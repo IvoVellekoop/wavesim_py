@@ -1,11 +1,15 @@
 import os
+import sys
 import torch
 import numpy as np
 from time import time
+sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
 
+if os.path.basename(os.getcwd()) == 'examples':
+    os.chdir('..')
 
 # generate a refractive index map
 sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers
@@ -66,9 +70,9 @@ for i in range(n_dims):
 
 output = (f'Size {n_size}; Boundaries {boundary_widths}; Domains {n_domains}; '
           + f'Time {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e} \n')
-if not os.path.exists('../logs'):
-    os.makedirs('../logs')
-with open('../logs/output.txt', 'a') as file:
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+with open('logs/output.txt', 'a') as file:
     file.write(output)
 
 # %% crop and save the field

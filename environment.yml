@@ -10,6 +10,5 @@ dependencies:
   - scipy
   - pytest
   - pytorch
-  - torchvision
-  - torchaudio
   - pytorch-cuda
+  - torchvision

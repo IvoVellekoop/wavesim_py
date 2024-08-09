@@ -4,15 +4,18 @@ import torch
 import numpy as np
 from time import time
 sys.path.append(".")
-from wavesim.helmholtzdomain import HelmholtzDomain
+# from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.multidomain import MultiDomain
 from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
 
 # generate a refractive index map
-sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers
+sim_size = 280 * np.array([1, 1, 1])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
@@ -40,18 +43,18 @@ values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple(np.array(n_size) + 2*boundary_array)
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
-# 1-domain, periodic boundaries (without wrapping correction)
-periodic = (True, True, True)  # periodic boundaries, wrapped field.
-n_domains = (1, 1, 1)  # number of domains in each direction
-domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size)
+# # 1-domain, periodic boundaries (without wrapping correction)
+# periodic = (True, True, True)  # periodic boundaries, wrapped field.
+# n_domains = (1, 1, 1)  # number of domains in each direction
+# domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size)
 
-# # OR. Uncomment to test domain decomposition
-# n_domains = np.array([2, 1, 1])  # number of domains in each direction
-# periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
-# n_domains = tuple(n_domains)
-# periodic = tuple(periodic)
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
-#                      n_domains=n_domains)
+# OR. Uncomment to test domain decomposition
+n_domains = np.array([2, 1, 1])  # number of domains in each direction
+periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
+n_domains = tuple(n_domains)
+periodic = tuple(periodic)
+domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
+                     n_domains=n_domains)
 
 start = time()
 # Field u and state object with information about the run
@@ -76,9 +79,9 @@ with open('logs/output.txt', 'a') as file:
     file.write(output)
 
 # %% crop and save the field
-# # crop the field to the region of interest
-# u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
-# np.savez_compressed(f'{file_name}.npz', u=u)  # save the field
+# crop the field to the region of interest
+u = u.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
+np.savez_compressed(f'{file_name}.npz', u=u)  # save the field
 
 # %% plot the field
 # extent = np.array([0, n_size[0], n_size[1], 0])*pixel_size

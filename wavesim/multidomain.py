@@ -3,6 +3,7 @@ import numpy as np
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
 from .utilities import partition, combine, list_to_array, is_zero
+from torch.cuda import empty_cache
 
 
 class MultiDomain(Domain):
@@ -105,6 +106,13 @@ class MultiDomain(Domain):
         self.scale = 0.95j / (Vscat_norm + Vwrap_norm)
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
+            empty_cache()  # free up memory before going to run_algorithm
+
+        # create an empty tensor to force the allocation of memory for the Vdot tensor
+        # always 8.1 MiB, irrespective of the domain size
+        for domain in self.domains.flat:
+            domain.empty_vdot = torch.empty((1024, 1036), dtype=domain._x[0].dtype, device=domain.device)
+            del domain.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
 
     # Functions implementing the domain interface
     # add_source()

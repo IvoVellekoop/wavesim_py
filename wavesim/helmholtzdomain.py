@@ -1,6 +1,7 @@
 import torch
 from .domain import Domain
 from .utilities import is_zero
+from torch.cuda import empty_cache
 
 
 class HelmholtzDomain(Domain):
@@ -136,6 +137,13 @@ class HelmholtzDomain(Domain):
             center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
             self.initialize_scale(0.95j / V_norm)
+
+            empty_cache()  # free up memory before going to run_algorithm
+
+            # create an empty tensor to force the allocation of memory for the Vdot tensor
+            # always 8.1 MiB, irrespective of the domain size
+            self.empty_vdot = torch.empty((1024, 1036), dtype=self._x[0].dtype, device=self.device)
+            del self.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
         elif Vwrap is not None:
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]

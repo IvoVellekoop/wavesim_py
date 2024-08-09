@@ -1,11 +1,11 @@
 #!/bin/bash
 # parameters for slurm
-#SBATCH -J wavesim-2gpu       # job name, don't use spaces, keep it short
-#SBATCH -c 1                  # number of cores, 1
-#SBATCH --gres=gpu:ampere:2   # number of gpus 1, remove if you don't use gpu's
-#SBATCH --mem=50gb            # Job memory request
-#SBATCH --mail-type=END,FAIL  # email status changes (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --time=1:00:00        # time limit 1h
+#SBATCH -J wavesim280           # job name, don't use spaces, keep it short
+#SBATCH -c 1                    # number of cores, 1
+#SBATCH --gres=gpu:ampere:2     # number of gpus 1, remove if you don't use gpu's
+#SBATCH --mem=50gb              # Job memory request
+#SBATCH --mail-type=END,FAIL    # email status changes (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --time=10:00:00         # time limit 10h
 
 # show actual node in output file, usefull for diagnostics
 hostname
@@ -14,8 +14,16 @@ hostname
 cd /local
 mkdir ${SLURM_JOBID}
 cd ${SLURM_JOBID}
-# Copy input and executable to the node
-cp -r ${SLURM_SUBMIT_DIR}/* .
+# # Copy input and executable to the node
+# cp -r ${SLURM_SUBMIT_DIR}/* .
+# instead of copying everything, just copy the necessary files
+mkdir examples
+cp -r ${SLURM_SUBMIT_DIR}/examples/run_example.py examples/
+
+mkdir logs
+cp -r ${SLURM_SUBMIT_DIR}/logs/output.txt logs/
+
+cp -r ${SLURM_SUBMIT_DIR}/wavesim .
 
 # It's nice to have some information logged for debugging
 echo "Date              = $(date)"
@@ -33,7 +41,7 @@ echo "GPU Name                    : $(nvidia-smi --query-gpu=name --format=csv,n
 echo "Starting worker: "
 
 # Run the job -- make sure that it terminates itself before time is up
-python run_example.py
+python examples/run_example.py
 
 # Copy output back to the master, comment with # if not used
 # cp log_file.txt ${SLURM_SUBMIT_DIR}

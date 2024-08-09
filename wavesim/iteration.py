@@ -1,15 +1,15 @@
 from .domain import Domain
 from .utilities import is_zero
-from torch.cuda import empty_cache
 
 
-def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6):
+def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6, full_residuals=False):
     """ WaveSim update
     :param domain: Helmholtz base parameters
     :param source: source field
     :param alpha: relaxation parameter for the Richardson iteration
     :param max_iterations: maximum number of iterations
     :param threshold: threshold for the residual norm
+    :param full_residuals: when True, returns list of residuals for all iterations. Otherwise, returns final residual
     :return: u (computed field), state (object) """
 
     # Reset the field u to zero
@@ -24,16 +24,21 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     init_norm_inv = 1 / domain.inner_product(slot_x, slot_x)  # inverse of initial norm: 1 / norm([x])
     domain.clear(slot_x)  # Clear [x]
 
+    # save list of residuals if requested
+    if full_residuals:
+        residuals = []
+
     for i in range(max_iterations):
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
         # normalize residual norm with preconditioned source (i.e., with norm of B(L+1)⁻¹y)
         residual_norm = residual_norm * init_norm_inv  # norm(B(x - (L+1)⁻¹ (B·x + c·y))) / norm(B(L+1)⁻¹y)
         print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}')
+        residuals.append(residual_norm) if full_residuals else None
         if residual_norm < threshold:
             break
 
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-    return domain.get(slot_x), (i + 1), residual_norm
+    return domain.get(slot_x), (i + 1), residuals if full_residuals else residual_norm
 
 
 def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_tmp: int = 1, alpha=0.75,

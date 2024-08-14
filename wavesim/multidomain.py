@@ -7,7 +7,7 @@ from torch.cuda import empty_cache
 
 
 class MultiDomain(Domain):
-    """" Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
+    """ Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
      and setting up wrapping and transfer corrections """
 
     def __init__(self,
@@ -21,7 +21,7 @@ class MultiDomain(Domain):
                  debug: bool = False):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
-        Arguments:
+        Args:
             permittivity: Permittivity distribution, must be 3-d.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
@@ -137,7 +137,7 @@ class MultiDomain(Domain):
         """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in
         one big array
 
-         :param: device: device on which to store the data. Defaults to the primary device
+        :param device: device on which to store the data. Defaults to the primary device
         """
         domain_data = list_to_array([domain.get(slot) for domain in self.domains.flat], 1).reshape(self.domains.shape)
         return combine(domain_data, device)
@@ -151,10 +151,11 @@ class MultiDomain(Domain):
     def inner_product(self, slot_a: int, slot_b: int):
         """ Compute the inner product of the fields in slots a and b
 
-        Note: use sqrt(inner_product(slot_a, slot_a)) to compute the norm of the field in slot_a.
-        There is a large but inconsistent difference in performance between vdot and linalg.norm.
-        Execution time can vary a factor of 3 or more between the two, depending on the input size
-        and whether the function is executed on the CPU or the GPU.
+        Note: 
+            Use sqrt(inner_product(slot_a, slot_a)) to compute the norm of the field in slot_a.
+            There is a large but inconsistent difference in performance between vdot and linalg.norm.
+            Execution time can vary a factor of 3 or more between the two, depending on the input size
+            and whether the function is executed on the CPU or the GPU.
         """
         inner_product = 0.0
         for domain in self.domains.flat:

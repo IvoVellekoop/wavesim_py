@@ -113,9 +113,11 @@ def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
 
 def preprocess(n, boundary_widths=10):
     """ Preprocess the input parameters for the simulation
+
     :param n: Refractive index distribution 
     :param boundary_widths: Boundary widths (in pixels)
-    :return: Preprocessed permittivity (n²) with boundaries and absorption"""
+    :return: Preprocessed permittivity (n²) with boundaries and absorption 
+    """
     n = check_input_dims(n)  # Ensure n is a 3-d array
     if n.dtype != np.complex64:
         n = n.astype(np.complex64)
@@ -132,8 +134,10 @@ def preprocess(n, boundary_widths=10):
 
 def check_input_dims(x):
     """ Expand arrays to 3 dimensions (e.g. refractive index distribution (n) or source)
+    
     :param x: Input array
-    :return: Array with 3 dimensions """
+    :return: Array with 3 dimensions 
+    """
     for _ in range(3 - x.ndim):
         x = np.expand_dims(x, axis=-1)  # Expand dimensions to 3
     return x
@@ -141,10 +145,12 @@ def check_input_dims(x):
 
 def check_input_len(x, e, n_dims):
     """ Check the length of input arrays and expand them to 3 elements if necessary. Either repeat or add 'e'
+    
     :param x: Input array
     :param e: Element to add
     :param n_dims: Number of dimensions
-    :return: Array with 3 elements """
+    :return: Array with 3 elements 
+    """
     if isinstance(x, int) or isinstance(x, float):  # If x is a single number
         x = n_dims * tuple((x,)) + (3 - n_dims) * (e,)  # Repeat the number n_dims times, and add (3-n_dims) e's
     elif len(x) == 1:  # If x is a single element list or tuple
@@ -158,16 +164,20 @@ def check_input_len(x, e, n_dims):
 
 def get_dims(n):
     """ Get the number of dimensions of 'n' 
+    
     :param n: Input array
-    :return: Number of dimensions """
+    :return: Number of dimensions 
+    """
     n = squeeze_(n)  # Squeeze the last dimension if it is 1
     return n.ndim  # Number of dimensions
 
 
 def squeeze_(n):
     """ Squeeze the last dimension of 'n' if it is 1 
+
     :param n: Input array
-    :return: Squeezed array """
+    :return: Squeezed array 
+    """
     while n.shape[-1] == 1:
         n = np.squeeze(n, axis=-1)
     return n
@@ -175,11 +185,13 @@ def squeeze_(n):
 
 def add_absorption(m, boundary_widths, n_roi, n_dims):
     """ Add (weighted) absorption to the permittivity (refractive index squared)
+
     :param m: array (permittivity)
     :param boundary_widths: Boundary widths
     :param n_roi: Number of points in the region of interest
     :param n_dims: Number of dimensions
-    :return: m with absorption """
+    :return: m with absorption 
+    """
     w = np.ones_like(m)  # Weighting function (1 everywhere)
     w = pad_boundaries(w, boundary_widths, mode='linear_ramp')  # pad w using linear_ramp
     a = 1 - w  # for absorption, inverse weighting 1 - w
@@ -199,12 +211,14 @@ def add_absorption(m, boundary_widths, n_roi, n_dims):
 def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
     """ Pad 'x' with boundaries in all dimensions using numpy pad (if x is np.ndarray) or PyTorch nn.functional.pad
     (if x is torch.Tensor).
-    If boundary_post is specified separately, pad with boundary_widths (before) and boundary_post (after)
+    If boundary_post is specified separately, pad with boundary_widths (before) and boundary_post (after).
+
     :param x: Input array
     :param boundary_widths: Boundary widths for padding before and after (or just before if boundary_post not None)
     :param boundary_post: Boundary widths for padding after
     :param mode: Padding mode
-    :return: Padded array """
+    :return: Padded array 
+    """
     x = check_input_dims(x)  # Ensure x is a 3-d array
 
     if boundary_post is None:
@@ -223,14 +237,16 @@ def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
 
 def boundary_(x):
     """ Anti-reflection boundary layer (ARL). Linear window function
+
     :param x: Size of the ARL
-    :return boundary_: Boundary"""
+    """
     return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
 
 
 # Used in tests
 def full_matrix(operator):
     """ Converts operator to a 2D square matrix of size np.prod(d) x np.prod(d) 
+
     :param operator: Operator to convert to a matrix. This function must be able to accept a 0 scalar, and
                      return a vector of the size and data type of the domain.
     """
@@ -250,25 +266,31 @@ def full_matrix(operator):
 # Metrics
 def max_abs_error(e, e_true):
     """ (Normalized) Maximum Absolute Error (MAE) ||e-e_true||_{inf} / ||e_true|| 
+
     :param e: Computed field
     :param e_true: True field
-    :return: (Normalized) MAE """
+    :return: (Normalized) MAE 
+    """
     return np.max(np.abs(e - e_true)) / np.linalg.norm(e_true)
 
 
 def max_relative_error(e, e_true):
     """Computes the maximum error, normalized by the rms of the true field 
+
     :param e: Computed field
     :param e_true: True field
-    :return: (Normalized) Maximum Relative Error """
+    :return: (Normalized) Maximum Relative Error 
+    """
     return np.max(np.abs(e - e_true)) / np.sqrt(np.mean(np.abs(e_true) ** 2))
 
 
 def relative_error(e, e_true):
     """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ 
+
     :param e: Computed field
     :param e_true: True field
-    :return: Relative Error """
+    :return: Relative Error 
+    """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
 
 
@@ -289,6 +311,7 @@ def is_zero(x):
 
 def normalize(x, min_val=None, max_val=None, a=0, b=1):
     """ Normalize x to the range [a, b]
+
     :param x: Input array
     :param min_val: Minimum value (of x)
     :param max_val: Maximum value (of x)

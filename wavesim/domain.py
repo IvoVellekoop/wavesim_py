@@ -5,10 +5,11 @@ from abc import ABCMeta, abstractmethod
 class Domain(metaclass=ABCMeta):
     """Base class for all simulation domains
 
-    This base class defines the interface for operations that are common for all simulation types, and for MultiDomain.
-    todo: the design using slots minimizes memory use, but it is a suboptimal design because it mixes mutable
-        and immutable state. This design should be revisited so that the Domain is immutable,
-        and the code that runs the algorithms performs the memory management.
+    This base class defines the interface for operations that are common for all simulation types, 
+    and for MultiDomain.
+    todo: the design using slots minimizes memory use, but it is a suboptimal design because it 
+    mixes mutable and immutable state. This design should be revisited so that the Domain is 
+    immutable, and the code that runs the algorithms performs the memory management.
     """
 
     def __init__(self, pixel_size: float, shape, device):
@@ -31,9 +32,10 @@ class Domain(metaclass=ABCMeta):
     def get(self, slot: int, copy=False):
         """Returns the data in the specified slot.
 
-        param: slot: slot from which to return the data
-        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
-                     Note that this data may be overwritten by the next call to domain.
+        :param slot: slot from which to return the data
+        :param copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+
+        Note that this data may be overwritten by the next call to domain.
         """
         pass
 
@@ -46,10 +48,11 @@ class Domain(metaclass=ABCMeta):
     def inner_product(self, slot_a, slot_b):
         """Computes the inner product of two data vectors
 
-        Note: the vectors may be represented as multidimensional arrays,
-        but these arrays must be contiguous for this operation to work.
-        Although it would be possible to use flatten(), this would create a
-        copy when the array is not contiguous, causing a hidden performance hit.
+        Note:
+            The vectors may be represented as multidimensional arrays,
+            but these arrays must be contiguous for this operation to work.
+            Although it would be possible to use flatten(), this would create a
+            copy when the array is not contiguous, causing a hidden performance hit.
         """
         pass
 

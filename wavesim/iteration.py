@@ -4,13 +4,14 @@ from .utilities import is_zero
 
 def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6, full_residuals=False):
     """ WaveSim update
+
     :param domain: Helmholtz base parameters
     :param source: source field
     :param alpha: relaxation parameter for the Richardson iteration
     :param max_iterations: maximum number of iterations
     :param threshold: threshold for the residual norm
     :param full_residuals: when True, returns list of residuals for all iterations. Otherwise, returns final residual
-    :return: u (computed field), state (object) """
+    :return: u, iteration count, residuals """
 
     # Reset the field u to zero
     slot_x = 0
@@ -63,10 +64,6 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
             = x + α c B (L+1)⁻¹ (y + c⁻¹ [1-V] x - c⁻¹ [L+1] x)
             = x + α B [(L+1)⁻¹ (c y + B x) - x]
             = x - α B x + α B (L+1)⁻¹ (c y + B x)
-
-    :param: base: domain or multi-domain to operate on
-    :param: alpha: relaxation parameter for the Richardson iteration
-    :param: compute_norm2: when True, returns the squared norm of the residual. Otherwise, returns 0.0
     """
     if slot_tmp == slot_in:
         raise ValueError("slot_in and slot_tmp should be different")

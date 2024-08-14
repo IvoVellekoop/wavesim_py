@@ -7,8 +7,9 @@ from torch.cuda import empty_cache
 class HelmholtzDomain(Domain):
     """Represents a single domain of the simulation.
 
-    The `Domain` object encapsulates all data that is stored on a single computation node (e.g. a GPU or a node in a
-    cluster), and provides methods to perform the basic operations that the Wavesim algorithm needs.
+    The `Domain` object encapsulates all data that is stored on a single computation node 
+    (e.g. a GPU or a node in a cluster), and provides methods to perform the basic operations 
+    that the Wavesim algorithm needs.
 
     Note:
         Domain currently works only for the Helmholtz equation and the PyTorch backend.
@@ -34,7 +35,7 @@ class HelmholtzDomain(Domain):
         Note: all operations performed on this domain will use the same pytorch device and data type as the
               permittivity array.
 
-        Attributes:
+        Args:
             permittivity: permittivity (n²) map. Must be a 3-dimensional array of complex float32 or float64.
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
                 used for all operations.
@@ -188,8 +189,8 @@ class HelmholtzDomain(Domain):
     def get(self, slot: int, copy=False):
         """Returns the data in the specified slot.
 
-        param: slot: slot from which to return the data
-        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+        :param: slot: slot from which to return the data
+        :param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
                      Note that this data may be overwritten by the next call to domain.
         """
         data = self._x[slot]
@@ -202,10 +203,11 @@ class HelmholtzDomain(Domain):
     def inner_product(self, slot_a: int, slot_b: int):
         """Computes the inner product of two data vectors
 
-        Note: the vectors may be represented as multidimensional arrays,
-        but these arrays must be contiguous for this operation to work.
-        Although it would be possible to use flatten(), this would create a
-        copy when the array is not contiguous, causing a hidden performance hit.
+        Note: 
+            The vectors may be represented as multidimensional arrays,
+            but these arrays must be contiguous for this operation to work.
+            Although it would be possible to use flatten(), this would create a
+            copy when the array is not contiguous, causing a hidden performance hit.
         """
         retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
@@ -213,9 +215,10 @@ class HelmholtzDomain(Domain):
     def medium(self, slot_in: int, slot_out: int):
         """Applies the operator 1-Vscat.
 
-        Note: does not apply the wrapping correction. When part of a multi-domain,
-        the wrapping correction is applied by the medium() function of the multi-domain object
-        and this function should not be called directly.
+        Note: 
+            Does not apply the wrapping correction. When part of a multi-domain,
+            the wrapping correction is applied by the medium() function of the multi-domain object
+            and this function should not be called directly.
         """
         torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
 
@@ -289,10 +292,11 @@ class HelmholtzDomain(Domain):
 
         Computes Bscat (from the temporary storage 0), the propagator kernel (from the temporary value in
         propagator_kernel), and scales Vwrap.
+
         Attributes:
-            scale: Scaling factor of the problem. Its magnitude is chosen such that the
-                operator V = scale · (the scattering potential + the wrapping correction)
-                 has norm < 1. The complex argument is chosen such that L+V is accretive.
+            scale: Scaling factor of the problem. Its magnitude is chosen such that the operator 
+                   V = scale · (the scattering potential + the wrapping correction) has norm < 1. 
+                   The complex argument is chosen such that L+V is accretive.
         """
 
         # B = 1 - scale·(n² k₀² - shift). Scaling and shifting was already applied. 1-... not yet
@@ -313,14 +317,11 @@ class HelmholtzDomain(Domain):
             self.Vwrap = [scale * W if W is not None else None for W in self.Vwrap]
 
     def compute_corrections(self, slot_in: int):
-        """Computes the edge corrections by multiplying the first and last pixels of each line with the Vwrap matrix.
+        """Computes the edge corrections by multiplying the first and last pixels of each line with 
+        the Vwrap matrix.
 
-        The corrections are stored in self.edges.TODO: re-use this memory
-        """
-        """ Function to compute the wrapping/transfer corrections in 3 dimensions as six separate arrays
-        for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
-        :param x: Array to which wrapping correction is to be applied
-        :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
+        The corrections are stored in self.edges.
+        TODO: re-use this memory
         """
         for edge in range(6):
             axes = [1, ] if edge % 2 == 0 else [0, ]
@@ -342,12 +343,12 @@ class HelmholtzDomain(Domain):
         return self.edges
 
     def apply_corrections(self, wrap_corrections, transfer_corrections, slot: int):
-        """Apply  -1·wrapping/transfer corrections
+        """Apply wrapping/transfer corrections
 
-        Transfer corrections correspond to a contribution from neighboring domains, and are added to the current domain.
-        Wrap corrections correct for the periodicity of the fft. They are subtracted from the domain
-        In this case, there is an additional factor of -1 because this function is called from `medium`, which applies
-        1-V instead of V.
+        Transfer corrections correspond to a contribution from neighboring domains, and are added
+        to the current domain. Wrap corrections correct for the periodicity of the fft. They are 
+        subtracted from the domain. In this case, there is an additional factor of -1 because 
+        this function is called from `medium`, which applies 1-V instead of V.
         Therefore, transfer corrections are now subtracted, and wrap corrections are added.
 
         :param slot: slot index for the data to which the corrections are applied. Operation is always in-place

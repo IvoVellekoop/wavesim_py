@@ -1,3 +1,10 @@
+""" 
+Helmholtz 3D disordered medium test
+===================================
+Test for propagation in a 3D disordered medium. 
+Compare with reference solution (matlab repo result). 
+"""
+
 import os
 import torch
 import numpy as np
@@ -11,8 +18,6 @@ from __init__ import plot
 
 if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
-
-""" Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
 
 
 wavelength = 1.

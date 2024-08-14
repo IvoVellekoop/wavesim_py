@@ -1,3 +1,9 @@
+"""
+PyTorch memory snapshot example
+===============================
+This script captures a memory snapshot of the GPU memory usage during the simulation.
+"""
+
 import os
 import sys
 import torch

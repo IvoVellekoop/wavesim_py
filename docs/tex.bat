@@ -1,0 +1,1 @@
+.\make.bat clean & .\make.bat latex & cd _build\latex & xelatex wavesim.tex & xelatex wavesim.tex & cd .. & cd ..

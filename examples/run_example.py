@@ -1,3 +1,9 @@
+"""
+Run Helmholtz example
+=====================
+Example script to run a simulation of a point source in a random refractive index map using the Helmholtz equation.
+"""
+
 import os
 import sys
 import torch

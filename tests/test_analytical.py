@@ -118,10 +118,11 @@ def test_residual(size, boundary_widths, periodic):
 ])
 def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
-    wavelength = 1.
-    n_size = (256, 1, 1)
+    wavelength = 1.  # wavelength in micrometer (um)
+    pixel_size = wavelength / 4  # pixel size in wavelength units
+    n_size = (350, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
     n = np.ones(n_size, dtype=np.complex64)
-    boundary_widths = 50
+    boundary_widths = 50  # width of the boundary in pixels
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n, boundary_widths)
 
@@ -131,7 +132,8 @@ def test_1d_analytical(n_domains, periodic):
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     # domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-    domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
+    domain = MultiDomain(permittivity=n, periodic=periodic, 
+                         wavelength=wavelength, pixel_size=pixel_size, n_domains=n_domains)
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
     u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)

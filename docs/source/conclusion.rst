@@ -1,0 +1,10 @@
+Conclusion
+==========
+
+We have introduced a domain decomposition of the modified Born series (MBS) approach :cite:`osnabrugge2016convergent, vettenburg2023universal` applied to the Helmholtz equation. This new framework enables arbitrarily large simulations by decomposing the problem over smaller subdomains that can be solved over multiple processors while leveraging the convergence guarantees of the MBS. To enable communication between the subdomains, we introduced a transfer correction that transfers information between the subdomains and is computed along the edges of the subdomains through fast convolution. We also introduced a wrapping correction that is identical in amplitude but opposite in polarity to the transfer correction, which in addition to enabling the domain decomposition framework, also allows for narrower boundaries in the simulations only for tackling reflections. The lockstep execution and communication between subdomains in each iteration are important considerations and currently form the bottleneck of the approach. Further, the overhead of domain decomposition can be minimized by splitting into subdomains along one axis, causing the least amount of increase in the number of iterations for convergence. It is however important to note the advantage that the number of subdomains along a given axis does not lead to an increase in the number of iterations. These considerations provide opportunities for further development of the framework. Nevertheless, the current form of the domain decomposition of the MBS, available as an open-source Python implementation on GitHub, is a significant inclusion into the advantages of speed and accuracy of the MBS.
+
+Code availability
+-----------------
+The code for Wavesim is available on GitHub :cite:`wavesimgithub`, it is licensed under the BSD 3-Clause license. When using Wavesim in your work, please cite :cite:`osnabrugge2016convergent, osnabrugge2021` and this current paper. Examples and documentation for this project are available at `Read the Docs <https://wavesim.readthedocs.io/en/latest/>`_ :cite:`wavesimdocumentation`.
+
+%endmatter%

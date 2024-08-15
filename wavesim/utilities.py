@@ -285,7 +285,7 @@ def max_relative_error(e, e_true):
 
 
 def relative_error(e, e_true):
-    """ Relative error ⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩ 
+    """ Relative error ``⟨|e-e_true|^2⟩ / ⟨|e_true|^2⟩``
 
     :param e: Computed field
     :param e_true: True field

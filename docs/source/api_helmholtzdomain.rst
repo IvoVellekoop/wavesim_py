@@ -1,5 +1,5 @@
 wavesim.helmholtzdomain
-----------------------
+-----------------------
 .. automodule:: wavesim.helmholtzdomain
     :members:
     :imported-members:

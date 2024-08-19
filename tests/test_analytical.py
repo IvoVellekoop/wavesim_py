@@ -120,7 +120,7 @@ def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     wavelength = 1.  # wavelength in micrometer (um)
     pixel_size = wavelength / 4  # pixel size in wavelength units
-    n_size = (350, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+    n_size = (512, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
     n = np.ones(n_size, dtype=np.complex64)
     boundary_widths = 50  # width of the boundary in pixels
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)

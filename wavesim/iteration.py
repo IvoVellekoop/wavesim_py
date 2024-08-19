@@ -17,7 +17,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     slot_x = 0
     slot_tmp = 1
     domain.clear(slot_x)
-    domain.set_source(source)
+    domain.set_source(source, in_iteration=True)
 
     # compute initial residual
     domain.add_source(slot_x, weight=1.)  # [x] = y
@@ -68,11 +68,11 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
     if slot_tmp == slot_in:
         raise ValueError("slot_in and slot_tmp should be different")
 
-    domain.medium(slot_in, slot_tmp)  # [tmp] = B·x
+    domain.medium(slot_in, slot_tmp, tc=0)  # [tmp] = B·x
     domain.add_source(slot_tmp, domain.scale)  # [tmp] = B·x + c·y
     domain.propagator(slot_tmp, slot_tmp)  # [tmp] = (L+1)⁻¹ (B·x + c·y)
     domain.mix(1.0, slot_in, -1.0, slot_tmp, slot_tmp)  # [tmp] = x - (L+1)⁻¹ (B·x + c·y)
-    domain.medium(slot_tmp, slot_tmp)  # [tmp] = B(x - (L+1)⁻¹ (B·x + c·y))
+    domain.medium(slot_tmp, slot_tmp, tc=1)  # [tmp] = B(x - (L+1)⁻¹ (B·x + c·y))
     # optionally compute norm of residual of preconditioned system
     retval = domain.inner_product(slot_tmp, slot_tmp) if compute_norm2 else 0.0
     domain.mix(1.0, slot_in, -alpha, slot_tmp, slot_out)  # [out] = x - α B x + α B (L+1)⁻¹ (B·x + c·y)

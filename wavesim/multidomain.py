@@ -159,14 +159,26 @@ class MultiDomain(Domain):
         """
         inner_product = 0.0
         for domain in self.domains.flat:
+            # domain_inner_product = domain.inner_product(slot_a, slot_b)
+            # domain.ip.append(domain_inner_product)
+            # inner_product += domain_inner_product
             inner_product += domain.inner_product(slot_a, slot_b)
         return inner_product
 
-    def medium(self, slot_in: int, slot_out: int):
-        """ Apply the medium operator B, including wrapping corrections."""
+    def medium(self, slot_in: int, slot_out: int, tc=None):
+        """ Apply the medium operator B, including wrapping corrections.
+
+        Args:
+            slot_in: slot holding the input field
+            slot_out: slot that will receive the result
+            tc: transfer correction for which medium() call in preconditioned iteration. 0 or 1.
+        """
+    
+        # compute the corrections for each domain, before applying the medium operator
         domain_edges = [domain.compute_corrections(slot_in) for domain in self.domains.flat]
         domain_edges = list_to_array(domain_edges, 2).reshape(*self.domains.shape, 6)
 
+        # Only applies the operator B=1-Vscat. The corrections are applied in the next step
         for domain in self.domains.flat:
             domain.medium(slot_in, slot_out)
 
@@ -192,7 +204,26 @@ class MultiDomain(Domain):
                 return domain_edges[*tuple(x_neighbor), edge - offset]
 
             transfer_corrections = [get_neighbor(edge) for edge in range(6)]
-            domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
+
+            # tc_norm = torch.vdot(transfer_corrections[abs(idx-1)].view(-1), transfer_corrections[abs(idx-1)].view(-1)).item().real
+            tc_ = next((a for a in transfer_corrections if a is not None), None)
+            if tc_ is not None:
+                tc_norm = torch.vdot(tc_.view(-1), tc_.view(-1)).item().real
+
+                if tc == 0:
+                    domain.tc0[1] = tc_norm
+                elif tc == 1:
+                    domain.tc1[1] = tc_norm
+
+            if domain.counter < 100:
+                domain.counter = domain.counter + 1 if domain.tc0[1] > domain.tc0[0] and domain.tc1[1] > domain.tc1[0] else 0
+                domain.tc0[0] = domain.tc0[1]
+                domain.tc1[0] = domain.tc1[1]
+            else:
+                domain.active = True
+
+            if domain.active:
+                domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """ Mix the fields in slots a and b and store the result in slot_out """
@@ -209,7 +240,7 @@ class MultiDomain(Domain):
         for domain in self.domains.flat:
             domain.inverse_propagator(slot_in, slot_out)
 
-    def set_source(self, source):
+    def set_source(self, source, in_iteration=False):
         """ Split the source into subdomains and store in the subdomain states."""
         if source is None or is_zero(source):
             for domain in self.domains.flat:

@@ -169,6 +169,13 @@ class HelmholtzDomain(Domain):
         # # compute the norm of Vwrap. Worst case: just add all norms
         self.Vwrap_norm = sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
 
+        # Setup to iterate over domains only when the source is non-zero, 
+        # or the norm of transfer corrections consistently increases
+        self.tc0 = [0] * 2  # store the last two values of the transfer correction norm for 1st medium call
+        self.tc1 = [0] * 2  # store the last two values of the transfer correction norm for 1st medium call
+        self.counter = 0  # counter to keep track of the number of iterations
+        self.active = True  # flag to indicate if the domain is active in the iteration
+
     # Functions implementing the domain interface
     # add_source()
     # clear()
@@ -179,8 +186,10 @@ class HelmholtzDomain(Domain):
     # propagator()
     # set_source()
     def add_source(self, slot: int, weight: float):
+        """Adds the source term to the data in the specified slot."""
         if self._source is not None:
-            torch.add(self._x[slot], self._source, out=self._x[slot], alpha=weight)
+            if self.active:
+                torch.add(self._x[slot], self._source, out=self._x[slot], alpha=weight)
 
     def clear(self, slot: int):
         """Clears the data in the specified slot"""
@@ -212,7 +221,7 @@ class HelmholtzDomain(Domain):
         retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
-    def medium(self, slot_in: int, slot_out: int):
+    def medium(self, slot_in: int, slot_out: int, tc = None):
         """Applies the operator 1-Vscat.
 
         Note: 
@@ -220,36 +229,39 @@ class HelmholtzDomain(Domain):
             the wrapping correction is applied by the medium() function of the multi-domain object
             and this function should not be called directly.
         """
-        torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
+        if self.active:
+            torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """Mixes two data arrays and stores the result in the specified slot"""
-        a = self._x[slot_a]
-        b = self._x[slot_b]
-        out = self._x[slot_out]
-        if weight_a == 1.0:
-            torch.add(a, b, alpha=weight_b, out=out)
-        elif weight_a == 0.0:
-            torch.mul(b, weight_b, out=out)
-        elif weight_b == 1.0:
-            torch.add(b, a, alpha=weight_a, out=out)
-        elif weight_b == 0.0:
-            torch.mul(a, weight_a, out=out)
-        elif weight_a + weight_b == 1.0:
-            torch.lerp(a, b, weight_b, out=out)
-        elif slot_a == slot_out:
-            a.mul_(weight_a)
-            a.add_(b, alpha=weight_b)
-        else:
-            torch.mul(b, weight_b, out=out)
-            out.add_(a, alpha=weight_a)
+        if self.active:
+            a = self._x[slot_a]
+            b = self._x[slot_b]
+            out = self._x[slot_out]
+            if weight_a == 1.0:
+                torch.add(a, b, alpha=weight_b, out=out)
+            elif weight_a == 0.0:
+                torch.mul(b, weight_b, out=out)
+            elif weight_b == 1.0:
+                torch.add(b, a, alpha=weight_a, out=out)
+            elif weight_b == 0.0:
+                torch.mul(a, weight_a, out=out)
+            elif weight_a + weight_b == 1.0:
+                torch.lerp(a, b, weight_b, out=out)
+            elif slot_a == slot_out:
+                a.mul_(weight_a)
+                a.add_(b, alpha=weight_b)
+            else:
+                torch.mul(b, weight_b, out=out)
+                out.add_(a, alpha=weight_a)
 
     def propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1)^-1 x."""
         # todo: convert to on-the-fly computation
-        torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-        self._x[slot_out].mul_(self.propagator_kernel)
-        torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
+        if self.active:
+            torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
+            self._x[slot_out].mul_(self.propagator_kernel)
+            torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def inverse_propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1) x .
@@ -266,13 +278,17 @@ class HelmholtzDomain(Domain):
             self._x[slot_out].mul_(self.inverse_propagator_kernel)
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
-    def set_source(self, source):
+    def set_source(self, source, in_iteration=False):
         """Sets the source term for this domain."""
         self._source = None
         if source is None or is_zero(source):
             return
 
         source = source.to(self.device)
+        # Domain is active at the start of the iteration if the source is non-zero
+        if in_iteration:  # only check if in the iteration
+            self.active = False if torch.vdot(source.to_dense().view(-1), 
+                                            source.to_dense().view(-1)).item().real == 0.0 else True
         if source.is_sparse:
             source = source.coalesce()
             if len(source.indices()) == 0:
@@ -329,13 +345,6 @@ class HelmholtzDomain(Domain):
             if self.Vwrap[dim] is None:
                 continue
 
-            # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of the wrap matrix
-            # (of size n_correction) is always at axis=0. It should be at axis=dim,
-            # moveaxis moves the non-contracted dimension to the correct position
-            # self.edges[edge] = torch.moveaxis(
-            #    torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
-            #                    out=self.edges[edge]), 0,
-            #    dim)
             view = torch.moveaxis(self.edges[edge], dim, 0)
             torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
                             out=view)

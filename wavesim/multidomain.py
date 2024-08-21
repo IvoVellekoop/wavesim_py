@@ -159,19 +159,17 @@ class MultiDomain(Domain):
         """
         inner_product = 0.0
         for domain in self.domains.flat:
-            # domain_inner_product = domain.inner_product(slot_a, slot_b)
-            # domain.ip.append(domain_inner_product)
-            # inner_product += domain_inner_product
             inner_product += domain.inner_product(slot_a, slot_b)
         return inner_product
 
-    def medium(self, slot_in: int, slot_out: int, tc=None):
+    def medium(self, slot_in: int, slot_out: int, mnum=None):
         """ Apply the medium operator B, including wrapping corrections.
 
         Args:
             slot_in: slot holding the input field
             slot_out: slot that will receive the result
-            tc: transfer correction for which medium() call in preconditioned iteration. 0 or 1.
+            mnum: # of the medium() call in preconditioned iteration. 
+                  0 for first, 1 for second medium call.
         """
     
         # compute the corrections for each domain, before applying the medium operator
@@ -205,22 +203,37 @@ class MultiDomain(Domain):
 
             transfer_corrections = [get_neighbor(edge) for edge in range(6)]
 
-            # tc_norm = torch.vdot(transfer_corrections[abs(idx-1)].view(-1), transfer_corrections[abs(idx-1)].view(-1)).item().real
-            tc_ = next((a for a in transfer_corrections if a is not None), None)
-            if tc_ is not None:
-                tc_norm = torch.vdot(tc_.view(-1), tc_.view(-1)).item().real
-
-                if tc == 0:
-                    domain.tc0[1] = tc_norm
-                elif tc == 1:
-                    domain.tc1[1] = tc_norm
-
-            if domain.counter < 100:
-                domain.counter = domain.counter + 1 if domain.tc0[1] > domain.tc0[0] and domain.tc1[1] > domain.tc1[0] else 0
-                domain.tc0[0] = domain.tc0[1]
-                domain.tc1[0] = domain.tc1[1]
-            else:
+            # check if domain should be active in the iteration or not
+            if mnum is None or domain._debug:  # always active outside iteration (mnum==None) in debug mod
                 domain.active = True
+            else:  # check based on the norm of the transfer corrections
+                tc_norm = next((a for a in transfer_corrections if a is not None), None)
+                if tc_norm is not None:
+                    if domain.counter < 25:  # counter for the number of iterations with increasing norm
+                        tc_norm = torch.vdot(tc_norm.view(-1), tc_norm.view(-1)).item().real
+
+                        if mnum == 0:  # first medium call in preconditioned iteration
+                            domain.mnum0[1] = tc_norm
+                        elif mnum == 1:  # second medium call in preconditioned iteration
+                            domain.mnum1[1] = tc_norm
+
+                            # if norm is monotonically increasing, increase the counter
+                            if domain.mnum0[-1] > domain.mnum0[-2] and domain.mnum1[-1] > domain.mnum1[-2]:
+                                domain.counter = domain.counter + 1
+                            # if norm is high, domain is set to active
+                            elif domain.mnum0[1] >= 1.e-7 or domain.mnum1[1] >= 1.e-7:
+                                domain.counter = 25
+                                domain.active = True
+                            else:
+                                domain.counter = 0
+                                # if the norm is not increasing and source is zero, domain is set to inactive
+                                domain.active = False if domain._source is not None and torch.sum(domain._source).item().real == 0.0 else True
+
+                            # current norm becomes previous norm
+                            domain.mnum0[0] = domain.mnum0[1]
+                            domain.mnum1[0] = domain.mnum1[1]
+                    else:
+                        domain.active = True
 
             if domain.active:
                 domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
@@ -240,7 +253,7 @@ class MultiDomain(Domain):
         for domain in self.domains.flat:
             domain.inverse_propagator(slot_in, slot_out)
 
-    def set_source(self, source, in_iteration=False):
+    def set_source(self, source):
         """ Split the source into subdomains and store in the subdomain states."""
         if source is None or is_zero(source):
             for domain in self.domains.flat:

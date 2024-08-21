@@ -57,7 +57,7 @@ class Domain(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def medium(self, slot_in, slot_out, tc):
+    def medium(self, slot_in, slot_out, mnum):
         """Applies the operator 1-Vscat."""
         pass
 
@@ -82,7 +82,7 @@ class Domain(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def set_source(self, source, in_iteration):
+    def set_source(self, source):
         """Sets the source term for this domain."""
         pass
 

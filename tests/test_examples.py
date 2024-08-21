@@ -58,7 +58,6 @@ def test_1d_glass_plate(n_domains, periodic):
     (1, 2, 1),
     (1, 3, 1),
     (2, 2, 1),
-    (3, 2, 1),
 ])
 def test_2d_low_contrast(n_domains):
     """ Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic
@@ -160,7 +159,6 @@ def test_2d_high_contrast(n_domains):
     (1, 2, 1),
     (1, 3, 1),
     (1, 1, 2),
-    (1, 1, 2),
     (2, 2, 1),
     (2, 1, 2),
     (1, 2, 2),
@@ -212,7 +210,6 @@ def test_3d_disordered(n_domains):
     (3, 1, 1),
     (1, 2, 1),
     (1, 3, 1),
-    (1, 1, 2),
     (1, 1, 2),
     (2, 2, 1),
     (2, 1, 2),

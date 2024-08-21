@@ -171,9 +171,9 @@ class HelmholtzDomain(Domain):
 
         # Setup to iterate over domains only when the source is non-zero, 
         # or the norm of transfer corrections consistently increases
-        self.tc0 = [0] * 2  # store the last two values of the transfer correction norm for 1st medium call
-        self.tc1 = [0] * 2  # store the last two values of the transfer correction norm for 1st medium call
-        self.counter = 0  # counter to keep track of the number of iterations
+        self.mnum0 = [0.0] * 2  # store the last two values of the transfer correction norm for 1st medium call
+        self.mnum1 = [0.0] * 2  # ... for 2nd medium call
+        self.counter = 0  # counter to keep track of the number of iterations with increasing transfer correction norm
         self.active = True  # flag to indicate if the domain is active in the iteration
 
     # Functions implementing the domain interface
@@ -221,7 +221,7 @@ class HelmholtzDomain(Domain):
         retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
-    def medium(self, slot_in: int, slot_out: int, tc = None):
+    def medium(self, slot_in: int, slot_out: int, mnum = None):
         """Applies the operator 1-Vscat.
 
         Note: 
@@ -278,17 +278,13 @@ class HelmholtzDomain(Domain):
             self._x[slot_out].mul_(self.inverse_propagator_kernel)
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
-    def set_source(self, source, in_iteration=False):
+    def set_source(self, source):
         """Sets the source term for this domain."""
         self._source = None
         if source is None or is_zero(source):
             return
 
         source = source.to(self.device)
-        # Domain is active at the start of the iteration if the source is non-zero
-        if in_iteration:  # only check if in the iteration
-            self.active = False if torch.vdot(source.to_dense().view(-1), 
-                                            source.to_dense().view(-1)).item().real == 0.0 else True
         if source.is_sparse:
             source = source.coalesce()
             if len(source.indices()) == 0:

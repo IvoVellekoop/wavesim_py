@@ -204,30 +204,34 @@ class MultiDomain(Domain):
             transfer_corrections = [get_neighbor(edge) for edge in range(6)]
 
             # check if domain should be active in the iteration or not
-            if mnum is None or domain._debug:  # always active outside iteration (mnum==None) in debug mod
+            if mnum is None or domain._debug:  # always active outside iteration (mnum==None) or in debug mod
                 domain.active = True
             else:  # check based on the norm of the transfer corrections
-                tc_norm = next((a for a in transfer_corrections if a is not None), None)
-                if tc_norm is not None:
+                tc_norm = [a for a in transfer_corrections if a is not None]
+                if tc_norm:
                     if domain.counter < 25:  # counter for the number of iterations with increasing norm
-                        tc_norm = torch.vdot(tc_norm.view(-1), tc_norm.view(-1)).item().real
+                        tc_norm = max([torch.vdot(a.view(-1), a.view(-1)).item().real for a in tc_norm])
 
                         if mnum == 0:  # first medium call in preconditioned iteration
                             domain.mnum0[1] = tc_norm
                         elif mnum == 1:  # second medium call in preconditioned iteration
                             domain.mnum1[1] = tc_norm
 
-                            # if norm is monotonically increasing, increase the counter
-                            if domain.mnum0[-1] > domain.mnum0[-2] and domain.mnum1[-1] > domain.mnum1[-2]:
-                                domain.counter = domain.counter + 1
                             # if norm is high, domain is set to active
-                            elif domain.mnum0[1] >= 1.e-7 or domain.mnum1[1] >= 1.e-7:
-                                domain.counter = 25
+                            if domain.mnum0[1] >= 1.e-7 or domain.mnum1[1] >= 1.e-7:
                                 domain.active = True
+                                domain.counter = 25
+                            # if norm is monotonically increasing, increase the counter
+                            elif domain.mnum0[-1] > domain.mnum0[-2] and domain.mnum1[-1] > domain.mnum1[-2]:
+                                domain.counter += 1
                             else:
                                 domain.counter = 0
                                 # if the norm is not increasing and source is zero, domain is set to inactive
-                                domain.active = False if domain._source is not None and torch.sum(domain._source).item().real == 0.0 else True
+                                if domain._source is not None and torch.sum(domain._source).item().real == 0.0:
+                                    domain.active = False 
+                                else:
+                                    domain.active = True
+                                    domain.counter = 25
 
                             # current norm becomes previous norm
                             domain.mnum0[0] = domain.mnum0[1]

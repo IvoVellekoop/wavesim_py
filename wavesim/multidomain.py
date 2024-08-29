@@ -22,7 +22,7 @@ class MultiDomain(Domain):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
         Args:
-            permittivity: Permittivity distribution, must be 3-d.
+            permittivity: Permittivity distribution, must be 4-d.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
             pixel_size: Grid spacing in wavelengths.
@@ -30,7 +30,7 @@ class MultiDomain(Domain):
             n_domains: number of domains to split the simulation into.
                 the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other
                 ones. In the future, the domain size may be adjusted to have an efficient fourier transform.
-                is (1,1,1), no domain decomposition.
+                is (1, 1, 1), no domain decomposition.
             n_boundary: Number of points used in the wrapping and domain transfer correction. Default is 8.
             device: 'cpu' to use the cpu, 'cuda' to distribute the simulation over all available cuda devices, 'cuda:x'
                 to use a specific cuda device, a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the

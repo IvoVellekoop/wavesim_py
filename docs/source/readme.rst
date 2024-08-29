@@ -61,7 +61,7 @@ Once the virtual environment is set up with all the required packages, you are r
 
 You can run the code with just three inputs:
 
-* :attr:`~.Domain.permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
+* :attr:`~.Domain.permittivity`, i.e. refractive index distribution squared (a 4-dimensional array on a regular grid),
 
 * :attr:`~.Domain.periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [``True``] or not [``False``], and
 
@@ -78,7 +78,7 @@ Apart from the inputs :attr:`~.Domain.permittivity`, :attr:`~.Domain.periodic`, 
 
 Parameters in the :class:`~.domain.Domain` class: :class:`~.helmholtzdomain.HelmholtzDomain` or :class:`~.multidomain.MultiDomain`
 
-* :attr:`~.Domain.permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
+* :attr:`~.Domain.permittivity`: 4-dimensional array with refractive index-squared distribution in x, y, and z direction, and a polarization dimension (unused in Helmholtz case). To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 
 * :attr:`~.Domain.periodic`: indicates for each dimension whether the simulation is periodic (``True``) or not (``False``). For periodic dimensions, i.e., :attr:`~.Domain.periodic` ``= [True, True, True]``, the field is wrapped around the domain.
 
@@ -106,7 +106,7 @@ Parameters in the :func:`run_algorithm` function
 
 * :attr:`~.domain`: the domain object created by HelmholtzDomain() or MultiDomain()
 
-* :attr:`~.Domain.source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
+* :attr:`~.Domain.source`: source term, a 4-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
 
 * :attr:`~.alpha` ``: float = 0.75``: relaxation parameter for the Richardson iteration
 

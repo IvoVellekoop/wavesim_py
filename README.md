@@ -41,7 +41,7 @@ Once the virtual environment is set up with all the required packages, you are r
 
 You can run the code with just three inputs:
 
-* `permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
+* `permittivity`, i.e. refractive index distribution squared (a 4-dimensional array on a regular grid),
 * `periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [`True`] or not [`False`], and
 * `source`, the same size as permittivity.
 
@@ -59,6 +59,7 @@ Compare 1D free-space propagation with analytic solution
 
 import torch
 import numpy as np
+from time import time
 import sys
 sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
@@ -67,9 +68,10 @@ from wavesim.iteration import run_algorithm  # to run the wavesim iteration
 from wavesim.utilities import preprocess, relative_error
 from __init__ import analytical_solution, plot
 
+
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # refractive index map
 boundary_widths = 50  # width of the boundary in pixels
 
@@ -91,25 +93,28 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
 
 # Run the wavesim iteration and get the computed field
-u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
-u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
+start = time()
+u_computed, iterations, residual_norm = run_algorithm(domain, source, max_iterations=2000)
+end = time() - start
+print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
+u_computed = u_computed.squeeze().cpu().numpy()[boundary_widths:-boundary_widths]
 u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
 
 # Compute relative error with respect to the analytical solution
-re = relative_error(u_computed.cpu().numpy(), u_ref)
+re = relative_error(u_computed, u_ref)
 print(f'Relative error: {re:.2e}')
 threshold = 1.e-3
 assert re < threshold, f"Relative error higher than {threshold}"
 
 # Plot the results
-plot(u_computed.cpu().numpy(), u_ref, re)
+plot(u_computed, u_ref, re)
 ```
 
 Apart from the inputs `permittivity`, `periodic`, and `source`, all other parameters have defaults. Details about these are given below (with the default values, if defined).
 
 Parameters in the `Domain` class: `HelmholtzDomain` or `MultiDomain`
 
-* `permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
+* `permittivity`: 4-dimensional array with refractive index-squared distribution in x, y, and z direction, and a polarization dimension (unused in Helmholtz case). To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 * `periodic`: indicates for each dimension whether the simulation is periodic (`True`) or not (`False`). For periodic dimensions, i.e., `periodic` `= [True, True, True]`, the field is wrapped around the domain.
 * `pixel_size` `:float = 0.25`: points per wavelength.
 * `wavelength` `:float = None`: wavelength: wavelength in micrometer (um). If not given, i.e. `None`, it is calculated as `1/pixel_size = 4 um`.
@@ -125,7 +130,7 @@ Parameters in the `Domain` class: `HelmholtzDomain` or `MultiDomain`
 Parameters in the `run_algorithm()` function
 
 * `domain`: the domain object created by HelmholtzDomain() or MultiDomain()
-* `source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
+* `source`: source term, a 4-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
 * `alpha` `: float = 0.75`: relaxation parameter for the Richardson iteration
 * `max_iterations` `: int = 1000`: maximum number of iterations
 * `threshold` `: float = 1.e-6`: threshold for the residual norm for stopping the iteration

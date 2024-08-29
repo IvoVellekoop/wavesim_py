@@ -6,5 +6,6 @@ Wavesim - A Python package for wave propagation simulation
     :numbered:
 
     Introduction <readme>
+    development
     conclusion
     auto_examples/index

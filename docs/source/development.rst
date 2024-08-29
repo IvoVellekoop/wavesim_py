@@ -44,4 +44,4 @@ Note that for building the pdf version of the documentation, you need to have `x
 
 Reporting bugs and contributing
 --------------------------------------------------
-Bugs can be reported through the GitHub issue tracking system. Better than reporting bugs, we encourage users to *contribute bug fixes, new algorithms, device drivers, and other improvements*. These contributions can be made in the form of a pull request :cite:`zandonellaMassiddaOpenScience2022`, which will be reviewed by the development team and integrated into the package when appropriate. Please contact the current development team through GitHub :cite:`wavesimgithub` to coordinate such contributions.
+Bugs can be reported through the GitHub issue tracking system. Better than reporting bugs, we encourage users to *contribute bug fixes, optimizations, and other improvements*. These contributions can be made in the form of a pull request :cite:`zandonellaMassiddaOpenScience2022`, which will be reviewed by the development team and integrated into the package when appropriate. Please contact the current development team through GitHub :cite:`wavesimgithub` to coordinate such contributions.

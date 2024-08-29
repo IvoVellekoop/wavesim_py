@@ -6,12 +6,12 @@
 
 ## What is Wavesim?
 
-Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method [[1](#id13), [2](#id14), [3](#id10), [4](#id7)], Wavesim is based on the Modified Born Series approach [[5](#id11)]. This method has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD. For more information (and to participate in the forum for discussions, queries, and requests), please visit our website [www.wavesim.org](https://www.wavesim.org/).
+Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method [[1](#id18), [2](#id14), [3](#id9), [4](#id8)], Wavesim is based on the Modified Born Series approach [[5](#id10)]. This method has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD. For more information (and to participate in the forum for discussions, queries, and requests), please visit our website [www.wavesim.org](https://www.wavesim.org/).
 
 * If you use Wavesim and publish your work, please cite:
-  > [[5](#id11)] [Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of computational physics, 322*, 113-124.](https://doi.org/10.1016/j.jcp.2016.06.034)
+  > [[5](#id10)] [Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of computational physics, 322*, 113-124.](https://doi.org/10.1016/j.jcp.2016.06.034)
 
-  > [[6](#id12)] [Osnabrugge, G., Benedictus, M., & Vellekoop, I. M. (2021). Ultra-thin boundary layer for high-accuracy simulations of light propagation. *Optics express, 29*(2), 1649-1658.](https://doi.org/10.1364/OE.412833)
+  > [[6](#id11)] [Osnabrugge, G., Benedictus, M., & Vellekoop, I. M. (2021). Ultra-thin boundary layer for high-accuracy simulations of light propagation. *Optics express, 29*(2), 1649-1658.](https://doi.org/10.1364/OE.412833)
 
 ## Installation
 
@@ -145,7 +145,7 @@ The authors declare no conflict of interest.
 
 ## References
 
-<a name="id13"></a>1
+<a name="id18"></a>1
 
 Kane Yee. Numerical solution of initial boundary value problems involving Maxwell's equations in isotropic media. *IEEE Transactions on Antennas and Propagation*, 14(3):302–307, 1966. [doi:10.1109/TAP.1966.1138693](https://doi.org/10.1109/TAP.1966.1138693).
 
@@ -153,18 +153,18 @@ Kane Yee. Numerical solution of initial boundary value problems involving Maxwel
 
 Allen Taflove and Susan C Hagnes. *Computational electrodynamics: The Finite-Difference Time-Domain Method*. Artech House, 1995.
 
-<a name="id10"></a>3
+<a name="id9"></a>3
 
 Ardavan F. Oskooi, David Roundy, Mihai Ibanescu, Peter Bermel, J.D. Joannopoulos, and Steven G. Johnson. MEEP: a flexible free-software package for electromagnetic simulations by the FDTD method. *Computer Physics Communications*, 181(3):687–702, 2010. [doi:10.1016/j.cpc.2009.11.008](https://doi.org/10.1016/j.cpc.2009.11.008).
 
-<a name="id7"></a>4
+<a name="id8"></a>4
 
 Majid Nabavi, M.H. Kamran Siddiqui, and Javad Dargahi. A new 9-point sixth-order accurate compact finite-difference method for the Helmholtz equation. *Journal of Sound and Vibration*, 307(3):972–982, 2007. [doi:10.1016/j.jsv.2007.06.070](https://doi.org/10.1016/j.jsv.2007.06.070).
 
-<a name="id11"></a>5
+<a name="id10"></a>5
 
 Gerwin Osnabrugge, Saroch Leedumrongwatthanakun, and Ivo M Vellekoop. A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of computational physics*, 322:113–124, 2016. [doi:10.1016/j.jcp.2016.06.034](https://doi.org/10.1016/j.jcp.2016.06.034).
 
-<a name="id12"></a>6
+<a name="id11"></a>6
 
 Gerwin Osnabrugge, Maaike Benedictus, and Ivo M Vellekoop. Ultra-thin boundary layer for high-accuracy simulations of light propagation. *Optics express*, 29(2):1649–1658, 2021. [doi:10.1364/OE.412833](https://doi.org/10.1364/OE.412833).

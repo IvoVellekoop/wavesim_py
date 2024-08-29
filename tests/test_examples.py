@@ -22,7 +22,7 @@ if os.path.basename(os.getcwd()) == 'tests':
 def test_1d_glass_plate(n_domains, periodic):
     """ Test for 1D propagation through glass plate. Compare with reference solution (matlab repo result). """
     wavelength = 1.
-    n_size = (256, 1, 1)
+    n_size = (256, 1, 1, 1)
     n = np.ones(n_size, dtype=np.complex64)
     n[99:130] = 1.5
     boundary_widths = 50
@@ -171,7 +171,7 @@ def test_2d_high_contrast(n_domains):
 def test_3d_disordered(n_domains):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
     wavelength = 1.
-    n_size = (128, 48, 96)
+    n_size = (128, 48, 96, 1)
     n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])
     boundary_widths = 50
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
@@ -222,7 +222,7 @@ def test_3d_disordered(n_domains):
 def test_3d_homogeneous(n_domains):
     """ Test for propagation in a 3D disordered medium. Compare with reference solution (matlab repo result). """
     wavelength = 1.
-    n_size = (128, 128, 128)
+    n_size = (128, 128, 128, 1)
     n = np.ones(tuple(n_size), dtype=np.complex64)
     boundary_widths = 50
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)

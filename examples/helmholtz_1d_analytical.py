@@ -8,6 +8,7 @@ Compare 1D free-space propagation with analytic solution
 
 import torch
 import numpy as np
+from time import time
 import sys
 sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
@@ -16,9 +17,10 @@ from wavesim.iteration import run_algorithm  # to run the wavesim iteration
 from wavesim.utilities import preprocess, relative_error
 from __init__ import analytical_solution, plot
 
+
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # refractive index map
 boundary_widths = 50  # width of the boundary in pixels
 
@@ -40,15 +42,18 @@ domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelengt
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
 
 # Run the wavesim iteration and get the computed field
-u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
-u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]
+start = time()
+u_computed, iterations, residual_norm = run_algorithm(domain, source, max_iterations=2000)
+end = time() - start
+print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
+u_computed = u_computed.squeeze().cpu().numpy()[boundary_widths:-boundary_widths]
 u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
 
 # Compute relative error with respect to the analytical solution
-re = relative_error(u_computed.cpu().numpy(), u_ref)
+re = relative_error(u_computed, u_ref)
 print(f'Relative error: {re:.2e}')
 threshold = 1.e-3
 assert re < threshold, f"Relative error higher than {threshold}"
 
 # Plot the results
-plot(u_computed.cpu().numpy(), u_ref, re)
+plot(u_computed, u_ref, re)

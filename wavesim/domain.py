@@ -89,8 +89,8 @@ class Domain(metaclass=ABCMeta):
     def coordinates_f(self, dim):
         """Returns the Fourier-space coordinates along the specified dimension"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device,
-                                                 dtype=torch.float64)).reshape(shapes[dim])
+        return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device, 
+                                                 dtype=torch.float64)).reshape(shapes[dim]).to(torch.complex64)
 
     def coordinates(self, dim, type: str = 'linear'):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""

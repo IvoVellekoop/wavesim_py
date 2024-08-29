@@ -33,8 +33,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
         # normalize residual norm with preconditioned source (i.e., with norm of B(L+1)⁻¹y)
         residual_norm = residual_norm * init_norm_inv  # norm(B(x - (L+1)⁻¹ (B·x + c·y))) / norm(B(L+1)⁻¹y)
-        print('.', end='', flush=True) if i % 100 == 0 else None
-        # print(f'Iteration {i + 1}\t residual norm: {residual_norm:.3e}')
+        print('.', end='', flush=True) if (i + 1) % 100 == 0 else None
         residuals.append(residual_norm) if full_residuals else None
         if residual_norm < threshold:
             break

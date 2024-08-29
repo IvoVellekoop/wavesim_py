@@ -43,7 +43,7 @@ n_dims = len(sim_size.squeeze())
 # Size of the simulation domain in pixels
 n_size = sim_size * wavelength / pixel_size
 n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
-n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
+n_size = tuple(n_size.astype(int)) + (1,)  # Convert to integer for indexing
 
 torch.manual_seed(0)  # Set the random seed for reproducibility
 n = (torch.normal(mean=1.3, std=0.1, size=n_size, dtype=torch.float32)
@@ -64,6 +64,7 @@ values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple(np.array(n_size) + 2*boundary_array)
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
+# Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
 # # 1-domain, periodic boundaries (without wrapping correction)
 # periodic = (True, True, True)  # periodic boundaries, wrapped field.
 # n_domains = (1, 1, 1)  # number of domains in each direction
@@ -78,9 +79,8 @@ periodic = tuple(periodic)
 domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
                      n_domains=n_domains)
 
-
+# Run the wavesim iteration and get the computed field
 start = time()
-# Field u and state object with information about the run
 u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=5)
 end = time() - start
 print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')

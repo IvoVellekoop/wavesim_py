@@ -36,8 +36,8 @@ class HelmholtzDomain(Domain):
               permittivity array.
 
         Args:
-            permittivity: permittivity (n²) map. Must be a 3-dimensional array of complex float32 or float64.
-                Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
+            permittivity: permittivity (n²) map. Must be a 4-dimensional array of complex float32 or float64.
+                Its shape (n_x, n_y, n_z, 1) is used to determine the size of the domain, and the device and datatype are
                 used for all operations.
             periodic: tuple of three booleans indicating whether the domain is periodic in each dimension.            
             pixel_size: grid spacing (in wavelength units).
@@ -70,10 +70,10 @@ class HelmholtzDomain(Domain):
         # validate input arguments
         if n_slots < 2:
             raise ValueError("n_slots must be at least 2")
-        if permittivity.ndim != 3 or not (
+        if permittivity.ndim != 4 or not (
                 permittivity.dtype == torch.complex64 or permittivity.dtype == torch.complex128):
             raise ValueError(
-                f"Permittivity must be 3-dimensional and complex float32 or float64, not {permittivity.dtype}.")
+                f"Permittivity must be 4-dimensional and complex float32 or float64, not {permittivity.dtype}.")
         if any([n_boundary > 0.5 * self.shape[i] and not periodic[i] for i in range(3)]):
             raise ValueError(f"Domain boundary of {n_boundary} is too large for the given domain size {self.shape}")
 
@@ -115,6 +115,7 @@ class HelmholtzDomain(Domain):
         self.propagator_kernel = 0.0j
         for dim in range(3):
             self.propagator_kernel = self.propagator_kernel + self._laplace_kernel(dim)
+        self.propagator_kernel = self.propagator_kernel[:, :, :, None]  # add extra dimension for polarization
         # self.propagator_kernel = None  # will be set in initialize_scale
 
         # allocate storage for temporary data, re-use the memory we got for the raw scattering potential

@@ -34,7 +34,7 @@ n_dims = len(sim_size.squeeze())  # Number of dimensions
 # Size of the simulation domain
 n_size = sim_size * wavelength / pixel_size  # Size of the simulation domain in pixels
 n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
-n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
+n_size = tuple(n_size.astype(int)) + (1,)  # Convert to integer for indexing
 
 torch.manual_seed(0)  # Set the random seed for reproducibility
 n = (torch.normal(mean=1.3, std=0.1, size=n_size, dtype=torch.float32)

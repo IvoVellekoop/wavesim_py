@@ -36,7 +36,7 @@ def test_no_propagation():
     """Basic test where the L-component is zero
     By manually removing the laplacian, we are solving the equation (2 π n / λ)² x = y
     """
-    n = random_refractive_index((2, 3, 4))
+    n = random_refractive_index((2, 3, 4, 1))
     domain = HelmholtzDomain(permittivity=(n ** 2), periodic=(True, True, True))
     x = random_vector(domain.shape)
 
@@ -68,7 +68,7 @@ def test_no_propagation():
     assert allclose(x_wavesim, x)
 
 
-@pytest.mark.parametrize("size", [(32, 1, 1), (7, 15, 1), (13, 25, 46)])
+@pytest.mark.parametrize("size", [(32, 1, 1, 1), (7, 15, 1, 1), (13, 25, 46, 1)])
 @pytest.mark.parametrize("boundary_widths", [0, 10])
 @pytest.mark.parametrize("periodic", [(True, True, True),  # periodic boundaries, wrapped field
                                       (False, True, True)])  # wrapping correction
@@ -120,7 +120,7 @@ def test_1d_analytical(n_domains, periodic):
     """ Test for 1D free-space propagation. Compare with analytic solution """
     wavelength = 1.  # wavelength in micrometer (um)
     pixel_size = wavelength / 4  # pixel size in wavelength units
-    n_size = (512, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+    n_size = (512, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
     n = np.ones(n_size, dtype=np.complex64)
     boundary_widths = 50  # width of the boundary in pixels
     # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)

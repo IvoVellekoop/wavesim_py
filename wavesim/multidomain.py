@@ -47,8 +47,8 @@ class MultiDomain(Domain):
         #   preprocess(n, pixel_size, n_domains))
 
         # validata input parameters
-        if not permittivity.ndim == 3:
-            raise ValueError("The permittivity must be a 3D array")
+        if not permittivity.ndim == 4:
+            raise ValueError("The permittivity must be a 4D array")
         if not len(n_domains) == 3:
             raise ValueError("The number of domains must be a 3-tuple")
 

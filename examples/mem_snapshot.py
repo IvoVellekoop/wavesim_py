@@ -30,8 +30,8 @@ if is_supported_platform():
     torch.cuda.memory._record_memory_history(True, trace_alloc_max_entries=100000, 
                                              trace_alloc_record_context=True)
 else:
-    print("This functionality is not supported on your platform.")
-    # On Windows, gives "RuntimeError: record_context_cpp is not support on non-linux non-x86_64 platforms"
+    print(f"Pytorch emory snapshot functionality is not supported on {platform.system()} (non-linux non-x86_64 platforms).")
+    # On Windows, gives "RuntimeError: record_context_cpp is not supported on non-linux non-x86_64 platforms"
 
 # generate a refractive index map
 sim_size = 200 * np.array([1, 2, 2])  # Simulation size in micrometers
@@ -52,8 +52,8 @@ print(f"Size of n: {n_size}")
 print(f"Size of n in GB: {n.nbytes / (1024**3):.2f}")
 assert n.imag.min() >= 0, 'Imaginary part of n is negative'
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n, boundary_widths)
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
 assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
 
 # set up source, with size same as n + 2*boundary_widths, and a point source at the center of the domain

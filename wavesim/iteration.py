@@ -26,8 +26,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     domain.clear(slot_x)  # Clear [x]
 
     # save list of residuals if requested
-    if full_residuals:
-        residuals = []
+    residuals = [] if full_residuals else None
 
     for i in range(max_iterations):
         residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)

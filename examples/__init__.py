@@ -1,33 +1,18 @@
 import numpy as np
-from scipy.special import exp1
 import matplotlib.pyplot as plt
 from wavesim.utilities import normalize, relative_error
 
 
-def analytical_solution(n_size0, pixel_size, wavelength=None):
-    """ Compute analytic solution for 1D case """
-    x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
-    x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
-    h = pixel_size
-    # wavenumber (k)
-    if wavelength is None:
-        k = 1. * 2. * np.pi * pixel_size
-    else:
-        k = 1. * 2. * np.pi / wavelength
-    phi = k * x
-    u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
-                - h / (4 * np.pi * k) * (
-        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
-    )
-    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
-    u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
-    return u_theory[n_size0:-n_size0]
+def plot(x, x_ref, re=None, normalize_x=True):
+    """Plot the computed field x and the reference field x_ref.
+    If x and x_ref are 1D arrays, the real and imaginary parts are plotted separately.
+    If x and x_ref are 2D arrays, the absolute values are plotted.
+    If x and x_ref are 3D arrays, the central slice is plotted.
+    If normalize_x is True, the values are normalized to the same range.
+    The relative error is (computed, if needed, and) displayed.
+    """
 
-
-def plot(x, x_ref, re=None):
-    if re is None:
-        re = relative_error(x, x_ref)
+    re = relative_error(x, x_ref) if re is None else re
 
     if x.ndim == 1 and x_ref.ndim == 1:
         plt.subplot(211)
@@ -49,18 +34,21 @@ def plot(x, x_ref, re=None):
         plt.show()
     else:
         if x.ndim == 3 and x_ref.ndim == 3:
-            x = x[:, :, x.shape[2]//2]
-            x_ref = x_ref[:, :, x_ref.shape[2]//2]
+            x = x[x.shape[0]//2, ...]
+            x_ref = x_ref[x_ref.shape[0]//2, ...]
 
         x = np.abs(x)
         x_ref = np.abs(x_ref)
-        min_val = min(np.min(x), np.min(x_ref))
-        max_val = max(np.max(x), np.max(x_ref))
-
-        a = 0
-        b = 1
-        x = normalize(x, min_val, max_val, a, b)
-        x_ref = normalize(x_ref, min_val, max_val, a, b)
+        if normalize_x:
+            min_val = min(np.min(x), np.min(x_ref))
+            max_val = max(np.max(x), np.max(x_ref))
+            a = 0
+            b = 1
+            x = normalize(x, min_val, max_val, a, b)
+            x_ref = normalize(x_ref, min_val, max_val, a, b)
+        else:
+            a = None
+            b = None
 
         plt.figure(figsize=(10, 5))
         plt.subplot(121)

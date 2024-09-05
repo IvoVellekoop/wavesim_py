@@ -37,11 +37,10 @@ n_im = ((np.where(im[:, :, 2] > 0.25, 1, 0) * n_contrast) + 1)  # Refractive ind
 n_roi = int(oversampling * n_im.shape[0])  # Size of ROI in pixels
 n = np.asarray(fromarray(n_im.real).resize((n_roi, n_roi), BILINEAR)) + 1j * np.asarray(
     fromarray(n_im.imag).resize((n_roi, n_roi), BILINEAR))  # Refractive index map
-# n = loadmat('examples/matlab_results.mat')['n2d_hc']  # OR load refractive index from matlab wavesim
 boundary_widths = 50  # Width of the boundary in pixels
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n, boundary_widths)
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
 
 # Source term
 source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))

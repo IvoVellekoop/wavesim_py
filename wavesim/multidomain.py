@@ -137,6 +137,9 @@ class MultiDomain(Domain):
         """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in
         one big array
 
+        :param slot: slot to get the data from
+        :param copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+                      Note that this data may be overwritten by the next call to domain.
         :param device: device on which to store the data. Defaults to the primary device
         """
         domain_data = list_to_array([domain.get(slot) for domain in self.domains.flat], 1).reshape(self.domains.shape)

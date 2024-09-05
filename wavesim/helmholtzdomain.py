@@ -199,8 +199,8 @@ class HelmholtzDomain(Domain):
     def get(self, slot: int, copy=False):
         """Returns the data in the specified slot.
 
-        :param: slot: slot from which to return the data
-        :param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+        :param slot: slot from which to return the data
+        :param copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
                      Note that this data may be overwritten by the next call to domain.
         """
         data = self._x[slot]
@@ -399,7 +399,7 @@ def _make_wrap_matrix(L_kernel, n_boundary):
 
     :param L_kernel: the kernel for the laplace operator
     :param n_boundary: the size of the correction matrix
-    :param tmp: temporary storage, of the same size as the kernel. MUST be initialized to zero
+    :return: the wrapping correction matrix
 
     Note: the matrices need may not be identical for the different dimensions if the sizes are different
     Note: uses the temporary storage slot 1 for the intermediate results

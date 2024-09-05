@@ -14,18 +14,18 @@ sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
 from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
 from wavesim.iteration import run_algorithm  # to run the wavesim iteration
-from wavesim.utilities import preprocess, relative_error
-from __init__ import analytical_solution, plot
+from wavesim.utilities import analytical_solution, preprocess, relative_error
+from __init__ import plot
 
 
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
 n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
-n = np.ones(n_size, dtype=np.complex64)  # refractive index map
+n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
 boundary_widths = 50  # width of the boundary in pixels
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n, boundary_widths)  # n is actually n², but uses the same variable
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
 
 # Source term. This way is more efficient than dense tensor
 indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain

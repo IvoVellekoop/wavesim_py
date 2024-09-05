@@ -1,35 +1,13 @@
 import pytest
 import torch
 import numpy as np
-from scipy.special import exp1
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from wavesim.iteration import domain_operator, preconditioned_iteration, preconditioner, run_algorithm
-from wavesim.utilities import preprocess, relative_error
+from wavesim.utilities import analytical_solution, preprocess, relative_error
 from . import allclose, random_vector, random_refractive_index
 
 """Tests to compare the result of Wavesim to analytical results"""
-
-
-def analytical_solution(n_size0, pixel_size, wavelength=None):
-    """ Compute analytic solution for 1D case """
-    x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
-    x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
-    h = pixel_size
-    # wavenumber (k)
-    if wavelength is None:
-        k = 1. * 2. * np.pi * pixel_size
-    else:
-        k = 1. * 2. * np.pi / wavelength
-    phi = k * x
-    u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
-                - h / (4 * np.pi * k) * (
-                    np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-                    np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
-                )
-    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
-    u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
-    return u_theory[n_size0:-n_size0]
 
 
 def test_no_propagation():
@@ -68,10 +46,10 @@ def test_no_propagation():
     assert allclose(x_wavesim, x)
 
 
-@pytest.mark.parametrize("size", [(32, 1, 1, 1), (7, 15, 1, 1), (13, 25, 46, 1)])
+@pytest.mark.parametrize("size", [[32, 1, 1, 1], [7, 15, 1, 1], [13, 25, 46, 1]])
 @pytest.mark.parametrize("boundary_widths", [0, 10])
-@pytest.mark.parametrize("periodic", [(True, True, True),  # periodic boundaries, wrapped field
-                                      (False, True, True)])  # wrapping correction
+@pytest.mark.parametrize("periodic", [[True, True, True],  # periodic boundaries, wrapped field
+                                      [False, True, True]])  # wrapping correction
 def test_residual(size, boundary_widths, periodic):
     """ Check that the residual_norm at first iteration == 1
         residual_norm is normalized with the preconditioned source
@@ -81,8 +59,8 @@ def test_residual(size, boundary_widths, periodic):
     torch.manual_seed(0)  # Set the random seed for reproducibility
     n = (torch.normal(mean=1.3, std=0.1, size=size, dtype=torch.float32)
          + 1j * abs(torch.normal(mean=0.05, std=0.02, size=size, dtype=torch.float32))).numpy()
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1
@@ -123,8 +101,8 @@ def test_1d_analytical(n_domains, periodic):
     n_size = (512, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
     n = np.ones(n_size, dtype=np.complex64)
     boundary_widths = 50  # width of the boundary in pixels
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1

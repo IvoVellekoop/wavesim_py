@@ -38,8 +38,8 @@ n_roi = int(oversampling * n_im.shape[0])  # Size of ROI in pixels
 n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))  # Refractive index map
 boundary_widths = 50  # Width of the boundary in pixels
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n, boundary_widths)
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
 
 # Source term
 source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))

@@ -2,80 +2,146 @@ import torch
 import numpy as np
 from typing import Sequence
 from itertools import chain
+from scipy.special import exp1
 
 
-def partition(array: torch.Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
-    """ Split a 3-D array into a 3-D set of sub-arrays of approximately equal sizes."""
-    n_domains = np.array(n_domains + (1,))  # Add 1 to the end to make it a 4-element array
-    size = np.array(array.shape)
-    if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 4:
-        raise ValueError(f"Number of domains {n_domains} must be larger than 1 and "
-                         f"less than or equal to the size of the array {array.shape}")
+# Preprocessing functions. These functions are used to preprocess the input parameters , i.e., 
+# to add absorption and boundaries to the permittivity (refractive index²).
+def preprocess(permittivity, boundary_widths=10):
+    """ Preprocess the input parameters for the simulation. 
+    Add absorption and boundaries to the permittivity (refractive index²), 
+    and return the preprocessed permittivity and boundaries in the format (ax0, ax1, ax2).
 
-    # Calculate the size of each domain
-    large_domain_size = np.ceil(size / n_domains).astype(int)
-    small_domain_count = large_domain_size * n_domains - size
-    large_domain_count = n_domains - small_domain_count
-    subdomain_sizes = [(large_domain_size[dim],) * large_domain_count[dim] + (large_domain_size[dim] - 1,)
-                       * small_domain_count[dim] for dim in range(3)]
+    :param permittivity: Refractive index²
+    :param boundary_widths: Boundary widths (in pixels)
+    :return: Preprocessed permittivity (refractive index²) with boundaries and absorption 
+    """
+    permittivity = check_input_dims(permittivity)  # Ensure permittivity is a 4-d array
+    if permittivity.dtype != np.complex64:
+        permittivity = permittivity.astype(np.complex64)
+    n_dims = get_dims(permittivity[..., 0])  # Number of dimensions in simulation
+    n_roi = np.array(permittivity.shape)  # Num of points in ROI (Region of Interest)
 
-    split = _sparse_split if array.is_sparse else torch.split
+    # Ensure boundary_widths is a 4-element array of ints with 0s after n_dims
+    boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
 
-    array = split(array, subdomain_sizes[0], dim=0)
-    array = [split(part, subdomain_sizes[1], dim=1) for part in array]
-    array = [[split(part, subdomain_sizes[2], dim=2) for part in subpart] for subpart in array]
-    return list_to_array(array, depth=3)
+    permittivity = add_absorption(permittivity, boundary_widths, n_roi, n_dims)
 
-
-def list_to_array(input: list, depth: int) -> np.ndarray:
-    """ Convert a nested list of depth `depth` to a numpy object array """
-    # first determine the size of the final array
-    size = np.zeros(depth, dtype=int)
-    outer = input
-    for i in range(depth):
-        size[i] = len(outer)
-        outer = outer[0]
-
-    # allocate memory
-    array = np.empty(size, dtype=object)
-
-    # flatten the input array
-    for i in range(depth - 1):
-        input = sum(input, input[0][0:0])  # works both for tuples and lists
-
-    # copy to the output array
-    ra = array.reshape(-1)
-    assert ra.base is not None  # must be a view
-    for i in range(ra.size):
-        if input[i] is None or input[i].is_sparse or input[i].is_contiguous():
-            ra[i] = input[i]
-        else:
-            ra[i] = input[i].contiguous()
-    return array
+    return permittivity, boundary_widths
 
 
-def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
-    """ Split a COO-sparse tensor into a 3-D set of sub-arrays of approximately equal sizes."""
-    coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
-    domain_starts = np.cumsum((0,) + sizes)
-    tensor = tensor.coalesce()
-    indices = tensor.indices().cpu().numpy()
-    domains = coordinate_to_domain[indices[dim, :]]
+def add_absorption(m, boundary_widths, n_roi, n_dims):
+    """ Add (weighted) absorption to the permittivity (refractive index squared)
 
-    def extract_subarray(domain: int) -> torch.Tensor:
-        mask = domains == domain
-        domain_indices = indices[:, mask]
-        if len(domain_indices) == 0:
-            return None
-        domain_values = tensor.values()[mask]
-        domain_indices[dim, :] -= domain_starts[domain]
-        size = list(tensor.shape)
-        size[dim] = sizes[domain]
-        return torch.sparse_coo_tensor(domain_indices, domain_values, size)
+    :param m: array (permittivity)
+    :param boundary_widths: Boundary widths
+    :param n_roi: Number of points in the region of interest
+    :param n_dims: Number of dimensions
+    :return: m with absorption 
+    """
+    w = np.ones_like(m)  # Weighting function (1 everywhere)
+    w = pad_boundaries(w, boundary_widths, mode='linear_ramp')  # pad w using linear_ramp
+    a = 1 - w  # for absorption, inverse weighting 1 - w
+    for i in range(n_dims):
+        left_boundary = boundary_(boundary_widths[i])  # boundary_ is a linear window function
+        right_boundary = np.flip(left_boundary)  # flip is a vertical flip
+        full_filter = np.concatenate((left_boundary, np.ones(n_roi[i], dtype=np.float32), right_boundary))
+        a = np.moveaxis(a, i, -1) * full_filter  # transpose to last dimension, apply filter
+        a = np.moveaxis(a, -1, i)  # transpose back to original position
+    a = 1j * a  # absorption is imaginary
 
-    return [extract_subarray(d) for d in range(len(sizes))]
+    m = pad_boundaries(m, boundary_widths, mode='edge')  # pad m using edge values
+    m = w * m + a  # add absorption to m
+    return m
 
 
+def boundary_(x):
+    """ Anti-reflection boundary layer (ARL). Linear window function
+
+    :param x: Size of the ARL
+    """
+    return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
+
+
+def check_input_dims(x):
+    """ Expand arrays to 4 dimensions (e.g. permittivity (refractive index²) or source)
+    
+    :param x: Input array
+    :return: x with 4 dimensions
+    """
+    for _ in range(4 - x.ndim):
+        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 4
+    return x
+
+
+def check_input_len(x, e, n_dims):
+    """ Check the length of input arrays and expand them to 4 elements if necessary. Either repeat or add 'e'
+    
+    :param x: Input array
+    :param e: Element to add
+    :param n_dims: Number of dimensions
+    :return: Array with 4 elements 
+    """
+    if isinstance(x, int) or isinstance(x, float):  # If x is a single number
+        x = n_dims * tuple((x,)) + (4 - n_dims) * (e,)  # Repeat the number n_dims times, and add (4-n_dims) e's
+    elif len(x) == 1:  # If x is a single element list or tuple
+        x = n_dims * tuple(x) + (4 - n_dims) * (e,)  # Repeat the element n_dims times, and add (4-n_dims) e's
+    elif isinstance(x, list) or isinstance(x, tuple):  # If x is a list or tuple
+        x += (4 - len(x)) * (e,)  # Add (4-len(x)) e's
+    if isinstance(x, np.ndarray):  # If x is a numpy array
+        x = np.concatenate((x, np.zeros(4 - len(x))))  # Concatenate with (4-len(x)) zeros
+    return np.array(x)
+
+
+def get_dims(x):
+    """ Get the number of dimensions of 'x' 
+    
+    :param x: Input array
+    :return: Number of dimensions 
+    """
+    x = squeeze_(x)  # Squeeze the last dimension if it is 1
+    return x.ndim  # Number of dimensions
+
+
+def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
+    """ Pad 'x' with boundaries in all dimensions using numpy pad (if x is np.ndarray) or PyTorch nn.functional.pad
+    (if x is torch.Tensor).
+    If boundary_post is specified separately, pad with boundary_widths (before) and boundary_post (after).
+
+    :param x: Input array
+    :param boundary_widths: Boundary widths for padding before and after (or just before if boundary_post not None)
+    :param boundary_post: Boundary widths for padding after
+    :param mode: Padding mode
+    :return: Padded array 
+    """
+    x = check_input_dims(x)  # Ensure x is a 4-d array
+
+    if boundary_post is None:
+        boundary_post = boundary_widths
+
+    if isinstance(x, np.ndarray):
+        pad_width = tuple(zip(boundary_widths, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
+        return np.pad(x, pad_width, mode)
+    elif torch.is_tensor(x):
+        t = zip(boundary_widths[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
+        pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
+        return torch.nn.functional.pad(x, pad_width, mode)
+    else:
+        raise ValueError("Input must be a numpy array or a torch tensor")
+
+
+def squeeze_(x):
+    """ Squeeze the last dimension of 'x' if it is 1 
+
+    :param x: Input array
+    :return: Squeezed array 
+    """
+    while x.shape[-1] == 1:
+        x = np.squeeze(x, axis=-1)
+    return x
+
+
+# Domain decomposition functions.
 def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
     """ Concatenates a 3-d array of 3-d tensors"""
 
@@ -112,136 +178,76 @@ def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
     return result_tensor
 
 
-def preprocess(n, boundary_widths=10):
-    """ Preprocess the input parameters for the simulation
+def list_to_array(input: list, depth: int) -> np.ndarray:
+    """ Convert a nested list of depth `depth` to a numpy object array """
+    # first determine the size of the final array
+    size = np.zeros(depth, dtype=int)
+    outer = input
+    for i in range(depth):
+        size[i] = len(outer)
+        outer = outer[0]
 
-    :param n: Refractive index distribution 
-    :param boundary_widths: Boundary widths (in pixels)
-    :return: Preprocessed permittivity (n²) with boundaries and absorption 
-    """
-    n = check_input_dims(n)  # Ensure n is a 4-d array
-    if n.dtype != np.complex64:
-        n = n.astype(np.complex64)
-    n_dims = get_dims(n[..., 0])  # Number of dimensions in simulation
-    n_roi = np.array(n.shape)  # Num of points in ROI (Region of Interest)
+    # allocate memory
+    array = np.empty(size, dtype=object)
 
-    # Ensure boundary_widths is a 4-element array of ints with 0s after n_dims
-    boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
+    # flatten the input array
+    for i in range(depth - 1):
+        input = sum(input, input[0][0:0])  # works both for tuples and lists
 
-    n = add_absorption(n ** 2, boundary_widths, n_roi, n_dims)  # add absorption to n^2
-
-    return n, boundary_widths
-
-
-def check_input_dims(x):
-    """ Expand arrays to 4 dimensions (e.g. refractive index distribution (n) or source)
-    
-    :param x: Input array
-    :return: Array with 4 dimensions 
-    """
-    for _ in range(4 - x.ndim):
-        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 4
-    return x
+    # copy to the output array
+    ra = array.reshape(-1)
+    assert ra.base is not None  # must be a view
+    for i in range(ra.size):
+        if input[i] is None or input[i].is_sparse or input[i].is_contiguous():
+            ra[i] = input[i]
+        else:
+            ra[i] = input[i].contiguous()
+    return array
 
 
-def check_input_len(x, e, n_dims):
-    """ Check the length of input arrays and expand them to 4 elements if necessary. Either repeat or add 'e'
-    
-    :param x: Input array
-    :param e: Element to add
-    :param n_dims: Number of dimensions
-    :return: Array with 4 elements 
-    """
-    if isinstance(x, int) or isinstance(x, float):  # If x is a single number
-        x = n_dims * tuple((x,)) + (4 - n_dims) * (e,)  # Repeat the number n_dims times, and add (4-n_dims) e's
-    elif len(x) == 1:  # If x is a single element list or tuple
-        x = n_dims * tuple(x) + (4 - n_dims) * (e,)  # Repeat the element n_dims times, and add (4-n_dims) e's
-    elif isinstance(x, list) or isinstance(x, tuple):  # If x is a list or tuple
-        x += (4 - len(x)) * (e,)  # Add (4-len(x)) e's
-    if isinstance(x, np.ndarray):  # If x is a numpy array
-        x = np.concatenate((x, np.zeros(4 - len(x))))  # Concatenate with (4-len(x)) zeros
-    return np.array(x)
+def partition(array: torch.Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
+    """ Split a 3-D array into a 3-D set of sub-arrays of approximately equal sizes."""
+    n_domains = np.array(n_domains + (1,))  # Add 1 to the end to make it a 4-element array
+    size = np.array(array.shape)
+    if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 4:
+        raise ValueError(f"Number of domains {n_domains} must be larger than 1 and "
+                         f"less than or equal to the size of the array {array.shape}")
+
+    # Calculate the size of each domain
+    large_domain_size = np.ceil(size / n_domains).astype(int)
+    small_domain_count = large_domain_size * n_domains - size
+    large_domain_count = n_domains - small_domain_count
+    subdomain_sizes = [(large_domain_size[dim],) * large_domain_count[dim] + (large_domain_size[dim] - 1,)
+                       * small_domain_count[dim] for dim in range(3)]
+
+    split = _sparse_split if array.is_sparse else torch.split
+
+    array = split(array, subdomain_sizes[0], dim=0)
+    array = [split(part, subdomain_sizes[1], dim=1) for part in array]
+    array = [[split(part, subdomain_sizes[2], dim=2) for part in subpart] for subpart in array]
+    return list_to_array(array, depth=3)
 
 
-def get_dims(n):
-    """ Get the number of dimensions of 'n' 
-    
-    :param n: Input array
-    :return: Number of dimensions 
-    """
-    n = squeeze_(n)  # Squeeze the last dimension if it is 1
-    return n.ndim  # Number of dimensions
+def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
+    """ Split a COO-sparse tensor into a 3-D set of sub-arrays of approximately equal sizes."""
+    coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
+    domain_starts = np.cumsum((0,) + sizes)
+    tensor = tensor.coalesce()
+    indices = tensor.indices().cpu().numpy()
+    domains = coordinate_to_domain[indices[dim, :]]
 
+    def extract_subarray(domain: int) -> torch.Tensor:
+        mask = domains == domain
+        domain_indices = indices[:, mask]
+        if len(domain_indices) == 0:
+            return None
+        domain_values = tensor.values()[mask]
+        domain_indices[dim, :] -= domain_starts[domain]
+        size = list(tensor.shape)
+        size[dim] = sizes[domain]
+        return torch.sparse_coo_tensor(domain_indices, domain_values, size)
 
-def squeeze_(n):
-    """ Squeeze the last dimension of 'n' if it is 1 
-
-    :param n: Input array
-    :return: Squeezed array 
-    """
-    while n.shape[-1] == 1:
-        n = np.squeeze(n, axis=-1)
-    return n
-
-
-def add_absorption(m, boundary_widths, n_roi, n_dims):
-    """ Add (weighted) absorption to the permittivity (refractive index squared)
-
-    :param m: array (permittivity)
-    :param boundary_widths: Boundary widths
-    :param n_roi: Number of points in the region of interest
-    :param n_dims: Number of dimensions
-    :return: m with absorption 
-    """
-    w = np.ones_like(m)  # Weighting function (1 everywhere)
-    w = pad_boundaries(w, boundary_widths, mode='linear_ramp')  # pad w using linear_ramp
-    a = 1 - w  # for absorption, inverse weighting 1 - w
-    for i in range(n_dims):
-        left_boundary = boundary_(boundary_widths[i])  # boundary_ is a linear window function
-        right_boundary = np.flip(left_boundary)  # flip is a vertical flip
-        full_filter = np.concatenate((left_boundary, np.ones(n_roi[i], dtype=np.float32), right_boundary))
-        a = np.moveaxis(a, i, -1) * full_filter  # transpose to last dimension, apply filter
-        a = np.moveaxis(a, -1, i)  # transpose back to original position
-    a = 1j * a  # absorption is imaginary
-
-    m = pad_boundaries(m, boundary_widths, mode='edge')  # pad m using edge values
-    m = w * m + a  # add absorption to m
-    return m
-
-
-def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
-    """ Pad 'x' with boundaries in all dimensions using numpy pad (if x is np.ndarray) or PyTorch nn.functional.pad
-    (if x is torch.Tensor).
-    If boundary_post is specified separately, pad with boundary_widths (before) and boundary_post (after).
-
-    :param x: Input array
-    :param boundary_widths: Boundary widths for padding before and after (or just before if boundary_post not None)
-    :param boundary_post: Boundary widths for padding after
-    :param mode: Padding mode
-    :return: Padded array 
-    """
-    x = check_input_dims(x)  # Ensure x is a 4-d array
-
-    if boundary_post is None:
-        boundary_post = boundary_widths
-
-    if isinstance(x, np.ndarray):
-        pad_width = tuple(zip(boundary_widths, boundary_post))  # pairs ((a0, b0), (a1, b1), (a2, b2))
-        return np.pad(x, pad_width, mode)
-    elif torch.is_tensor(x):
-        t = zip(boundary_widths[::-1], boundary_post[::-1])  # reversed pairs (a2, b2) (a1, b1) (a0, b0)
-        pad_width = tuple(chain.from_iterable(t))  # flatten to (a2, b2, a1, b1, a0, b0)
-        return torch.nn.functional.pad(x, pad_width, mode)
-    else:
-        raise ValueError("Input must be a numpy array or a torch tensor")
-
-
-def boundary_(x):
-    """ Anti-reflection boundary layer (ARL). Linear window function
-
-    :param x: Size of the ARL
-    """
-    return ((np.arange(1, x + 1) - 0.21).T / (x + 0.66)).astype(np.float32)
+    return [extract_subarray(d) for d in range(len(sizes))]
 
 
 # Used in tests
@@ -293,6 +299,28 @@ def relative_error(e, e_true):
     :return: Relative Error 
     """
     return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+
+
+# Miscellaneous functions
+def analytical_solution(n_size0, pixel_size, wavelength=None):
+    """ Compute analytic solution for 1D case """
+    x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
+    x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
+    h = pixel_size
+    # wavenumber (k)
+    if wavelength is None:
+        k = 1. * 2. * np.pi * pixel_size
+    else:
+        k = 1. * 2. * np.pi / wavelength
+    phi = k * x
+    u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
+                - h / (4 * np.pi * k) * (
+                    np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+                    np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+                )
+    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
+    u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
+    return u_theory[n_size0:-n_size0]
 
 
 def is_zero(x):

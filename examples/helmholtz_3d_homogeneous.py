@@ -28,8 +28,8 @@ n_size = (128, 128, 128, 1)  # Size of the domain in pixels (x, y, z, 1)
 n = np.ones(tuple(n_size), dtype=np.complex64)  # Refractive index map
 boundary_widths = 50  # Width of the boundary in pixels
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n, boundary_widths)
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
 
 # Source term. This way is more efficient than dense tensor
 indices = torch.tensor([[int(v/2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain

@@ -53,8 +53,8 @@ print(f"Size of n: {n_size}")
 print(f"Size of n in GB: {n.nbytes / (1024**3):.2f}")
 assert n.imag.min() >= 0, 'Imaginary part of n is negative'
 
-# add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n.numpy(), boundary_widths)
+# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+n, boundary_array = preprocess((n**2).numpy(), boundary_widths)  # permittivity is n², but uses the same variable n
 assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
 
 # set up source, with size same as n + 2*boundary_widths, and a point source at the center of the domain

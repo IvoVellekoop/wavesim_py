@@ -26,8 +26,8 @@ def test_1d_glass_plate(n_domains, periodic):
     n = np.ones(n_size, dtype=np.complex64)
     n[99:130] = 1.5
     boundary_widths = 50
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1
@@ -70,8 +70,8 @@ def test_2d_low_contrast(n_domains):
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
     boundary_widths = 50
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     source = pad_boundaries(source, boundary_array)
@@ -117,11 +117,9 @@ def test_2d_high_contrast(n_domains):
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im.real).resize((n_roi, n_roi), BILINEAR)) + 1j * np.asarray(
         fromarray(n_im.imag).resize((n_roi, n_roi), BILINEAR))
-    # # load dictionary of results from matlab wavesim/anysim for comparison and validation
-    # n = loadmat('examples/matlab_results.mat')['n2d_hc']
     boundary_widths = 50
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     source = np.asarray(fromarray(im[:, :, 1]).resize((n_roi, n_roi), BILINEAR))
     source = pad_boundaries(source, boundary_array)
@@ -174,8 +172,8 @@ def test_3d_disordered(n_domains):
     n_size = (128, 48, 96, 1)
     n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])
     boundary_widths = 50
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     # Source: single point source in the center of the domain
     indices = torch.tensor([[int(v/2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location
@@ -225,8 +223,8 @@ def test_3d_homogeneous(n_domains):
     n_size = (128, 128, 128, 1)
     n = np.ones(tuple(n_size), dtype=np.complex64)
     boundary_widths = 50
-    # add boundary conditions and return permittivity (n²) and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess(n, boundary_widths)
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
     # Source: single point source in the center of the domain
     indices = torch.tensor([[int(v/2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location

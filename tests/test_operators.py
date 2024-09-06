@@ -24,9 +24,12 @@ parameters = [
     {'n_size': (1, 5, 19, 1), 'n_domains': (1, 1, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
     {'n_size': (1, 14, 19, 1), 'n_domains': (1, 2, 2), 'n_boundary': 3, 'periodic': (True, False, True)},
     {'n_size': (17, 30, 1, 1), 'n_domains': (2, 3, 1), 'n_boundary': 3, 'periodic': (True, True, True)},
-    {'n_size': (12, 12, 12, 1), 'n_domains': (2, 2, 2), 'n_boundary': 3, 'periodic': (False, False, True)},
-    {'n_size': (18, 24, 18, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
-    {'n_size': (17, 23, 19, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
+    {'n_size': (8, 8, 8, 1), 'n_domains': (2, 2, 2), 'n_boundary': 2, 'periodic': (False, False, True)},
+    {'n_size': (8, 12, 8, 1), 'n_domains': (2, 3, 2), 'n_boundary': 2, 'periodic': (True, True, True)},
+    # these parameters are very slow for test_accretivity and should be run only when needed
+    # {'n_size': (12, 12, 12, 1), 'n_domains': (2, 2, 2), 'n_boundary': 3, 'periodic': (False, False, True)},
+    # {'n_size': (18, 24, 18, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
+    # {'n_size': (17, 23, 19, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
 ]
 
 

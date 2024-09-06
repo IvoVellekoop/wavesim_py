@@ -100,7 +100,7 @@ def test_1d_analytical(n_domains, periodic):
     pixel_size = wavelength / 4  # pixel size in wavelength units
     n_size = (512, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
     n = np.ones(n_size, dtype=np.complex64)
-    boundary_widths = 50  # width of the boundary in pixels
+    boundary_widths = 16  # width of the boundary in pixels
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 

@@ -27,7 +27,7 @@ wavelength = 1.  # Wavelength in micrometers
 n_size = (128, 48, 96, 1)  # Size of the domain in pixels (x, y, z, 1)
 n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])  # Refractive index map
 n = n[..., None]  # Add polarization dimension (unused in Helmholtz case)
-boundary_widths = 50  # Width of the boundary in pixels
+boundary_widths = 8  # Width of the boundary in pixels
 
 # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
 n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n

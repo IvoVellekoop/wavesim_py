@@ -36,7 +36,7 @@ im = np.asarray(open('examples/logo_structure_vector.png')) / 255
 n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
 n_roi = int(oversampling * n_im.shape[0])  # Size of ROI in pixels
 n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))  # Refractive index map
-boundary_widths = 50  # Width of the boundary in pixels
+boundary_widths = 40  # Width of the boundary in pixels
 
 # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
 n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n

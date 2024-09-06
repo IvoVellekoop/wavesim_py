@@ -25,7 +25,7 @@ def test_1d_glass_plate(n_domains, periodic):
     n_size = (256, 1, 1, 1)
     n = np.ones(n_size, dtype=np.complex64)
     n[99:130] = 1.5
-    boundary_widths = 50
+    boundary_widths = 24
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
@@ -69,7 +69,7 @@ def test_2d_low_contrast(n_domains):
     n_im = (np.where(im[:, :, 2] > 0.25, 1, 0) * (n_fat - n_water)) + n_water
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im).resize((n_roi, n_roi), BILINEAR))
-    boundary_widths = 50
+    boundary_widths = 40
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
@@ -117,7 +117,7 @@ def test_2d_high_contrast(n_domains):
     n_roi = int(oversampling * n_im.shape[0])
     n = np.asarray(fromarray(n_im.real).resize((n_roi, n_roi), BILINEAR)) + 1j * np.asarray(
         fromarray(n_im.imag).resize((n_roi, n_roi), BILINEAR))
-    boundary_widths = 50
+    boundary_widths = 8
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
@@ -171,7 +171,7 @@ def test_3d_disordered(n_domains):
     wavelength = 1.
     n_size = (128, 48, 96, 1)
     n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])
-    boundary_widths = 50
+    boundary_widths = 12
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 
@@ -222,7 +222,7 @@ def test_3d_homogeneous(n_domains):
     wavelength = 1.
     n_size = (128, 128, 128, 1)
     n = np.ones(tuple(n_size), dtype=np.complex64)
-    boundary_widths = 50
+    boundary_widths = 20
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
     n, boundary_array = preprocess(n ** 2, boundary_widths)  # permittivity is n², but uses the same variable n
 

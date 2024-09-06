@@ -26,7 +26,7 @@ if os.path.basename(os.getcwd()) == 'examples':
 wavelength = 1.  # Wavelength in micrometers
 n_size = (128, 128, 128, 1)  # Size of the domain in pixels (x, y, z, 1)
 n = np.ones(tuple(n_size), dtype=np.complex64)  # Refractive index map
-boundary_widths = 50  # Width of the boundary in pixels
+boundary_widths = 20  # Width of the boundary in pixels
 
 # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
 n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n

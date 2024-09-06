@@ -73,7 +73,7 @@ from __init__ import plot
 wavelength = 1.  # wavelength in micrometer (um)
 n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
-boundary_widths = 50  # width of the boundary in pixels
+boundary_widths = 16  # width of the boundary in pixels
 
 # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
 n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n

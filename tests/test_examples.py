@@ -3,11 +3,13 @@ import os
 import torch
 import numpy as np
 from scipy.io import loadmat
+from scipy.signal.windows import gaussian, tukey
 from PIL.Image import BILINEAR, fromarray, open
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.maxwelldomain import MaxwellDomain
 from wavesim.multidomain import MultiDomain
 from wavesim.iteration import run_algorithm
-from wavesim.utilities import pad_boundaries, preprocess, relative_error
+from wavesim.utilities import create_sphere, pad_boundaries, preprocess, relative_error
 
 if os.path.basename(os.getcwd()) == 'tests':
     os.chdir('..')
@@ -199,3 +201,123 @@ def test_3d_disordered(n_domains):
     print(f'Relative error: {re:.2e}')
     threshold = 1.e-3
     assert re < threshold, f"Relative error {re} higher than {threshold}"
+
+
+def test_maxwell_mie():
+    """ Test for Maxwell's equations for Mie scattering. Compare with reference solution (matlab repo result). """
+    wavelength = 1
+    pixel_size = wavelength/5
+    boundary_wavelengths = 5  # Boundary width in wavelengths
+    boundary_widths = int(boundary_wavelengths * wavelength / pixel_size)  # Boundary width in pixels
+    sphere_radius = 1
+    sphere_index = 1.2
+    bg_index = 1
+    n_size = (60, 40, 30)
+
+    # generate a refractive index map
+    n, x_r, y_r, z_r = create_sphere(n_size, pixel_size, sphere_radius, sphere_index, bg_index)
+    n = n[..., None]  # Add dimension for polarization
+
+    n_size += (3,)  # Add 4th dimension for polarization
+
+    # Define source
+    # calculate source prefactor
+    k = bg_index * 2 * np.pi / wavelength
+    prefactor = 1.0j * pixel_size / (2 * k)
+
+    # Linearly-polarized apodized plane wave
+    sx = n.shape[0]
+    sy = n.shape[1]
+    srcx = np.reshape(tukey(sx, 0.5), (1, sx, 1))
+    srcy = np.reshape(tukey(sy, 0.5), (sy, 1, 1))
+    source_amplitude = np.squeeze(1 / prefactor * np.exp(1.0j * k * z_r[0,0,0]) * srcx * srcy).T
+    source = np.zeros(n_size, dtype=np.complex64)
+    p = 0  # x-polarization
+    source[..., 0, p] = source_amplitude
+
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
+    # pad the source with boundaries
+    source = torch.tensor(pad_boundaries(source, boundary_array), dtype=torch.complex64)
+
+    periodic = (True, True, True)  # periodic boundaries, wrapped field.
+    domain = MaxwellDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
+    
+    u_sphere = run_algorithm(domain, source)[0]
+    u_sphere = u_sphere.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)][..., 0].cpu().numpy()
+
+    # Run similar simulation, but without the medium (to get the background field)
+    n_bg = bg_index * np.ones(n_size[:3], dtype=np.complex64)
+    n_bg = n_bg[..., None]  # Add dimension for polarization
+    n_bg, _ = preprocess(n_bg, boundary_widths)
+
+    domain2 = MaxwellDomain(permittivity=n_bg, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
+    u_bg = run_algorithm(domain2, source)[0]
+    u_bg = u_bg.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)][..., 0].cpu().numpy()
+
+    u_computed = u_sphere - u_bg
+
+    # load results from matlab wavesim for comparison and validation
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['maxwell_mie'])[..., 0]
+
+    re = relative_error(u_computed, u_ref)
+    print(f'Relative error: {re:.2e}')
+    threshold = 1.e-3
+    assert re < threshold, f"Relative error {re} higher than {threshold}"
+
+
+def test_maxwell_2d():
+    """ Test for Maxwell's equations for 2D propagation. Compare with reference solution (matlab repo result). """
+    # generate a refractive index map
+    boundary_wavelengths = 4  # Boundary width in wavelengths
+    sim_size = np.array([16 + boundary_wavelengths*2, 32 + boundary_wavelengths*2])  # Simulation size in micrometers
+    wavelength = 1.  # Wavelength in micrometers
+    pixel_size = wavelength/8  # Pixel size in wavelength units
+    boundary_widths = int(boundary_wavelengths * wavelength / pixel_size)  # Boundary width in pixels
+    n_dims = len(sim_size.squeeze())  # Number of dimensions
+
+    # Size of the simulation domain
+    n_size = sim_size * wavelength / pixel_size  # Size of the simulation domain in pixels
+    n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
+    n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
+    n_size += (1,3,)
+
+    n1 = 1
+    n2 = 2
+    n = np.ones((n_size[0]//2, n_size[1]), dtype=np.complex64)
+    n = np.concatenate((n1 * n, n2 * n), axis=0)
+    n = n[..., None, None]  # Add dimensions for z-axis and polarization
+
+    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+    n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
+
+    # define plane wave source with Gaussian intensity profile with incident angle theta
+    # properties
+    theta = np.pi/4  # angle of plane wave
+    kx = 2 * np.pi/wavelength * np.sin(theta)
+    x = np.arange(1, n_size[1] + 1) * pixel_size
+
+    # create source object
+    m = n_size[1]//2
+    a = 3
+    std = (m - 1)/(2 * a)
+    values = torch.tensor(np.concatenate((gaussian(m, std)*np.exp(1j*kx*x[:m]), np.zeros(m))))
+    idx = [[boundary_array[0], i, 0, 0] for i in range(boundary_array[1], boundary_array[1]+n_size[1])]  # [x, y, z, polarization]
+    indices = torch.tensor(idx).T  # Location: beginning of domain
+    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
+
+    # 1-domain, periodic boundaries (without wrapping correction)
+    periodic = (True, True, True)  # periodic boundaries, wrapped field.
+    domain = MaxwellDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
+
+    u_computed = run_algorithm(domain, source)[0]
+    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)][..., 0].cpu().numpy()
+
+    # load dictionary of results from matlab wavesim/anysim for comparison and validation
+    u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['maxwell_2d'])[:,:,0]
+
+    re = relative_error(u_computed, u_ref)
+    print(f'Relative error: {re:.2e}')
+    threshold = 1.e-3
+    assert re < threshold, f"Relative error higher than {threshold}"

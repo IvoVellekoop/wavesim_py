@@ -298,7 +298,7 @@ def relative_error(e, e_true):
     :param e_true: True field
     :return: Relative Error 
     """
-    return np.mean(np.abs(e - e_true) ** 2) / np.mean(np.abs(e_true) ** 2)
+    return np.nanmean(np.abs(e - e_true) ** 2) / np.nanmean(np.abs(e_true) ** 2)
 
 
 # Miscellaneous functions

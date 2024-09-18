@@ -4,6 +4,9 @@ import torch
 import numpy as np
 from scipy.io import loadmat
 from PIL.Image import BILINEAR, fromarray, open
+import sys
+
+sys.path.append('..')
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.multidomain import MultiDomain
 from wavesim.iteration import run_algorithm
@@ -31,7 +34,7 @@ def test_1d_glass_plate(n_domains, periodic):
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1
-    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     if n_domains is None:  # 1-domain, periodic boundaries (without wrapping correction)
@@ -91,7 +94,7 @@ def test_2d_low_contrast(n_domains):
                              n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
-    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
+    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 2)]
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
     u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u2d_lc'])
 
@@ -141,7 +144,7 @@ def test_2d_high_contrast(n_domains):
                              n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=int(1.e+5))[0]
-    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*2)]
+    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 2)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
     u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u2d_hc'])
@@ -180,9 +183,9 @@ def test_3d_disordered(n_domains):
     n, boundary_array = preprocess(n, boundary_widths)
 
     # Source: single point source in the center of the domain
-    indices = torch.tensor([[int(v/2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location
+    indices = torch.tensor([[int(v / 2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location
     values = torch.tensor([1.0])  # Amplitude: 1
-    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     if n_domains is None:  # 1-domain, periodic boundaries (without wrapping correction)
@@ -194,7 +197,7 @@ def test_3d_disordered(n_domains):
         domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=1000)[0]
-    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
+    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 3)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
     u_ref = np.squeeze(loadmat('examples/matlab_results.mat')['u3d_disordered'])
@@ -232,9 +235,9 @@ def test_3d_homogeneous(n_domains):
     n, boundary_array = preprocess(n, boundary_widths)
 
     # Source: single point source in the center of the domain
-    indices = torch.tensor([[int(v/2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location
+    indices = torch.tensor([[int(v / 2 - 1) + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location
     values = torch.tensor([1.0])  # Amplitude: 1
-    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     if n_domains is None:  # 1-domain, periodic boundaries (without wrapping correction)
@@ -246,7 +249,7 @@ def test_3d_homogeneous(n_domains):
         domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=n_domains)
 
     u_computed = run_algorithm(domain, source, max_iterations=2000)[0]
-    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)]*3)]
+    u_computed = u_computed.squeeze()[*([slice(boundary_widths, -boundary_widths)] * 3)]
 
     # load dictionary of results from matlab wavesim/anysim for comparison and validation
     u_ref = np.squeeze(loadmat('examples/matlab_results.mat')[f'u3d_{n_size[0]}_{n_size[1]}_{n_size[2]}_bw_20_24_32'])

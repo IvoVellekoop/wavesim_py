@@ -40,7 +40,7 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
         return HelmholtzDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary, debug=True)
     else:
         return MultiDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary,
-                           n_domains=n_domains, debug=True)
+                           n_domains=n_domains)
 
 
 @pytest.mark.parametrize("params", parameters)

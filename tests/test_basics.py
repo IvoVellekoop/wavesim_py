@@ -15,7 +15,7 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
         return HelmholtzDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary, debug=True)
     else:
         return MultiDomain(permittivity=n, periodic=periodic, n_boundary=n_boundary,
-                           n_domains=n_domains, debug=True)
+                           n_domains=n_domains)
 
 
 def construct_source(n_size):
@@ -135,13 +135,14 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
         k = 2 * torch.pi * torch.round(k_relative * n_size) / n_size  # in 1/pixels
         k[n_size == 1] = 0.0
         plane_wave = torch.exp(1j * (
-            k[0] * torch.arange(n_size[0], device=domain.device).reshape(-1, 1, 1) +
-            k[1] * torch.arange(n_size[1], device=domain.device).reshape(1, -1, 1) +
-            k[2] * torch.arange(n_size[2], device=domain.device).reshape(1, 1, -1)))
+                k[0] * torch.arange(n_size[0], device=domain.device).reshape(-1, 1, 1) +
+                k[1] * torch.arange(n_size[1], device=domain.device).reshape(1, -1, 1) +
+                k[2] * torch.arange(n_size[2], device=domain.device).reshape(1, 1, -1)))
         domain.set(0, plane_wave)
         domain.inverse_propagator(0, 0)
         result = domain.get(0)
-        laplace_kernel = (k[0]**2 + k[1]**2 + k[2]**2) / domain.pixel_size ** 2  # -∇² [negative of laplace kernel]
+        laplace_kernel = (k[0] ** 2 + k[1] ** 2 + k[
+            2] ** 2) / domain.pixel_size ** 2  # -∇² [negative of laplace kernel]
         correct_result = (1.0 + domain.scale * (laplace_kernel + domain.shift)) * plane_wave  # L+1 =  scale·(-∇²) + 1.
         # note: the result is not exactly the same because wavesim is using the real-space kernel, and we compare to
         # the Fourier-space kernel

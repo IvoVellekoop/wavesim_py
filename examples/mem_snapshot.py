@@ -1,14 +1,25 @@
+"""
+PyTorch memory snapshot example
+===============================
+This script captures a memory snapshot of the GPU memory usage during the simulation.
+"""
+
 import os
 import sys
 import torch
 import platform
 import numpy as np
 from time import time
+sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain
+from wavesim.multidomain import MultiDomain
 from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
+if os.path.basename(os.getcwd()) == 'examples':
+    os.chdir('..')
 
 
 def is_supported_platform():
@@ -16,19 +27,19 @@ def is_supported_platform():
 
 
 if is_supported_platform():
-    torch.cuda.memory._record_memory_history()
+    torch.cuda.memory._record_memory_history(True, trace_alloc_max_entries=100000, 
+                                             trace_alloc_record_context=True)
 else:
     print("This functionality is not supported on your platform.")
     # On Windows, gives "RuntimeError: record_context_cpp is not support on non-linux non-x86_64 platforms"
 
 # generate a refractive index map
-sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers
+sim_size = 200 * np.array([1, 2, 2])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
 n_dims = len(sim_size.squeeze())
 
-# Size of the simulation domain
 # Size of the simulation domain in pixels
 n_size = sim_size * wavelength / pixel_size
 n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
@@ -53,19 +64,19 @@ values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple(np.array(n_size) + 2*boundary_array)
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
-# 1-domain, periodic boundaries (without wrapping correction)
-periodic = (True, True, True)  # periodic boundaries, wrapped field.
-n_domains = (1, 1, 1)  # number of domains in each direction
-domain = HelmholtzDomain(permittivity=n, periodic=periodic,
-                         wavelength=wavelength, pixel_size=pixel_size)
+# # 1-domain, periodic boundaries (without wrapping correction)
+# periodic = (True, True, True)  # periodic boundaries, wrapped field.
+# n_domains = (1, 1, 1)  # number of domains in each direction
+# domain = HelmholtzDomain(permittivity=n, periodic=periodic,
+#                          wavelength=wavelength, pixel_size=pixel_size)
 
-# # OR. Uncomment to test domain decomposition
-# n_domains = np.array([2, 1, 1])  # number of domains in each direction
-# periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
-# n_domains = tuple(n_domains)
-# periodic = tuple(periodic)
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
-#                      n_domains=n_domains)
+# OR. Uncomment to test domain decomposition
+n_domains = np.array([1, 2, 2])  # number of domains in each direction
+periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
+n_domains = tuple(n_domains)
+periodic = tuple(periodic)
+domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, pixel_size=pixel_size,
+                     n_domains=n_domains)
 
 
 start = time()
@@ -76,7 +87,7 @@ print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_no
 
 if is_supported_platform():
     try:
-        torch.cuda.memory._dump_snapshot(f"mem_snapshot.pickle")
+        torch.cuda.memory._dump_snapshot(f"logs/mem_snapshot.pickle")
         # To view memory snapshot, got this link in a browser window: https://pytorch.org/memory_viz
         # Then drag and drop the file "mem_snapshot.pickle" into the browser window.
         # From the dropdown menus in the top left corner, open the second one and select "Allocator State History".
@@ -90,7 +101,7 @@ if is_supported_platform():
 
 # %% Postprocessing
 
-file_name = './logs/size'
+file_name = 'logs/size'
 for i in range(n_dims):
     file_name += f'{n_size[i]}_'
 file_name += f'bw{boundary_widths}_domains'
@@ -99,7 +110,7 @@ for i in range(n_dims):
 
 output = (f'Size {n_size}; Boundaries {boundary_widths}; Domains {n_domains}; '
           + f'Time {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e} \n')
-if not os.path.exists('../logs'):
-    os.makedirs('../logs')
-with open('../logs/output.txt', 'a') as file:
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+with open('logs/output.txt', 'a') as file:
     file.write(output)

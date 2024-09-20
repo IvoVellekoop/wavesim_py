@@ -3,10 +3,11 @@ import numpy as np
 from .domain import Domain
 from .helmholtzdomain import HelmholtzDomain
 from .utilities import partition, combine, list_to_array, is_zero
+from torch.cuda import empty_cache
 
 
 class MultiDomain(Domain):
-    """" Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
+    """ Class for generating medium (B) and propagator (L+1)^(-1) operators, scaling,
      and setting up wrapping and transfer corrections """
 
     def __init__(self,
@@ -20,7 +21,7 @@ class MultiDomain(Domain):
                  debug: bool = False):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
-        Arguments:
+        Args:
             permittivity: Permittivity distribution, must be 3-d.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
@@ -105,6 +106,13 @@ class MultiDomain(Domain):
         self.scale = 0.95j / (Vscat_norm + Vwrap_norm)
         for domain in self.domains.flat:
             domain.initialize_scale(self.scale)
+            empty_cache()  # free up memory before going to run_algorithm
+
+        # create an empty tensor to force the allocation of memory for the Vdot tensor
+        # always 8.1 MiB, irrespective of the domain size
+        for domain in self.domains.flat:
+            domain.empty_vdot = torch.empty((1024, 1036), dtype=domain._x[0].dtype, device=domain.device)
+            del domain.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
 
     # Functions implementing the domain interface
     # add_source()
@@ -129,7 +137,7 @@ class MultiDomain(Domain):
         """ Get the field in the specified slot, this gathers the fields from all subdomains and puts them in
         one big array
 
-         :param: device: device on which to store the data. Defaults to the primary device
+        :param device: device on which to store the data. Defaults to the primary device
         """
         domain_data = list_to_array([domain.get(slot) for domain in self.domains.flat], 1).reshape(self.domains.shape)
         return combine(domain_data, device)
@@ -143,21 +151,32 @@ class MultiDomain(Domain):
     def inner_product(self, slot_a: int, slot_b: int):
         """ Compute the inner product of the fields in slots a and b
 
-        Note: use sqrt(inner_product(slot_a, slot_a)) to compute the norm of the field in slot_a.
-        There is a large but inconsistent difference in performance between vdot and linalg.norm.
-        Execution time can vary a factor of 3 or more between the two, depending on the input size
-        and whether the function is executed on the CPU or the GPU.
+        Note: 
+            Use sqrt(inner_product(slot_a, slot_a)) to compute the norm of the field in slot_a.
+            There is a large but inconsistent difference in performance between vdot and linalg.norm.
+            Execution time can vary a factor of 3 or more between the two, depending on the input size
+            and whether the function is executed on the CPU or the GPU.
         """
         inner_product = 0.0
         for domain in self.domains.flat:
             inner_product += domain.inner_product(slot_a, slot_b)
         return inner_product
 
-    def medium(self, slot_in: int, slot_out: int):
-        """ Apply the medium operator B, including wrapping corrections."""
+    def medium(self, slot_in: int, slot_out: int, mnum=None):
+        """ Apply the medium operator B, including wrapping corrections.
+
+        Args:
+            slot_in: slot holding the input field
+            slot_out: slot that will receive the result
+            mnum: # of the medium() call in preconditioned iteration. 
+                  0 for first, 1 for second medium call.
+        """
+    
+        # compute the corrections for each domain, before applying the medium operator
         domain_edges = [domain.compute_corrections(slot_in) for domain in self.domains.flat]
         domain_edges = list_to_array(domain_edges, 2).reshape(*self.domains.shape, 6)
 
+        # Only applies the operator B=1-Vscat. The corrections are applied in the next step
         for domain in self.domains.flat:
             domain.medium(slot_in, slot_out)
 
@@ -183,7 +202,45 @@ class MultiDomain(Domain):
                 return domain_edges[*tuple(x_neighbor), edge - offset]
 
             transfer_corrections = [get_neighbor(edge) for edge in range(6)]
-            domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
+
+            # check if domain should be active in the iteration or not
+            if mnum is None or domain._debug:  # always active outside iteration (mnum==None) or in debug mod
+                domain.active = True
+            else:  # check based on the norm of the transfer corrections
+                tc_norm = [a for a in transfer_corrections if a is not None]
+                if tc_norm:
+                    if domain.counter < 25:  # counter for the number of iterations with increasing norm
+                        tc_norm = max([torch.vdot(a.view(-1), a.view(-1)).item().real for a in tc_norm])
+
+                        if mnum == 0:  # first medium call in preconditioned iteration
+                            domain.mnum0[1] = tc_norm
+                        elif mnum == 1:  # second medium call in preconditioned iteration
+                            domain.mnum1[1] = tc_norm
+
+                            # if norm is high, domain is set to active
+                            if domain.mnum0[1] >= 1.e-7 or domain.mnum1[1] >= 1.e-7:
+                                domain.active = True
+                                domain.counter = 25
+                            # if norm is monotonically increasing, increase the counter
+                            elif domain.mnum0[-1] > domain.mnum0[-2] and domain.mnum1[-1] > domain.mnum1[-2]:
+                                domain.counter += 1
+                            else:
+                                domain.counter = 0
+                                # if the norm is not increasing and source is zero, domain is set to inactive
+                                if domain._source is not None and torch.sum(domain._source).item().real == 0.0:
+                                    domain.active = False 
+                                else:
+                                    domain.active = True
+                                    domain.counter = 25
+
+                            # current norm becomes previous norm
+                            domain.mnum0[0] = domain.mnum0[1]
+                            domain.mnum1[0] = domain.mnum1[1]
+                    else:
+                        domain.active = True
+
+            if domain.active:
+                domain.apply_corrections(wrap_corrections, transfer_corrections, slot_out)
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """ Mix the fields in slots a and b and store the result in slot_out """

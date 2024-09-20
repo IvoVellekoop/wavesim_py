@@ -1,13 +1,15 @@
 import torch
 from .domain import Domain
 from .utilities import is_zero
+from torch.cuda import empty_cache
 
 
 class HelmholtzDomain(Domain):
     """Represents a single domain of the simulation.
 
-    The `Domain` object encapsulates all data that is stored on a single computation node (e.g. a GPU or a node in a
-    cluster), and provides methods to perform the basic operations that the Wavesim algorithm needs.
+    The `Domain` object encapsulates all data that is stored on a single computation node
+    (e.g. a GPU or a node in a cluster), and provides methods to perform the basic operations
+    that the Wavesim algorithm needs.
 
     Note:
         Domain currently works only for the Helmholtz equation and the PyTorch backend.
@@ -32,7 +34,7 @@ class HelmholtzDomain(Domain):
         Note: all operations performed on this domain will use the same pytorch device and data type as the
               permittivity array.
 
-        Attributes:
+        Args:
             permittivity: permittivity (n²) map. Must be a 3-dimensional array of complex float32 or float64.
                 Its shape (n_x, n_y, n_z) is used to determine the size of the domain, and the device and datatype are
                 used for all operations.
@@ -142,6 +144,13 @@ class HelmholtzDomain(Domain):
             center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
             self.initialize_scale(0.95j / V_norm)
+
+            empty_cache()  # free up memory before going to run_algorithm
+
+            # create an empty tensor to force the allocation of memory for the Vdot tensor
+            # always 8.1 MiB, irrespective of the domain size
+            self.empty_vdot = torch.empty((1024, 1036), dtype=self._x[0].dtype, device=self.device)
+            del self.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
         elif Vwrap is not None:
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
@@ -163,6 +172,13 @@ class HelmholtzDomain(Domain):
         # # compute the norm of Vwrap. Worst case: just add all norms
         self.Vwrap_norm = sum([torch.linalg.norm(W, ord=2).item() for W in self.Vwrap if W is not None])
 
+        # Setup to iterate over domains only when the source is non-zero,
+        # or the norm of transfer corrections consistently increases
+        self.mnum0 = [0.0] * 2  # store the last two values of the transfer correction norm for 1st medium call
+        self.mnum1 = [0.0] * 2  # ... for 2nd medium call
+        self.counter = 0  # counter to keep track of the number of iterations with increasing transfer correction norm
+        self.active = True  # flag to indicate if the domain is active in the iteration
+
     # Functions implementing the domain interface
     # add_source()
     # clear()
@@ -173,8 +189,10 @@ class HelmholtzDomain(Domain):
     # propagator()
     # set_source()
     def add_source(self, slot: int, weight: float):
+        """Adds the source term to the data in the specified slot."""
         if self._source is not None:
-            torch.add(self._x[slot], self._source, out=self._x[slot], alpha=weight)
+            if self.active:
+                torch.add(self._x[slot], self._source, out=self._x[slot], alpha=weight)
 
     def clear(self, slot: int):
         """Clears the data in the specified slot"""
@@ -183,8 +201,8 @@ class HelmholtzDomain(Domain):
     def get(self, slot: int, copy=False):
         """Returns the data in the specified slot.
 
-        param: slot: slot from which to return the data
-        param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
+        :param: slot: slot from which to return the data
+        :param: copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
                      Note that this data may be overwritten by the next call to domain.
         """
         data = self._x[slot]
@@ -197,52 +215,56 @@ class HelmholtzDomain(Domain):
     def inner_product(self, slot_a: int, slot_b: int):
         """Computes the inner product of two data vectors
 
-        Note: the vectors may be represented as multidimensional arrays,
-        but these arrays must be contiguous for this operation to work.
-        Although it would be possible to use flatten(), this would create a
-        copy when the array is not contiguous, causing a hidden performance hit.
+        Note:
+            The vectors may be represented as multidimensional arrays,
+            but these arrays must be contiguous for this operation to work.
+            Although it would be possible to use flatten(), this would create a
+            copy when the array is not contiguous, causing a hidden performance hit.
         """
         retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
-    def medium(self, slot_in: int, slot_out: int):
+    def medium(self, slot_in: int, slot_out: int, mnum = None):
         """Applies the operator 1-Vscat.
 
-        Note: does not apply the wrapping correction. When part of a multi-domain,
-        the wrapping correction is applied by the medium() function of the multi-domain object
-        and this function should not be called directly.
+        Note:
+            Does not apply the wrapping correction. When part of a multi-domain,
+            the wrapping correction is applied by the medium() function of the multi-domain object
+            and this function should not be called directly.
         """
-        torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
+        if self.active:
+            torch.mul(self._Bscat, self._x[slot_in], out=self._x[slot_out])
 
     def mix(self, weight_a: float, slot_a: int, weight_b: float, slot_b: int, slot_out: int):
         """Mixes two data arrays and stores the result in the specified slot"""
-        a = self._x[slot_a]
-        b = self._x[slot_b]
-        out = self._x[slot_out]
-        if weight_a == 1.0:
-            torch.add(a, b, alpha=weight_b, out=out)
-        elif weight_a == 0.0:
-            torch.mul(b, weight_b, out=out)
-        elif weight_b == 1.0:
-            torch.add(b, a, alpha=weight_a, out=out)
-        elif weight_b == 0.0:
-            torch.mul(a, weight_a, out=out)
-        elif weight_a + weight_b == 1.0:
-            torch.lerp(a, b, weight_b, out=out)
-        elif slot_a == slot_out:
-            a.mul_(weight_a)
-            a.add_(b, alpha=weight_b)
-        else:
-            torch.mul(b, weight_b, out=out)
-            out.add_(a, alpha=weight_a)
+        if self.active:
+            a = self._x[slot_a]
+            b = self._x[slot_b]
+            out = self._x[slot_out]
+            if weight_a == 1.0:
+                torch.add(a, b, alpha=weight_b, out=out)
+            elif weight_a == 0.0:
+                torch.mul(b, weight_b, out=out)
+            elif weight_b == 1.0:
+                torch.add(b, a, alpha=weight_a, out=out)
+            elif weight_b == 0.0:
+                torch.mul(a, weight_a, out=out)
+            elif weight_a + weight_b == 1.0:
+                torch.lerp(a, b, weight_b, out=out)
+            elif slot_a == slot_out:
+                a.mul_(weight_a)
+                a.add_(b, alpha=weight_b)
+            else:
+                torch.mul(b, weight_b, out=out)
+                out.add_(a, alpha=weight_a)
 
     def propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1)^-1 x."""
         # todo: convert to on-the-fly computation
-        torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-        self._mul_propagator_kernel(self._x[slot_out], self._mpx2, self._mpy2, self._mpz2)
-        # self._x[slot_out].mul_(self.propagator_kernel)
-        torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
+        if self.active:
+            torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
+            self._mul_propagator_kernel(self._x[slot_out], self._mpx2, self._mpy2, self._mpz2)
+            torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     @property
     def propagator_kernel(self):
@@ -295,10 +317,11 @@ class HelmholtzDomain(Domain):
 
         Computes Bscat (from the temporary storage 0), the propagator kernel (from the temporary value in
         propagator_kernel), and scales Vwrap.
+
         Attributes:
-            scale: Scaling factor of the problem. Its magnitude is chosen such that the
-                operator V = scale · (the scattering potential + the wrapping correction)
-                 has norm < 1. The complex argument is chosen such that L+V is accretive.
+            scale: Scaling factor of the problem. Its magnitude is chosen such that the operator
+                   V = scale · (the scattering potential + the wrapping correction) has norm < 1.
+                   The complex argument is chosen such that L+V is accretive.
         """
 
         # B = 1 - scale·(n² k₀² - shift). Scaling and shifting was already applied. 1-... not yet
@@ -317,14 +340,11 @@ class HelmholtzDomain(Domain):
             self.Vwrap = [scale * W if W is not None else None for W in self.Vwrap]
 
     def compute_corrections(self, slot_in: int):
-        """Computes the edge corrections by multiplying the first and last pixels of each line with the Vwrap matrix.
+        """Computes the edge corrections by multiplying the first and last pixels of each line with
+        the Vwrap matrix.
 
-        The corrections are stored in self.edges.TODO: re-use this memory
-        """
-        """ Function to compute the wrapping/transfer corrections in 3 dimensions as six separate arrays
-        for the edges of size n_correction (==wrap_matrix.shape[0 or 1])
-        :param x: Array to which wrapping correction is to be applied
-        :param wrap_matrix: Non-cyclic convolution matrix with the wrapping artifacts
+        The corrections are stored in self.edges.
+        TODO: re-use this memory
         """
         for edge in range(6):
             axes = [1, ] if edge % 2 == 0 else [0, ]
@@ -332,13 +352,6 @@ class HelmholtzDomain(Domain):
             if self.Vwrap[dim] is None:
                 continue
 
-            # tensordot(wrap_matrix, x[slice]) gives the correction, but the uncontracted dimension of the wrap matrix
-            # (of size n_correction) is always at axis=0. It should be at axis=dim,
-            # moveaxis moves the non-contracted dimension to the correct position
-            # self.edges[edge] = torch.moveaxis(
-            #    torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
-            #                    out=self.edges[edge]), 0,
-            #    dim)
             view = torch.moveaxis(self.edges[edge], dim, 0)
             torch.tensordot(a=self.Vwrap[dim], b=self._x[slot_in][self.edge_slices[edge]], dims=(axes, [dim, ]),
                             out=view)
@@ -346,12 +359,12 @@ class HelmholtzDomain(Domain):
         return self.edges
 
     def apply_corrections(self, wrap_corrections, transfer_corrections, slot: int):
-        """Apply  -1·wrapping/transfer corrections
+        """Apply wrapping/transfer corrections
 
-        Transfer corrections correspond to a contribution from neighboring domains, and are added to the current domain.
-        Wrap corrections correct for the periodicity of the fft. They are subtracted from the domain
-        In this case, there is an additional factor of -1 because this function is called from `medium`, which applies
-        1-V instead of V.
+        Transfer corrections correspond to a contribution from neighboring domains, and are added
+        to the current domain. Wrap corrections correct for the periodicity of the fft. They are
+        subtracted from the domain. In this case, there is an additional factor of -1 because
+        this function is called from `medium`, which applies 1-V instead of V.
         Therefore, transfer corrections are now subtracted, and wrap corrections are added.
 
         :param slot: slot index for the data to which the corrections are applied. Operation is always in-place

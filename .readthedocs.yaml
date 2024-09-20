@@ -5,9 +5,16 @@ build:
   tools:
     python: "3.11"
 
+  jobs:
+    post_create_environment:
+      - pip install poetry
+      - pip install poetry-plugin-export
+      - poetry export -f requirements.txt -o requirements.txt --with docs --without opengl
+      - cat requirements.txt
+
 python:
   install:
-    - requirements: docs/requirements.txt
+    - requirements: requirements.txt
 
 sphinx:
-  configuration: docs/conf.py
+  configuration: docs/source/conf.py

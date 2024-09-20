@@ -1,3 +1,11 @@
+""" 
+Helmholtz 2D low contrast test
+===============================
+Test for propagation in 2D structure with low refractive index contrast 
+(made of fat and water to mimic biological tissue). 
+Compare with reference solution (matlab repo result). 
+"""
+
 import os
 import torch
 import numpy as np
@@ -12,9 +20,6 @@ from __init__ import plot
 
 if os.path.basename(os.getcwd()) == 'examples':
     os.chdir('..')
-
-""" Test for propagation in 2D structure with low refractive index contrast (made of fat and water to mimic biological 
-    tissue). Compare with reference solution (matlab repo result). """
 
 
 oversampling = 0.25

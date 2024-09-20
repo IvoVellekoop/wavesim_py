@@ -1,6 +1,28 @@
 import numpy as np
+from scipy.special import exp1
 import matplotlib.pyplot as plt
 from wavesim.utilities import normalize, relative_error
+
+
+def analytical_solution(n_size0, pixel_size, wavelength=None):
+    """ Compute analytic solution for 1D case """
+    x = np.arange(0, n_size0 * pixel_size, pixel_size, dtype=np.float32)
+    x = np.pad(x, (n_size0, n_size0), mode='constant', constant_values=np.nan)
+    h = pixel_size
+    # wavenumber (k)
+    if wavelength is None:
+        k = 1. * 2. * np.pi * pixel_size
+    else:
+        k = 1. * 2. * np.pi / wavelength
+    phi = k * x
+    u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
+                - h / (4 * np.pi * k) * (
+        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+    )
+    small = np.abs(k * x) < 1.e-10  # special case for values close to 0
+    u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
+    return u_theory[n_size0:-n_size0]
 
 
 def plot(x, x_ref, re=None):

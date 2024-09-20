@@ -1,3 +1,9 @@
+""" 
+Hemlholtz 2D homogeneous medium test
+====================================
+Test for propagation in 2D homogeneous medium.
+"""
+
 import torch
 import numpy as np
 from time import time
@@ -6,8 +12,6 @@ sys.path.append(".")
 from wavesim.helmholtzdomain import HelmholtzDomain
 from wavesim.iteration import run_algorithm
 from wavesim.utilities import preprocess
-
-""" Test for propagation in 2D homogeneous medium """
 
 
 pixel_size = 0.25

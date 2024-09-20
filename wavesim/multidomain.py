@@ -171,7 +171,7 @@ class MultiDomain(Domain):
             mnum: # of the medium() call in preconditioned iteration. 
                   0 for first, 1 for second medium call.
         """
-    
+
         # compute the corrections for each domain, before applying the medium operator
         domain_edges = [domain.compute_corrections(slot_in) for domain in self.domains.flat]
         domain_edges = list_to_array(domain_edges, 2).reshape(*self.domains.shape, 6)
@@ -204,7 +204,7 @@ class MultiDomain(Domain):
             transfer_corrections = [get_neighbor(edge) for edge in range(6)]
 
             # check if domain should be active in the iteration or not
-            if mnum is None or domain._debug:  # always active outside iteration (mnum==None) or in debug mod
+            if mnum is None:  # always active outside iteration (mnum==None) or in debug mod
                 domain.active = True
             else:  # check based on the norm of the transfer corrections
                 tc_norm = [a for a in transfer_corrections if a is not None]
@@ -228,7 +228,7 @@ class MultiDomain(Domain):
                                 domain.counter = 0
                                 # if the norm is not increasing and source is zero, domain is set to inactive
                                 if domain._source is not None and torch.sum(domain._source).item().real == 0.0:
-                                    domain.active = False 
+                                    domain.active = False
                                 else:
                                     domain.active = True
                                     domain.counter = 25

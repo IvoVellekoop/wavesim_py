@@ -24,8 +24,8 @@ def analytical_solution(n_size0, pixel_size, wavelength=None):
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (
-                    np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-                    np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+                        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+                        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
                 )
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
@@ -42,8 +42,8 @@ def test_no_propagation():
 
     # manually disable the propagator, and test if, indeed, we are solving the system (2 π n / λ)² x = y
     L1 = 1.0 + domain.shift * domain.scale
-    domain.propagator_kernel = 1.0 / L1
-    domain.inverse_propagator_kernel = L1
+    domain._propagator_kernel = 1.0 / L1
+    domain._inverse_propagator_kernel = L1
     k2 = -(2 * torch.pi * n * domain.pixel_size) ** 2  # -(2 π n / λ)²
     B = (1.0 - (k2 - domain.shift) * domain.scale)
     assert allclose(domain_operator(domain, 'inverse_propagator')(x), x * L1)
@@ -86,7 +86,7 @@ def test_residual(size, boundary_widths, periodic):
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1
-    n_ext = tuple(np.array(size) + 2*boundary_array)
+    n_ext = tuple(np.array(size) + 2 * boundary_array)
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     wavelength = 1.
@@ -128,11 +128,11 @@ def test_1d_analytical(n_domains, periodic):
 
     indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
     values = torch.tensor([1.0])  # Amplitude: 1
-    n_ext = tuple(np.array(n_size) + 2*boundary_array)
+    n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
     # domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-    domain = MultiDomain(permittivity=n, periodic=periodic, 
+    domain = MultiDomain(permittivity=n, periodic=periodic,
                          wavelength=wavelength, pixel_size=pixel_size, n_domains=n_domains)
     u_computed = run_algorithm(domain, source, max_iterations=10000)[0]
     u_computed = u_computed.squeeze()[boundary_widths:-boundary_widths]

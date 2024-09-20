@@ -54,7 +54,6 @@ class HelmholtzDomain(Domain):
                     a list of strings, e.g., ['cuda:0', 'cuda:1'] to distribute the simulation over these 
                         devices in a round-robin fashion, or 
                     None, which is equivalent to 'cuda' if cuda devices are available, and 'cpu' if they are not.
-            debug: set to True to return inverse_propagator_kernel as output.
          """
 
         if device is None or device == 'cuda':
@@ -224,7 +223,7 @@ class HelmholtzDomain(Domain):
         retval = torch.vdot(self._x[slot_a].view(-1), self._x[slot_b].view(-1)).item()
         return retval if slot_a != slot_b else retval.real  # remove small imaginary part if present
 
-    def medium(self, slot_in: int, slot_out: int, mnum = None):
+    def medium(self, slot_in: int, slot_out: int, mnum=None):
         """Applies the operator 1-Vscat.
 
         Note:
@@ -263,12 +262,13 @@ class HelmholtzDomain(Domain):
         # todo: convert to on-the-fly computation
         if self.active:
             torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-            self._mul_propagator_kernel(self._x[slot_out], self._mpx2, self._mpy2, self._mpz2)
+            #            self._mul_propagator_kernel(self._x[slot_out], self._mpx2, self._mpy2, self._mpz2)
+            self._x[slot_out].mul_(self.propagator_kernel)
             torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     @property
     def propagator_kernel(self):
-        """Returns the propagator kernel for this domain. This kernel is computed on demand since it is not typically needed."""
+        """Returns the propagator kernel for this domain.."""
         # kernel = 1 / (scale·(L + shift) + 1). Shifting was already applied. scaling, +1 and reciprocal not yet
         if self._propagator_kernel is None:
             self._propagator_kernel = 1.0 / (self._mpx2 + self._mpy2 + self._mpz2)
@@ -276,6 +276,7 @@ class HelmholtzDomain(Domain):
 
     @property
     def inverse_propagator_kernel(self):
+        """Returns the inverse propagator kernel for this domain. This kernel is computed on demand since it is not typically needed."""
         if self._inverse_propagator_kernel is None:
             self._inverse_propagator_kernel = self._mpx2 + self._mpy2 + self._mpz2
         return self._inverse_propagator_kernel

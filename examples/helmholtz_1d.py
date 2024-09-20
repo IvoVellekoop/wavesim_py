@@ -24,7 +24,7 @@ if os.path.basename(os.getcwd()) == 'examples':
 
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # refractive index map
 n[99:130] = 1.5  # glass plate
 boundary_widths = 24  # width of the boundary in pixels

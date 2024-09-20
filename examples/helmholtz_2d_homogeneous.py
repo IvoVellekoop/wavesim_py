@@ -19,7 +19,8 @@ from wavesim.utilities import preprocess
 wavelength = 1.  # Wavelength in micrometers
 pixel_size = wavelength/4  # Pixel size in wavelength units
 # Size of simulation domain (in pixels in x, y, and z direction)
-n_size = tuple((wavelength/pixel_size * np.array([50, 50, 1])).astype(int)) + (1,)
+sim_size = np.array([50, 50, 1])  # Simulation size in micrometers
+n_size = (sim_size * wavelength/pixel_size).astype(int)
 n = np.ones(n_size, dtype=np.complex64)  # Refractive index map
 boundary_widths = 8  # Width of the boundary in pixels
 
@@ -37,7 +38,7 @@ source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
-# periodic = (False, False, True)  # wrapping correction
+# periodic = (False, True, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
 #                      n_domains=(2, 1, 1))
 

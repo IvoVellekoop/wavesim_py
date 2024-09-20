@@ -20,7 +20,7 @@ from __init__ import plot
 
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
 boundary_widths = 16  # width of the boundary in pixels
 

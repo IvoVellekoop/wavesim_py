@@ -51,9 +51,9 @@ source = torch.tensor(source, dtype=torch.complex64)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
-# periodic = (False, False, True)  # wrapping correction
+# periodic = (False, True, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength,
-#                      n_domains=(2, 2, 1))
+#                      n_domains=(3, 1, 1))
 
 # Run the wavesim iteration and get the computed field
 start = time()

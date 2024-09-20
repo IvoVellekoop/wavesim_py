@@ -9,27 +9,27 @@ from . import random_vector, allclose, dtype
 """ Performs checks on the operators represented as matrices (accretivity, norm)."""
 
 parameters = [
-    {'n_size': (1, 1, 12, 1), 'n_domains': None, 'n_boundary': 0, 'periodic': (False, False, True)},
-    {'n_size': (1, 1, 12, 1), 'n_domains': (1, 1, 1), 'n_boundary': 0, 'periodic': (False, False, True)},
-    {'n_size': (1, 1, 12, 1), 'n_domains': (1, 1, 1), 'n_boundary': 5, 'periodic': (True, True, False)},
-    {'n_size': (1, 1, 32, 1), 'n_domains': (1, 1, 2), 'n_boundary': 5, 'periodic': (True, True, True)},
-    {'n_size': (1, 1, 32, 1), 'n_domains': (1, 1, 2), 'n_boundary': 5, 'periodic': (True, True, False)},
-    {'n_size': (1, 32, 1, 1), 'n_domains': (1, 2, 1), 'n_boundary': 5, 'periodic': (True, True, True)},
-    {'n_size': (1, 32, 1, 1), 'n_domains': (1, 2, 1), 'n_boundary': 5, 'periodic': (True, False, True)},
-    {'n_size': (32, 1, 1, 1), 'n_domains': (2, 1, 1), 'n_boundary': 5, 'periodic': (False, True, True)},
-    {'n_size': (32, 1, 1, 1), 'n_domains': (2, 1, 1), 'n_boundary': 5, 'periodic': (True, True, True)},
+    {'n_size': (1, 1, 12), 'n_domains': None, 'n_boundary': 0, 'periodic': (False, False, True)},
+    {'n_size': (1, 1, 12), 'n_domains': (1, 1, 1), 'n_boundary': 0, 'periodic': (False, False, True)},
+    {'n_size': (1, 1, 12), 'n_domains': (1, 1, 1), 'n_boundary': 5, 'periodic': (True, True, False)},
+    {'n_size': (1, 1, 32), 'n_domains': (1, 1, 2), 'n_boundary': 5, 'periodic': (True, True, True)},
+    {'n_size': (1, 1, 32), 'n_domains': (1, 1, 2), 'n_boundary': 5, 'periodic': (True, True, False)},
+    {'n_size': (1, 32, 1), 'n_domains': (1, 2, 1), 'n_boundary': 5, 'periodic': (True, True, True)},
+    {'n_size': (1, 32, 1), 'n_domains': (1, 2, 1), 'n_boundary': 5, 'periodic': (True, False, True)},
+    {'n_size': (32, 1, 1), 'n_domains': (2, 1, 1), 'n_boundary': 5, 'periodic': (False, True, True)},
+    {'n_size': (32, 1, 1), 'n_domains': (2, 1, 1), 'n_boundary': 5, 'periodic': (True, True, True)},
     # test different-sized domains
-    {'n_size': (23, 1, 1, 1), 'n_domains': (3, 1, 1), 'n_boundary': 2, 'periodic': (True, True, True)},
-    {'n_size': (23, 1, 1, 1), 'n_domains': (3, 1, 1), 'n_boundary': 3, 'periodic': (False, True, True)},
-    {'n_size': (1, 5, 19, 1), 'n_domains': (1, 1, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
-    {'n_size': (1, 14, 19, 1), 'n_domains': (1, 2, 2), 'n_boundary': 3, 'periodic': (True, False, True)},
-    {'n_size': (17, 30, 1, 1), 'n_domains': (2, 3, 1), 'n_boundary': 3, 'periodic': (True, True, True)},
-    {'n_size': (8, 8, 8, 1), 'n_domains': (2, 2, 2), 'n_boundary': 2, 'periodic': (False, False, True)},
-    {'n_size': (8, 12, 8, 1), 'n_domains': (2, 3, 2), 'n_boundary': 2, 'periodic': (True, True, True)},
+    {'n_size': (23, 1, 1), 'n_domains': (3, 1, 1), 'n_boundary': 2, 'periodic': (True, True, True)},
+    {'n_size': (23, 1, 1), 'n_domains': (3, 1, 1), 'n_boundary': 3, 'periodic': (False, True, True)},
+    {'n_size': (1, 5, 19), 'n_domains': (1, 1, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
+    {'n_size': (1, 14, 19), 'n_domains': (1, 2, 2), 'n_boundary': 3, 'periodic': (True, False, True)},
+    {'n_size': (17, 30, 1), 'n_domains': (2, 3, 1), 'n_boundary': 3, 'periodic': (True, True, True)},
+    {'n_size': (8, 8, 8), 'n_domains': (2, 2, 2), 'n_boundary': 2, 'periodic': (False, False, True)},
+    {'n_size': (8, 12, 8), 'n_domains': (2, 3, 2), 'n_boundary': 2, 'periodic': (True, True, True)},
     # these parameters are very slow for test_accretivity and should be run only when needed
-    # {'n_size': (12, 12, 12, 1), 'n_domains': (2, 2, 2), 'n_boundary': 3, 'periodic': (False, False, True)},
-    # {'n_size': (18, 24, 18, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
-    # {'n_size': (17, 23, 19, 1), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
+    # {'n_size': (12, 12, 12), 'n_domains': (2, 2, 2), 'n_boundary': 3, 'periodic': (False, False, True)},
+    # {'n_size': (18, 24, 18), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
+    # {'n_size': (17, 23, 19), 'n_domains': (2, 3, 2), 'n_boundary': 3, 'periodic': (True, True, True)},
 ]
 
 

@@ -21,15 +21,14 @@ def construct_domain(n_size, n_domains, n_boundary, periodic=(False, False, True
 def construct_source(n_size):
     """ Construct a sparse-matrix source with some points at the corners and in the center"""
     locations = torch.tensor([
-        [n_size[0] // 2, 0, 0, 0],
-        [n_size[1] // 2, 0, 0, 0],
-        [n_size[2] // 2, 0, n_size[2] - 1, 0],
-        [0, 0, 0, 0]])
+        [n_size[0] // 2, 0, 0],
+        [n_size[1] // 2, 0, 0],
+        [n_size[2] // 2, 0, n_size[2] - 1]])
 
-    return torch.sparse_coo_tensor(locations, torch.tensor([1, 1, 1, 1]), n_size, dtype=dtype)
+    return torch.sparse_coo_tensor(locations, torch.tensor([1, 1, 1]), n_size, dtype=dtype)
 
 
-@pytest.mark.parametrize("n_size", [(128, 100, 93, 1), (50, 49, 1, 1)])
+@pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
 @pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])
 def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | None):
     """Tests the basic functionality of the Domain and MultiDomain classes
@@ -95,7 +94,7 @@ def test_basics(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | 
                 assert allclose(domain.get(out_slot), alpha * x + beta * y)
 
 
-@pytest.mark.parametrize("n_size", [(128, 100, 93, 1), (50, 49, 1, 1)])
+@pytest.mark.parametrize("n_size", [(128, 100, 93), (50, 49, 1)])
 @pytest.mark.parametrize("n_domains", [None, (1, 1, 1), (3, 2, 1)])
 def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int] | None):
     """Tests the forward and inverse propagator
@@ -132,14 +131,13 @@ def test_propagator(n_size: tuple[int, int, int], n_domains: tuple[int, int, int
     if n_domains is None:
         n_size = torch.tensor(n_size, dtype=torch.float64)
         # choose |k| <  Nyquist, make sure k is at exact grid point in Fourier space
-        k_relative = torch.tensor((0.2, -0.15, 0.4, 0), dtype=torch.float64)
+        k_relative = torch.tensor((0.2, -0.15, 0.4), dtype=torch.float64)
         k = 2 * torch.pi * torch.round(k_relative * n_size) / n_size  # in 1/pixels
         k[n_size == 1] = 0.0
         plane_wave = torch.exp(1j * (
             k[0] * torch.arange(n_size[0], device=domain.device).reshape(-1, 1, 1) +
             k[1] * torch.arange(n_size[1], device=domain.device).reshape(1, -1, 1) +
             k[2] * torch.arange(n_size[2], device=domain.device).reshape(1, 1, -1)))
-        plane_wave = plane_wave[..., None]
         domain.set(0, plane_wave)
         domain.inverse_propagator(0, 0)
         result = domain.get(0)
@@ -155,9 +153,9 @@ def test_basic_wrapping():
 
     Constructs a 1-D domain and splits it in two. A source is placed at the right edge of the left domain.
     """
-    n_size = (10, 1, 1, 1)
+    n_size = (10, 1, 1)
     n_boundary = 2
-    source = torch.sparse_coo_tensor(torch.tensor([[(n_size[0] - 1) // 2, 0, 0, 0]]).T, torch.tensor([1.0]), n_size,
+    source = torch.sparse_coo_tensor(torch.tensor([[(n_size[0] - 1) // 2, 0, 0]]).T, torch.tensor([1.0]), n_size,
                                      dtype=dtype)
     domain = MultiDomain(permittivity=torch.ones(n_size, dtype=dtype), n_domains=(2, 1, 1),
                          n_boundary=n_boundary, periodic=(False, True, True))
@@ -205,11 +203,11 @@ def test_wrapped_propagator():
     up to the difference in scaling factor.
     """
     # n_size = (128, 100, 93, 1)
-    n_size = (3 * 32 * 1024, 1, 1, 1)
+    n_size = (3 * 32 * 1024, 1, 1)
     n_boundary = 16
     domain_single = construct_domain(n_size, n_domains=None, n_boundary=n_boundary, periodic=(True, True, True))
     domain_multi = construct_domain(n_size, n_domains=(3, 1, 1), n_boundary=n_boundary, periodic=(True, True, True))
-    source = torch.sparse_coo_tensor(torch.tensor([[0, 0, 0, 0]]).T, torch.tensor([1.0]), n_size, dtype=dtype)
+    source = torch.sparse_coo_tensor(torch.tensor([[0, 0, 0]]).T, torch.tensor([1.0]), n_size, dtype=dtype)
 
     x = [None, None]
     for i, domain in enumerate([domain_single, domain_multi]):

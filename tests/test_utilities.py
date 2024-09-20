@@ -6,7 +6,7 @@ from . import allclose
 """Test of the utility functions."""
 
 
-@pytest.mark.parametrize("size", [(5, 4, 6, 1), (7, 15, 32, 1), (3, 5, 6, 1)])
+@pytest.mark.parametrize("size", [(5, 4, 6), (7, 15, 32), (3, 5, 6)])
 @pytest.mark.parametrize("n_domains", [(1, 2, 3), (3, 3, 3), (2, 4, 1)])
 @pytest.mark.parametrize("sparse", [False, True])
 def test_partition_combine(size: tuple[int, int, int], n_domains: tuple[int, int, int], sparse: bool):

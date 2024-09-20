@@ -24,9 +24,8 @@ if os.path.basename(os.getcwd()) == 'examples':
 
 # Parameters
 wavelength = 1.  # Wavelength in micrometers
-n_size = (128, 48, 96, 1)  # Size of the domain in pixels (x, y, z, 1)
+n_size = (128, 48, 96)  # Size of the domain in pixels (x, y, z)
 n = np.ascontiguousarray(loadmat('examples/matlab_results.mat')['n3d_disordered'])  # Refractive index map
-n = n[..., None]  # Add polarization dimension (unused in Helmholtz case)
 boundary_widths = 8  # Width of the boundary in pixels
 
 # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
@@ -38,14 +37,14 @@ values = torch.tensor([1.0])  # Amplitude: 1
 n_ext = tuple(np.array(n_size) + 2*boundary_array)
 source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
-# Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
-# 1-domain, periodic boundaries (without wrapping correction)
-periodic = (True, True, True)  # periodic boundaries, wrapped field.
-domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-# # OR. Uncomment to test domain decomposition
-# periodic = (False, False, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
-#                      n_domains=(2, 1, 1))
+# # Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
+# # 1-domain, periodic boundaries (without wrapping correction)
+# periodic = (True, True, True)  # periodic boundaries, wrapped field.
+# domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
+# OR. Uncomment to test domain decomposition
+periodic = (False, True, True)  # wrapping correction
+domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
+                     n_domains=(2, 1, 1))
 
 # Run the wavesim iteration and get the computed field
 start = time()

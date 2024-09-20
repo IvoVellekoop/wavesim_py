@@ -22,7 +22,7 @@ class MultiDomain(Domain):
         """ Takes input parameters for the HelmholtzBase class (and sets up the operators)
 
         Args:
-            permittivity: Permittivity distribution, must be 4-d.
+            permittivity: Permittivity distribution, must be 3-d.
             periodic: Indicates for each dimension whether the simulation is periodic or not.
                 periodic dimensions, the field is wrapped around the domain.
             pixel_size: Grid spacing in wavelengths.
@@ -47,8 +47,8 @@ class MultiDomain(Domain):
         #   preprocess(n, pixel_size, n_domains))
 
         # validata input parameters
-        if not permittivity.ndim == 4:
-            raise ValueError("The permittivity must be a 4D array")
+        if not permittivity.ndim == 3:
+            raise ValueError("The permittivity must be a 3D array")
         if not len(n_domains) == 3:
             raise ValueError("The number of domains must be a 3-tuple")
 

@@ -52,7 +52,7 @@ source = torch.tensor(source, dtype=torch.complex64)
 periodic = (True, True, True)  # periodic boundaries, wrapped field.
 domain = HelmholtzDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength)
 # # OR. Uncomment to test domain decomposition
-# periodic = (False, True, True)  # wrapping correction
+# periodic = (True, False, True)  # wrapping correction
 # domain = MultiDomain(permittivity=n, periodic=periodic, pixel_size=pixel_size, wavelength=wavelength,
 #                      n_domains=(1, 2, 1))
 

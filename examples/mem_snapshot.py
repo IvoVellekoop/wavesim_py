@@ -34,7 +34,7 @@ else:
     # On Windows, gives "RuntimeError: record_context_cpp is not supported on non-linux non-x86_64 platforms"
 
 # generate a refractive index map
-sim_size = 200 * np.array([1, 2, 2])  # Simulation size in micrometers
+sim_size = 50 * np.array([1, 2, 2])  # Simulation size in micrometers
 wavelength = 1.
 pixel_size = 0.25
 boundary_widths = 20
@@ -43,7 +43,7 @@ n_dims = len(sim_size.squeeze())
 # Size of the simulation domain in pixels
 n_size = sim_size * wavelength / pixel_size
 n_size = n_size - 2 * boundary_widths  # Subtract the boundary widths
-n_size = tuple(n_size.astype(int)) + (1,)  # Convert to integer for indexing
+n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 
 torch.manual_seed(0)  # Set the random seed for reproducibility
 n = (torch.normal(mean=1.3, std=0.1, size=n_size, dtype=torch.float32)

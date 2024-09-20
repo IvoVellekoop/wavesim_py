@@ -16,13 +16,13 @@ def preprocess(permittivity, boundary_widths=10):
     :param boundary_widths: Boundary widths (in pixels)
     :return: Preprocessed permittivity (refractive index²) with boundaries and absorption 
     """
-    permittivity = check_input_dims(permittivity)  # Ensure permittivity is a 4-d array
+    permittivity = check_input_dims(permittivity)  # Ensure permittivity is a 3-d array
     if permittivity.dtype != np.complex64:
         permittivity = permittivity.astype(np.complex64)
-    n_dims = get_dims(permittivity[..., 0])  # Number of dimensions in simulation
+    n_dims = get_dims(permittivity)  # Number of dimensions in simulation
     n_roi = np.array(permittivity.shape)  # Num of points in ROI (Region of Interest)
 
-    # Ensure boundary_widths is a 4-element array of ints with 0s after n_dims
+    # Ensure boundary_widths is a 3-element array of ints with 0s after n_dims
     boundary_widths = check_input_len(boundary_widths, 0, n_dims).astype(int)
 
     permittivity = add_absorption(permittivity, boundary_widths, n_roi, n_dims)
@@ -64,32 +64,32 @@ def boundary_(x):
 
 
 def check_input_dims(x):
-    """ Expand arrays to 4 dimensions (e.g. permittivity (refractive index²) or source)
+    """ Expand arrays to 3 dimensions (e.g. permittivity (refractive index²) or source)
     
     :param x: Input array
-    :return: x with 4 dimensions
+    :return: x with 3 dimensions
     """
-    for _ in range(4 - x.ndim):
-        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 4
+    for _ in range(3 - x.ndim):
+        x = np.expand_dims(x, axis=-1)  # Expand dimensions to 3
     return x
 
 
 def check_input_len(x, e, n_dims):
-    """ Check the length of input arrays and expand them to 4 elements if necessary. Either repeat or add 'e'
+    """ Check the length of input arrays and expand them to 3 elements if necessary. Either repeat or add 'e'
     
     :param x: Input array
     :param e: Element to add
     :param n_dims: Number of dimensions
-    :return: Array with 4 elements 
+    :return: Array with 3 elements 
     """
     if isinstance(x, int) or isinstance(x, float):  # If x is a single number
-        x = n_dims * tuple((x,)) + (4 - n_dims) * (e,)  # Repeat the number n_dims times, and add (4-n_dims) e's
+        x = n_dims * tuple((x,)) + (3 - n_dims) * (e,)  # Repeat the number n_dims times, and add (3-n_dims) e's
     elif len(x) == 1:  # If x is a single element list or tuple
-        x = n_dims * tuple(x) + (4 - n_dims) * (e,)  # Repeat the element n_dims times, and add (4-n_dims) e's
+        x = n_dims * tuple(x) + (3 - n_dims) * (e,)  # Repeat the element n_dims times, and add (3-n_dims) e's
     elif isinstance(x, list) or isinstance(x, tuple):  # If x is a list or tuple
-        x += (4 - len(x)) * (e,)  # Add (4-len(x)) e's
+        x += (3 - len(x)) * (e,)  # Add (3-len(x)) e's
     if isinstance(x, np.ndarray):  # If x is a numpy array
-        x = np.concatenate((x, np.zeros(4 - len(x))))  # Concatenate with (4-len(x)) zeros
+        x = np.concatenate((x, np.zeros(3 - len(x))))  # Concatenate with (3-len(x)) zeros
     return np.array(x)
 
 
@@ -114,7 +114,7 @@ def pad_boundaries(x, boundary_widths, boundary_post=None, mode='constant'):
     :param mode: Padding mode
     :return: Padded array 
     """
-    x = check_input_dims(x)  # Ensure x is a 4-d array
+    x = check_input_dims(x)  # Ensure x is a 3-d array
 
     if boundary_post is None:
         boundary_post = boundary_widths
@@ -150,7 +150,6 @@ def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
         sum(tensor.shape[0] for tensor in domains[:, 0, 0]),
         sum(tensor.shape[1] for tensor in domains[0, :, 0]),
         sum(tensor.shape[2] for tensor in domains[0, 0, :]),
-        1
     ]
 
     # allocate memory
@@ -170,7 +169,7 @@ def combine(domains: np.ndarray, device='cpu') -> torch.Tensor:
                 end0 = index0 + tensor.shape[0]
                 end1 = index1 + tensor.shape[1]
                 end2 = index2 + tensor.shape[2]
-                result_tensor[index0:end0, index1:end1, index2:end2, :] = tensor
+                result_tensor[index0:end0, index1:end1, index2:end2] = tensor
                 index2 += tensor.shape[2]
             index1 += domains[i, j, 0].shape[1]
         index0 += tensor_slice0.shape[0]
@@ -207,9 +206,9 @@ def list_to_array(input: list, depth: int) -> np.ndarray:
 
 def partition(array: torch.Tensor, n_domains: tuple[int, int, int]) -> np.ndarray:
     """ Split a 3-D array into a 3-D set of sub-arrays of approximately equal sizes."""
-    n_domains = np.array(n_domains + (1,))  # Add 1 to the end to make it a 4-element array
+    n_domains = np.array(n_domains)  # Add 1 to the end to make it a 3-element array
     size = np.array(array.shape)
-    if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 4:
+    if any(size < n_domains) or any(n_domains <= 0) or len(n_domains) != 3:
         raise ValueError(f"Number of domains {n_domains} must be larger than 1 and "
                          f"less than or equal to the size of the array {array.shape}")
 

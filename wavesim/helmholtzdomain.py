@@ -109,15 +109,10 @@ class HelmholtzDomain(Domain):
         # We temporarily store the kernel in `propagator_kernel`.
         # The shift and scale functions convert it to 1 / (scale·(L+shift)+1)
         # todo: convert to on-the-fly computation as in MATLAB code so that we don't need to store the kernel
-        self._inverse_propagator_kernel = None  # computed on demand, not needed for normal operation
-        self._propagator_kernel = None  # computed on demand, not needed for normal operation
         self._mpx2 = self._laplace_kernel(0)  # -px², will be modified to scale · (-px² + shift) + 1
         self._mpy2 = self._laplace_kernel(1)  # -py², will be modified to scale · (-py²)
         self._mpz2 = self._laplace_kernel(2)  # -pz², will be modified to scale · (-pz²)
-        self._mul_propagator_kernel = torch.jit.script(_mul_propagator_kernel)
-        self._mul_propagator_kernel.save("mul_propagator_kernel.pt")
-        print(self._mul_propagator_kernel.graph)
-        print(self._mul_propagator_kernel.code)
+        self._propagator_kernel = None  # will be initialized in  'initialize_scale' function
 
         # allocate storage for temporary data, re-use the memory we got for the raw scattering potential
         # as one of the locations (which will be overwritten later)
@@ -158,10 +153,13 @@ class HelmholtzDomain(Domain):
             # These matrices must be computed before initialize_scale, since they
             # affect the overall scaling.
             # place a point at -1,-1,-1 in slot 1 (which currently holds all zeros)
-            # and then convolve the point with the inverse propagator kernel
+            # and then convolve the point with the non-scaled inverse propagator kernel
             # we now have the wrap-around artefacts located at [:,-1,-1], [-1,:,-1] and [-1,-1,:]
             self._x[1][-1, -1, -1] = 1.0
-            self.inverse_propagator(1, 1)
+            torch.fft.fftn(self._x[1], out=self._x[1])
+            self._x[1].mul_(self._mpx2 + self._mpy2 + self._mpz2)
+            torch.fft.ifftn(self._x[1], out=self._x[1])
+
             self.Vwrap = [
                 _make_wrap_matrix(self._x[1][:, -1, -1], n_boundary) if not self._periodic[0] else None,
                 _make_wrap_matrix(self._x[1][-1, :, -1], n_boundary) if not self._periodic[1] else None,
@@ -262,34 +260,19 @@ class HelmholtzDomain(Domain):
         # todo: convert to on-the-fly computation
         if self.active:
             torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-            #            self._mul_propagator_kernel(self._x[slot_out], self._mpx2, self._mpy2, self._mpz2)
-            self._x[slot_out].mul_(self.propagator_kernel)
+            self._x[slot_out].mul_(self._propagator_kernel)
             torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
-
-    @property
-    def propagator_kernel(self):
-        """Returns the propagator kernel for this domain.."""
-        # kernel = 1 / (scale·(L + shift) + 1). Shifting was already applied. scaling, +1 and reciprocal not yet
-        if self._propagator_kernel is None:
-            self._propagator_kernel = 1.0 / (self._mpx2 + self._mpy2 + self._mpz2)
-        return self._propagator_kernel
-
-    @property
-    def inverse_propagator_kernel(self):
-        """Returns the inverse propagator kernel for this domain. This kernel is computed on demand since it is not typically needed."""
-        if self._inverse_propagator_kernel is None:
-            self._inverse_propagator_kernel = self._mpx2 + self._mpy2 + self._mpz2
-        return self._inverse_propagator_kernel
 
     def inverse_propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1) x .
 
         This operation is not needed for the Wavesim algorithm, but is provided for testing purposes,
         and can be used to evaluate the residue of the solution.
+        It is not optimized (using div, which may be slow)
         """
         # todo: convert to on-the-fly computation
         torch.fft.fftn(self._x[slot_in], out=self._x[slot_out])
-        self._x[slot_out].mul_(self.inverse_propagator_kernel)
+        self._x[slot_out].div_(self._propagator_kernel)
         torch.fft.ifftn(self._x[slot_out], out=self._x[slot_out])
 
     def set_source(self, source):
@@ -335,6 +318,9 @@ class HelmholtzDomain(Domain):
         self._mpx2 = self._mpx2 * scale + 1.0
         self._mpy2 = self._mpy2 * scale
         self._mpz2 = self._mpz2 * scale
+
+        # compute propagator kernel
+        self._propagator_kernel = 1.0 / (self._mpx2 + self._mpy2 + self._mpz2)
 
         # scale wrapping corrections
         if self.Vwrap is not None:
@@ -426,9 +412,3 @@ def _make_wrap_matrix(L_kernel, n_boundary):
         size = r + 1
         wrap_matrix[r, :] = kernel_section[n_boundary - size:2 * n_boundary - size]
     return wrap_matrix
-
-
-@torch.jit.script
-def _mul_propagator_kernel(x: torch.Tensor, mpx2: torch.Tensor, mpy2: torch.Tensor, mpz2: torch.Tensor):
-    """Multiplies the data in the specified slot by the propagator kernel."""
-    x.div_(mpx2 + mpy2 + mpz2)

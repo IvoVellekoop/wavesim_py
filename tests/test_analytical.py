@@ -43,7 +43,6 @@ def test_no_propagation():
     # manually disable the propagator, and test if, indeed, we are solving the system (2 π n / λ)² x = y
     L1 = 1.0 + domain.shift * domain.scale
     domain._propagator_kernel = 1.0 / L1
-    domain._inverse_propagator_kernel = L1
     k2 = -(2 * torch.pi * n * domain.pixel_size) ** 2  # -(2 π n / λ)²
     B = (1.0 - (k2 - domain.shift) * domain.scale)
     assert allclose(domain_operator(domain, 'inverse_propagator')(x), x * L1)

@@ -100,7 +100,6 @@ Parameters in the :class:`~.domain.Domain` class: :class:`~.helmholtzdomain.Helm
     
     * ``None``, which is equivalent to ``'cuda'`` if cuda devices are available, and ``'cpu'`` if they are not.
 
-* :attr:`~.debug` ``: bool = False``: set to ``True`` for testing to return :attr:`~.inverse_propagator_kernel` as output.
 
 Parameters in the :func:`run_algorithm` function
 

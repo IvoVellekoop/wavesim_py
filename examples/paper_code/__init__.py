@@ -28,8 +28,8 @@ def random_refractive_index(n_size):
     mask = (n ** 2).imag < 0
     n.imag[mask] *= -1.0
     n = smooth_n(n, n_size)
-    n[0:5, :, :] = 0
-    n[-5:, :, :] = 0
+    n[0:5, :, :] = 1
+    n[-5:, :, :] = 1
     return n
 
 

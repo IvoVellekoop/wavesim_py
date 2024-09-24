@@ -229,6 +229,12 @@ def partition(array: torch.Tensor, n_domains: tuple[int, int, int]) -> np.ndarra
 
 def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.ndarray:
     """ Split a COO-sparse tensor into a 3-D set of sub-arrays of approximately equal sizes."""
+    if len(sizes) == 1:
+        return [tensor]  # no need to split
+
+    if dim >= tensor.indices().shape[0]:
+        raise ValueError(f"Splitting of hybrid sparse tensors along non-sparse dimension is not supported yet.")
+
     coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
     domain_starts = np.cumsum((0,) + sizes)
     tensor = tensor.coalesce()
@@ -315,8 +321,8 @@ def analytical_solution(n_size0, pixel_size, wavelength=None):
     phi = k * x
     u_theory = (1.0j * h / (2 * k) * np.exp(1.0j * phi)  # propagating plane wave
                 - h / (4 * np.pi * k) * (
-                    np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
-                    np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
+                        np.exp(1.0j * phi) * (exp1(1.0j * (k - np.pi / h) * x) - exp1(1.0j * (k + np.pi / h) * x)) -
+                        np.exp(-1.0j * phi) * (-exp1(-1.0j * (k - np.pi / h) * x) + exp1(-1.0j * (k + np.pi / h) * x)))
                 )
     small = np.abs(k * x) < 1.e-10  # special case for values close to 0
     u_theory[small] = 1.0j * h / (2 * k) * (1 + 2j * np.arctanh(h * k / np.pi) / np.pi)  # exact value at 0.
@@ -346,11 +352,11 @@ def create_sphere(n_size, pixel_size, sphere_radius, sphere_index, bg_index, cen
     x_range = np.reshape((np.arange(1, n_size[1] + 1) * pixel_size - center[0]), (1, n_size[1], 1))
     y_range = np.reshape((np.arange(1, n_size[0] + 1) * pixel_size - center[1]), (n_size[0], 1, 1))
     z_range = np.reshape((np.arange(1, n_size[2] + 1) * pixel_size - center[2]), (1, 1, n_size[2]))
-    
+
     # Calculate refractive index
     inside = (x_range ** 2 + y_range ** 2 + z_range ** 2) < sphere_radius ** 2
     n = np.ones(n_size) * bg_index + inside * (sphere_index - bg_index)
-    
+
     return n, x_range, y_range, z_range
 
 

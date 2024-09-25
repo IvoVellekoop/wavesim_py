@@ -232,13 +232,25 @@ def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.nd
     if len(sizes) == 1:
         return [tensor]  # no need to split
 
-    if dim >= tensor.indices().shape[0]:
-        raise ValueError(f"Splitting of hybrid sparse tensors along non-sparse dimension is not supported yet.")
+    tensor = tensor.coalesce()
+    indices = tensor.indices().cpu().numpy()
+    values = tensor.values()
+
+    if dim >= tensor.sparse_dim():
+        values = torch.tensor(values.detach().clone().cpu().numpy())  # for troubleshooting access violation
+        value_list = list(torch.split(values, sizes, dim - tensor.sparse_dim() + 1))  # split dense tensor component
+        sz = list(tensor.shape)
+        for i in range(len(value_list)):
+            sz[dim] = sizes[i]
+            v = np.array(
+                value_list[i].cpu().numpy())  # should not be necessary, workaround for access violation bug in torch
+            value_list[i] = torch.sparse_coo_tensor(indices, v, tuple(sz))
+            print(indices, indices.dtype, value_list[i], value_list[i].shape, sz)
+            value_list[i].to_dense()  # for troubleshooting access violation
+        return value_list
 
     coordinate_to_domain = np.array(sum([(idx,) * size for idx, size in enumerate(sizes)], ()))
     domain_starts = np.cumsum((0,) + sizes)
-    tensor = tensor.coalesce()
-    indices = tensor.indices().cpu().numpy()
     domains = coordinate_to_domain[indices[dim, :]]
 
     def extract_subarray(domain: int) -> torch.Tensor:
@@ -246,11 +258,11 @@ def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.nd
         domain_indices = indices[:, mask]
         if len(domain_indices) == 0:
             return None
-        domain_values = tensor.values()[mask]
+        domain_values = values[mask]
         domain_indices[dim, :] -= domain_starts[domain]
         size = list(tensor.shape)
         size[dim] = sizes[domain]
-        return torch.sparse_coo_tensor(domain_indices, domain_values, size)
+        return torch.sparse_coo_tensor(domain_indices, domain_values, tuple(size))
 
     return [extract_subarray(d) for d in range(len(sizes))]
 

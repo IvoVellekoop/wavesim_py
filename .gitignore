@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Simulation output
+*.pdf
+*.npz
+
 # C extensions
 *.so
 

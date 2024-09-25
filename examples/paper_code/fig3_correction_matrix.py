@@ -33,9 +33,11 @@ rcParams['mathtext.fontset'] = 'cm'
 
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
+    os.makedirs('paper_figures', exist_ok=True)
     filename = 'paper_figures/fig3_correction_matrix.pdf'
 else:
     try:
+        os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_figures/fig3_correction_matrix.pdf'
     except FileNotFoundError:
         filename = 'fig3_correction_matrix.pdf'

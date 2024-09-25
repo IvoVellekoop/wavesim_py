@@ -17,20 +17,23 @@ from wavesim.iteration import run_algorithm  # to run the wavesim iteration
 from wavesim.utilities import preprocess, normalize, relative_error
 
 
+font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
+rc('font', **font)
+rcParams['mathtext.fontset'] = 'cm'
+
+
 def random_refractive_index(n_size):
     torch.manual_seed(0)  # Set the random seed for reproducibility
-    # n = (torch.normal(mean=1.3, std=0.1, size=n_size, dtype=torch.float32)
-    #     + 1j * abs(torch.normal(mean=0.05, std=0.02, size=n_size, dtype=torch.float32)))
-
     n = (1.0 + torch.rand(n_size, dtype=torch.float32) +
-         0.0j * torch.rand(n_size, dtype=torch.float32))
+         0.0j * torch.rand(n_size, dtype=torch.float32))  # Random refractive index
+    n = smooth_n(n, n_size)  # Low pass filter to remove sharp edges
     # make sure that the imaginary part of n² is positive
     mask = (n ** 2).imag < 0
     n.imag[mask] *= -1.0
-    n = smooth_n(n, n_size)
+
     n[0:5, :, :] = 1
     n[-5:, :, :] = 1
-    return n
+    return n.numpy()
 
 
 def smooth_n(n, n_size):
@@ -47,8 +50,8 @@ def smooth_n(n, n_size):
 
 
 def window(x):
-    """Gaussian window function"""
-    c0 = int(x * 2 / 8)
+    """Create a window function for low pass filtering"""
+    c0 = round(x / 4)
     cl = (x - c0) // 2
     cr = cl
     if c0 + cl + cr != x:
@@ -61,19 +64,6 @@ def window(x):
 def construct_source(n_size, boundary_array):
     """ Set up source, with size same as n + 2*boundary_widths, 
         and a plane wave source on one edge of the domain """
-    # choose |k| <  Nyquist, make sure k is at exact grid point in Fourier space
-    # k_size = torch.tensor([n_size[0], n_size[2]], dtype=torch.float64)
-    # k_relative = torch.tensor((0.2, -0.15), dtype=torch.float64)
-    # k = 2 * torch.pi * torch.round(k_relative * k_size) / k_size  # in 1/pixels
-    # source_amplitude = torch.exp(1j * (
-    #        k[0] * torch.arange(k_size[0]).reshape(-1, 1, 1) +
-    #       k[1] * torch.arange(k_size[1]).reshape(1, -1, 1))).squeeze_().to(torch.complex64)
-    # source = torch.zeros(n_ext, dtype=torch.complex64)
-    # source[boundary_array[0]:boundary_array[0] + n_size[0],
-    # boundary_array[1],
-    # boundary_array[2]:boundary_array[2] + n_size[2]] = source_amplitude
-
-    # convert source to sparse tensor
     # TODO: use CSR format instead?
     # TODO: source size should not include boundaries (framework should shift source to correct position)
     n_ext = tuple(np.array(n_size) + 2 * boundary_array)
@@ -83,19 +73,20 @@ def construct_source(n_size, boundary_array):
     return source
 
 
-def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=False, device=None):
+def sim_3d_random(filename, sim_size, n_domains, n_boundary=16, full_residuals=False, device=None):
     """Run a simulation with the given parameters and save the results to a file"""
 
     wavelength = 1.  # Wavelength in micrometers
     pixel_size = wavelength / 4  # Pixel size in wavelength units
-    boundary_wavelengths = 10  # Boundary width in wavelengths
+    boundary_wavelengths = 5  # Boundary width in wavelengths
     boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]  # Boundary width in pixels
+    # Periodic boundaries True (no wrapping correction) if boundary width is 0, else False (wrapping correction)
+    periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
     n_dims = np.count_nonzero(sim_size != 1)  # Number of dimensions
 
     # Size of the simulation domain
     n_size = np.ones_like(sim_size, dtype=int)
     n_size[:n_dims] = sim_size[:n_dims] * wavelength / pixel_size  # Size of the simulation domain in pixels
-    # n_size[:n_dims] = n_size[:n_dims] - 2 * boundary_widths  # Subtract the boundary widths
     n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 
     for i in range(n_dims):
@@ -121,7 +112,7 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=Fa
         n = random_refractive_index(n_size)  # Random refractive index
 
         # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-        n, boundary_array = preprocess((n ** 2).numpy(),
+        n, boundary_array = preprocess((n ** 2),
                                        boundary_widths)  # permittivity is n², but uses the same variable n
 
         print(f"Size of n: {n_size}")
@@ -133,29 +124,24 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=Fa
         source = construct_source(n_size, boundary_array)
 
         if n_domains is None:  # single domain
-            periodic = (True, True, True)
             domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
                                      pixel_size=pixel_size, n_boundary=n_boundary, device=device)
             n_domains = (1, 1, 1)
         else:
-            n_domains = np.array(n_domains)  # number of domains in each direction
-            periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
-            n_domains = tuple(n_domains)
-            periodic = tuple(periodic)
             domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
                                  pixel_size=pixel_size, n_domains=n_domains, n_boundary=n_boundary)
 
         start = time()
         # Field u and state object with information about the run
-        u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=1000,
+        u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=10000,
                                                      full_residuals=full_residuals)
         sim_time = time() - start
 
         # crop the field to the region of interest
-        u = u[
-            slice(boundary_widths[0], u.shape[0] - boundary_widths[0]),
-            slice(boundary_widths[1], u.shape[1] - boundary_widths[1]),
-            slice(boundary_widths[2], u.shape[2] - boundary_widths[2])].cpu().numpy()
+        u = u[*(slice(boundary_widths[i], 
+                      u.shape[i] - boundary_widths[i]) for i in range(3))].cpu().numpy()
+        n = np.sqrt(n[*(slice(boundary_widths[i], 
+                      n.shape[i] - boundary_widths[i]) for i in range(3))].real)
 
         np.savez_compressed(f'{filename}.npz',
                             n=n,
@@ -180,7 +166,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     print(f"Relative error: {relative_error(sim['u'], sim_ref['u']):.2e}")
 
     size = sim_ref['n'].shape
-    n = np.abs(sim_ref['n'])[:, :, size[2] // 2].T
+    n = sim_ref['n'][:, :, size[2] // 2].T
     u_ref = np.abs(sim_ref['u'])[:, :, size[2] // 2].T
     u = np.abs(sim['u'])[:, :, size[2] // 2].T
 
@@ -226,9 +212,9 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     yticks = np.arange(0, extent[2] + 1, np.round(extent[2] // 5, -1 if extent[1] // 5 >= 10 else 0))
 
     ax0 = fig.add_subplot(gs_n[0])
-    im0 = ax0.imshow(normalize(n), cmap='jet', extent=extent)
+    im0 = ax0.imshow(n, cmap='jet', extent=extent)
     cbar0 = plt.colorbar(mappable=im0, ax=ax0, fraction=fraction, pad=pad)
-    cbar0.ax.set_title(r'$|n|$')
+    cbar0.ax.set_title(r'$n$')
     ax0.set_xlabel(r'$x~(\lambda)$')
     ax0.set_ylabel(r'$y~(\lambda)$')
     ax0.set_title('Refractive index')

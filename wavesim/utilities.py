@@ -245,7 +245,7 @@ def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.nd
             v = np.array(
                 value_list[i].cpu().numpy())  # should not be necessary, workaround for access violation bug in torch
             value_list[i] = torch.sparse_coo_tensor(indices, v, tuple(sz))
-            print(indices, indices.dtype, value_list[i], value_list[i].shape, sz)
+            # print(indices, indices.dtype, value_list[i], value_list[i].shape, sz)
             value_list[i].to_dense()  # for troubleshooting access violation
         return value_list
 

@@ -150,3 +150,4 @@ percent = (min_a_12/max_a_12) * 100
 print(f'Wrapping artifact amplitudes: Min {min_a_12:.3f}, Max {max_a_12:.3f}')
 print(f'Min/Max of A_{12} = {percent:.2f} %')
 assert percent < 1, f"Min/Max of A_{12} ratio exceeds 1%: {percent:.2f} %"
+print('Done.')

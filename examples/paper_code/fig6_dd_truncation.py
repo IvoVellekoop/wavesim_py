@@ -125,7 +125,7 @@ else:
 
 
 # Plot
-length = int(len(ure_list) * 2/3)
+length = len(ure_list)
 x = np.arange(length)
 ncols = 3
 figsize = (12, 3)
@@ -136,15 +136,18 @@ ax0 = axs[0]
 ax0.semilogy(x, ure_list[:length], 'r', lw=1., marker='x', markersize=3)
 ax0.set_xlabel('Number of correction points')
 ax0.set_ylabel('Relative Error')
-ax0.set_xticks(np.arange(0, length, 10))
+ax0.set_xticks(np.arange(0, round(length,-1)+1, 20))
+ax0.set_yticks((1e-6, 1e-4, 1e-2, 1e0))
 ax0.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax0.grid(True, which='major', linestyle='--', linewidth=0.5)
+ax0.grid(True, which='minor', linestyle=':', linewidth=0.3)
+ax0.yaxis.set_minor_locator(LogLocator(numticks=12,subs=np.arange(2,10)))
 
 ax1 = axs[1]
 ax1.plot(x, iterations[:length], 'g', lw=1., marker='+', markersize=3)
 ax1.set_xlabel('Number of correction points')
 ax1.set_ylabel('Iterations')
-ax1.set_xticks(np.arange(0, length, 10))
+ax1.set_xticks(np.arange(0, round(length,-1)+1, 20))
 ax1.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax1.grid(True, which='major', linestyle='--', linewidth=0.5)
 
@@ -152,7 +155,7 @@ ax2 = axs[2]
 ax2.plot(x, sim_time[:length], 'b', lw=1., marker='*', markersize=3)
 ax2.set_xlabel('Number of correction points')
 ax2.set_ylabel('Time (s)')
-ax2.set_xticks(np.arange(0, length, 10))
+ax2.set_xticks(np.arange(0, round(length,-1)+1, 20))
 ax2.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax2.grid(True, which='major', linestyle='--', linewidth=0.5)
 

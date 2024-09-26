@@ -35,7 +35,7 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     filename = 'paper_figures/fig4_truncate.pdf'
 else:
     try:
-        os.makedirs('examples/paper_figures', exist_ok=True
+        os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_figures/fig4_truncate.pdf'
     except FileNotFoundError:
         filename = 'fig4_truncate.pdf'

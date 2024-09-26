@@ -398,8 +398,8 @@ def normalize(x, min_val=None, max_val=None, a=0, b=1):
     :return: Normalized x
     """
     if min_val is None:
-        min_val = np.min(x)
+        min_val = x.min()
     if max_val is None:
-        max_val = np.max(x)
+        max_val = x.max()
     normalized_x = (x - min_val) / (max_val - min_val) * (b - a) + a
     return normalized_x

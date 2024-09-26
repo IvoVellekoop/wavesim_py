@@ -26,3 +26,4 @@ sim = sim_3d_random(filename, sim_size, n_domains=(3, 1, 1), full_residuals=full
 
 # plot the field
 plot_validation(figname, sim_ref, sim, plt_norm='log')
+print('Done.')

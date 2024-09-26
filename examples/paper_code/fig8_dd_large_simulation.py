@@ -17,7 +17,7 @@ else:
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 
-sim_size = 326 * np.array([1, 1, 1])  # Simulation size in micrometers (excluding boundaries)
+sim_size = 315 * np.array([1, 1, 1])  # Simulation size in micrometers (excluding boundaries)
 full_residuals = True
 
 # Run the simulations
@@ -27,3 +27,4 @@ sim_cpu = sim_3d_random(filename, sim_size, n_domains=None, full_residuals=full_
 
 # plot the field
 plot_validation(figname, sim_cpu, sim_gpu, plt_norm='log')
+print('Done.')

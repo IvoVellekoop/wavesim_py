@@ -25,8 +25,10 @@ rcParams['mathtext.fontset'] = 'cm'
 def random_refractive_index(n_size):
     torch.manual_seed(0)  # Set the random seed for reproducibility
     n = (1.0 + torch.rand(n_size, dtype=torch.float32) +
-         0.0j * torch.rand(n_size, dtype=torch.float32))  # Random refractive index
+         0.03j * torch.rand(n_size, dtype=torch.float32))  # Random refractive index
     n = smooth_n(n, n_size)  # Low pass filter to remove sharp edges
+    n.real = normalize(n.real, a=1.0, b=2.0)  # Normalize to [1, 2]
+    n.imag = normalize(n.imag, a=0.0, b=0.03)  # Normalize to [0, 0.05]
     # make sure that the imaginary part of n² is positive
     mask = (n ** 2).imag < 0
     n.imag[mask] *= -1.0

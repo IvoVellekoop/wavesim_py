@@ -48,24 +48,33 @@ n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 if os.path.exists(filename):
     print(f"File {filename} already exists. Loading data and plotting...")
 else:
-    boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)]*2 + [0]
-    periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
-    n = random_refractive_index(n_size)  # Random refractive index
-
-    # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess((n**2), boundary_widths)  # permittivity is n², but uses the same variable n
-
-    print(f"Size of n: {n_size}")
-    print(f"Size of n in GB: {n.nbytes / (1024**3):.2f}")
-    assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
-    assert (n.shape == np.asarray(n_size) + 2*boundary_array).all(), 'n and n_size do not match'
-    assert n.dtype == np.complex64, f'n is not complex64, but {n.dtype}'
-
-    source = construct_source(n_size, boundary_array)
-
     domains = range(1, 11) #range(1, 21)
     for nx, ny in product(domains, domains):
         print(f'Domains {nx}/{domains[-1]}, {ny}/{domains[-1]}', end='\r')
+
+        if nx == 1 and ny == 1:
+            boundary_widths = [0, 0, 0]
+        elif nx > 1 and ny == 1:
+            boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]
+        elif nx == 1 and ny > 1:
+            boundary_widths = [0, round(boundary_wavelengths * wavelength / pixel_size), 0]
+        else:
+            boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)]*2 + [0]
+
+        periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
+        n = random_refractive_index(n_size)  # Random refractive index
+
+        # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
+        n, boundary_array = preprocess((n**2), boundary_widths)  # permittivity is n², but uses the same variable n
+
+        print(f"Size of n: {n_size}")
+        print(f"Size of n in GB: {n.nbytes / (1024**3):.2f}")
+        assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
+        assert (n.shape == np.asarray(n_size) + 2*boundary_array).all(), 'n and n_size do not match'
+        assert n.dtype == np.complex64, f'n is not complex64, but {n.dtype}'
+
+        source = construct_source(n_size, boundary_array)
+
         n_domains = (nx, ny, 1)
         domain = MultiDomain(permittivity=n, periodic=periodic, 
                              wavelength=wavelength, pixel_size=pixel_size, 
@@ -121,3 +130,4 @@ ax[1].text(0.5, -0.23, '(b)', color='k', ha='center', va='center', transform=ax[
 
 plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
+print(f'Saved: {figname}')

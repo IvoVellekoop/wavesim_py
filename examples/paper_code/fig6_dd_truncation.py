@@ -130,14 +130,13 @@ x = np.arange(length)
 ncols = 3
 figsize = (12, 3)
 
-fig, axs = plt.subplots(1, ncols, figsize=figsize, gridspec_kw={'hspace': 0., 'wspace': 0.3})
+fig, axs = plt.subplots(1, ncols, figsize=figsize, gridspec_kw={'hspace': 0., 'wspace': 0.25})
 
 ax0 = axs[0]
 ax0.semilogy(x, ure_list[:length], 'r', lw=1., marker='x', markersize=3)
 ax0.set_xlabel('Number of correction points')
 ax0.set_ylabel('Relative Error')
 ax0.set_xticks(np.arange(0, round(length,-1)+1, 10))
-ax0.set_yticks((1e-6, 1e-4, 1e-2, 1e0))
 ax0.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax0.grid(True, which='major', linestyle='--', linewidth=0.5)
 ax0.grid(True, which='minor', linestyle=':', linewidth=0.3)

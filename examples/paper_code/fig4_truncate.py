@@ -87,21 +87,21 @@ fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharex=True, sharey=True,
                         gridspec_kw={'wspace': 0.15, 'width_ratios': [1, 1, 1.094]})
 fraction = 0.046
 pad = 0.04
-extent = np.array([0, n_size[0], n_size[0], 0])  # * base.pixel_size
+extent = np.array([0, n_size[0], n_size[0], 0])
 cmap = 'seismic'
 
 ax0 = axs[0]
-im0 = ax0.imshow(a_c, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
+im0 = ax0.imshow(a_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
 ax0.set_title('$A$ (truncated corrections)')
 
 ax1 = axs[1]
-im1 = ax1.imshow(l_c, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
+im1 = ax1.imshow(l_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
 ax1.set_title('$L$')
 
 ax2 = axs[2]
-im2 = ax2.imshow(v_c, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
+im2 = ax2.imshow(v_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
 ax2.set_title('$V$ (truncated corrections)')
-fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad)
+fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad, ticks=[-1, -0.5, 0, 0.5, 1], format='%.1f')
 
 # Add text boxes with labels (a), (b), (c), ...
 labels = ['(a)', '(b)', '(c)', '(d)']

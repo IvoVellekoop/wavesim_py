@@ -48,12 +48,12 @@ n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 if os.path.exists(filename):
     print(f"File {filename} already exists. Loading data and plotting...")
 else:
-    domains = range(1, 11) #range(1, 21)
+    domains = range(1, 11)
     for nx, ny in product(domains, domains):
         print(f'Domains {nx}/{domains[-1]}, {ny}/{domains[-1]}', end='\r')
 
         if nx == 1 and ny == 1:
-            boundary_widths = [0, 0, 0]
+            boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]
         elif nx > 1 and ny == 1:
             boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]
         elif nx == 1 and ny > 1:
@@ -111,22 +111,23 @@ times = [data[i, 3] for i in range(len(data))]
 times = [float(times[i].split(' ')[2]) for i in range(len(times))]
 times = np.reshape(times, (x, y), order='F')
 
-fig, ax = plt.subplots(figsize=(11.5, 4), nrows=1, ncols=2)#, sharex=False, sharey=True)
-cmap = 'jet'  # 'winter'  # 'PuRd'  # 
+fig, ax = plt.subplots(figsize=(9, 3), nrows=1, ncols=2, sharey=True, gridspec_kw={'wspace': 0.05})
+cmap = 'jet'
 
 im0 = ax[0].imshow(np.flipud(iterations), cmap=cmap, extent=[0.5, x+0.5, 0.5, y+0.5])
 ax[0].set_xlabel('Domains in x direction')
 ax[0].set_ylabel('Domains in y direction')
 plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.04)
 ax[0].set_title('Iterations vs Number of domains')
-ax[0].text(0.5, -0.23, '(a)', color='k', ha='center', va='center', transform=ax[0].transAxes)
+ax[0].text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax[0].transAxes)
+ax[0].minorticks_on()
 
 im1 = ax[1].imshow(np.flipud(times), cmap=cmap, extent=[0.5, x+0.5, 0.5, y+0.5])
 ax[1].set_xlabel('Domains in x direction')
-ax[1].set_ylabel('Domains in y direction')
 plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.04)
 ax[1].set_title('Time vs Number of domains')
-ax[1].text(0.5, -0.23, '(b)', color='k', ha='center', va='center', transform=ax[1].transAxes)
+ax[1].text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax[1].transAxes)
+ax[1].minorticks_on()
 
 plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')

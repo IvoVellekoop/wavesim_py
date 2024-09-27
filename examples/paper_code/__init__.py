@@ -75,7 +75,7 @@ def construct_source(n_size, boundary_array):
     return source
 
 
-def sim_3d_random(filename, sim_size, n_domains, n_boundary=16, full_residuals=False, device=None):
+def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=False, device=None):
     """Run a simulation with the given parameters and save the results to a file"""
 
     wavelength = 1.  # Wavelength in micrometers
@@ -199,6 +199,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     if plt_norm == 'linear':
         plt_norm_ = colors.Normalize(vmin=vmin, vmax=vmax)
     elif plt_norm == 'log':
+        vmin = 1.e-4
         plt_norm_ = colors.LogNorm(vmin=vmin, vmax=vmax)
     elif plt_norm == 'power':
         plt_norm_ = colors.PowerNorm(gamma=0.1, vmin=vmin, vmax=vmax)

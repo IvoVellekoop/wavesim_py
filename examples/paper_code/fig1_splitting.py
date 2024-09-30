@@ -31,9 +31,11 @@ rcParams['mathtext.fontset'] = 'cm'
 
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
+    os.makedirs('paper_figures', exist_ok=True)
     filename = 'paper_figures/fig1_splitting.pdf'
 else:
     try:
+        os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_figures/fig1_splitting.pdf'
     except FileNotFoundError:
         filename = 'fig1_splitting.pdf'
@@ -60,10 +62,8 @@ b = full_matrix(domain_operator(domain, 'medium')).cpu().numpy()  # B = I - V
 l_plus1 = full_matrix(domain_operator(domain, 'inverse_propagator')).cpu().numpy()  # L + I
 
 I = np.eye(np.prod(n_size), dtype=np.complex64)
-
-v = (I - b) / domain.scale + domain.shift.item()*I  # V = (I - B) / scaling
-l = (l_plus1 - I) / domain.scale - domain.shift.item()*I  # L = (L + I - I) / scaling
-a = l + v  # A = L + V
+v = I - b
+l = l_plus1 - I
 
 # Get matrices of A, L, and V for large domain without wraparound artifacts
 boundary_widths = 100
@@ -80,15 +80,17 @@ l_plus1_o = full_matrix(domain_operator(domain_o, 'inverse_propagator'))[crop2ro
 
 v_o = (I - b_o) / domain_o.scale + domain_o.shift.item()*I  # V = (I - B) / scaling
 l_o = (l_plus1_o - I) / domain_o.scale - domain_o.shift.item()*I  # L = (L + I - I) / scaling
+
+v_o = (v_o - domain.shift.item()*I) * domain.scale
+l_o = (l_o + domain.shift.item()*I) * domain.scale
+
 a_o = l_o + v_o  # A = L + V
 
 # Normalize matrices for visualization
-# a = a.real
-l = l.real
-v = v.real
-a_o = a_o.real
-l_o = l_o.real
-# v_o = v_o.real
+l = l.imag
+v = v.imag
+a_o = a_o.imag
+l_o = l_o.imag
 
 max_val = max(np.max(l), np.max(a_o), np.max(l_o), np.max(v))
 min_val = min(np.min(l), np.min(a_o), np.min(l_o), np.min(v))
@@ -96,12 +98,10 @@ extremum = max(abs(min_val), abs(max_val))
 vmin = -1
 vmax = 1
 
-# a = normalize(a, -extremum, extremum, vmin, vmax)
 l = normalize(l, -extremum, extremum, vmin, vmax)
 v = normalize(v, -extremum, extremum, vmin, vmax)
 a_o = normalize(a_o, -extremum, extremum, vmin, vmax)
 l_o = normalize(l_o, -extremum, extremum, vmin, vmax)
-# v_o = normalize(v_o, -extremum, extremum, vmin, vmax)
 
 # Create a figure with four subplots in one row
 fig, axs = plt.subplots(1, 4, figsize=(12, 3), sharex=True, sharey=True, 
@@ -109,30 +109,24 @@ fig, axs = plt.subplots(1, 4, figsize=(12, 3), sharex=True, sharey=True,
 fraction = 0.046
 pad = 0.04
 extent = np.array([0, n_size[0], n_size[0], 0])  # * base.pixel_size
-# axs[].set_xlabel(r'$\lambda$')
-# axs[].set_ylabel(r'$\lambda$')
 cmap = 'seismic'
 
 ax0 = axs[0]
-im0 = ax0.imshow(a_o, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im0 = ax0.imshow(a_o, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax0.set_title('$A$')
 
 ax1 = axs[1]
-im1 = ax1.imshow(l_o, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im1 = ax1.imshow(l_o, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax1.set_title('$L$')
 
 ax2 = axs[2]
-im2 = ax2.imshow(v, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im2 = ax2.imshow(v, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax2.set_title('$V$')
 
 ax3 = axs[3]
-im3 = ax3.imshow(l, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im3 = ax3.imshow(l, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax3.set_title('$L$ with wraparound artifacts')
-fig.colorbar(im3, ax=ax3, fraction=fraction, pad=pad, ticks=[-1, -0.1, 0, 0.1, 1], format='%.1f')
+fig.colorbar(im3, ax=ax3, fraction=fraction, pad=pad)
 
 # Add text boxes with labels (a), (b), (c), ...
 labels = ['(a)', '(b)', '(c)', '(d)']
@@ -143,3 +137,4 @@ for i, ax in enumerate(axs.flat):
 
 plt.savefig(filename, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
+print(f'Saved: {filename}')

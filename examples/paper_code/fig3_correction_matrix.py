@@ -33,9 +33,11 @@ rcParams['mathtext.fontset'] = 'cm'
 
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
+    os.makedirs('paper_figures', exist_ok=True)
     filename = 'paper_figures/fig3_correction_matrix.pdf'
 else:
     try:
+        os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_figures/fig3_correction_matrix.pdf'
     except FileNotFoundError:
         filename = 'fig3_correction_matrix.pdf'
@@ -102,7 +104,7 @@ gs = GridSpec(2, 2, figure=fig)
 # 1-domain case
 ax1 = fig.add_subplot(gs[0, 0])
 ax1.plot(fc1, 'k')  # 1-domain, no wrapping field
-ax1.set_title('Fast convolution with a point source for 1-domain case')
+ax1.set_title(r'$\nabla^2$ kernel in infinite domain')
 ax1.set_xlim([-1, n_size])
 ax1.set_xticks(np.arange(0, n_size + 1, 5))
 ax1.set_xticklabels([])
@@ -126,7 +128,7 @@ ax2.set_xticks(np.arange(0, n_size + 1, 5))
 ax2.set_xlabel('x')
 ax2.text(0.26, 0.09, 'Subdomain 1', transform=ax2.transAxes, ha='center')
 ax2.text(0.76, 0.09, 'Subdomain 2', transform=ax2.transAxes, ha='center')
-ax2.set_title('Fast convolution with a point source for 2-domain case')
+ax2.set_title(r'$\nabla^2$ kernel in periodic subdomains')
 ax2.grid(True, which='major', linestyle='--', linewidth=0.5)
 ax2.legend()
 ax2.text(0.5, -0.36, '(b)', transform=ax2.transAxes, ha='center')
@@ -148,3 +150,4 @@ percent = (min_a_12/max_a_12) * 100
 print(f'Wrapping artifact amplitudes: Min {min_a_12:.3f}, Max {max_a_12:.3f}')
 print(f'Min/Max of A_{12} = {percent:.2f} %')
 assert percent < 1, f"Min/Max of A_{12} ratio exceeds 1%: {percent:.2f} %"
+print('Done.')

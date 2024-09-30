@@ -29,9 +29,11 @@ rcParams['mathtext.fontset'] = 'cm'
 
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
+    os.makedirs('paper_figures', exist_ok=True)
     filename = 'paper_figures/fig2_decompose.pdf'
 else:
     try:
+        os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_figures/fig2_decompose.pdf'
     except FileNotFoundError:
         filename = 'fig2_decompose.pdf'
@@ -59,14 +61,11 @@ domain_o = HelmholtzDomain(permittivity=n_o, periodic=periodic, wavelength=wavel
 
 crop2roi = (slice(boundary_array[0], -boundary_array[0]), 
             slice(boundary_array[0], -boundary_array[0]))
-b_o = full_matrix(domain_operator(domain_o, 'medium'))[crop2roi].cpu().numpy()  # B = I - V
-l_plus1_o = full_matrix(domain_operator(domain_o, 'inverse_propagator'))[crop2roi].cpu().numpy()  # L + I
 
 I = np.eye(np.prod(n_size), dtype=np.complex64)
 
-v_o = (I - b_o) / domain_o.scale + domain_o.shift.item()*I  # V = (I - B) / scaling
+l_plus1_o = full_matrix(domain_operator(domain_o, 'inverse_propagator'))[crop2roi].cpu().numpy()  # L + I
 l_o = (l_plus1_o - I) / domain_o.scale - domain_o.shift.item()*I  # L = (L + I - I) / scaling
-a_o = l_o + v_o  # A = L + V
 
 # Get matrices of A, L, and V operators decomposed into two domains
 domain_2 = MultiDomain(permittivity=n, periodic=(True, True, True), wavelength=wavelength, 
@@ -75,22 +74,20 @@ domain_2 = MultiDomain(permittivity=n, periodic=(True, True, True), wavelength=w
 b_2 = full_matrix(domain_operator(domain_2, 'medium')).cpu().numpy()  # B = I - V
 l_plus1_2 = full_matrix(domain_operator(domain_2, 'inverse_propagator')).cpu().numpy()  # L + I
 
-v_2 = (I - b_2) / domain_2.scale + domain_2.shift.item()*I  # V = (I - B) / scaling
-l_2 = (l_plus1_2 - I) / domain_2.scale - domain_2.shift.item()*I  # L = (L + I - I) / scaling
+v_2 = I - b_2
+l_2 = l_plus1_2 - I
+
+l_o = (l_o + domain_2.shift.item()*I) * domain_2.scale
+
 l_diff = l_o - l_2
 v_l_diff = v_2 + l_diff
 a_2 = l_2 + v_l_diff  # A = L + V
 
-
 # Normalize matrices for visualization
-l_2 = l_2.real
-# l_diff = l_diff.real
-# v_2 = v_2.real
-v_l_diff = v_l_diff.real
-a_2 = a_2.real
+l_2 = l_2.imag
+v_l_diff = v_l_diff.imag
+a_2 = a_2.imag
 
-# print(np.max(l_2), np.max(l_diff), np.max(v_2), np.max(v_l_diff), np.max(a_2))
-# print(np.min(l_2), np.min(l_diff), np.min(v_2), np.min(v_l_diff), np.min(a_2))
 max_val = max(np.max(l_2), np.max(v_l_diff), np.max(a_2))
 min_val = min(np.min(l_2), np.min(v_l_diff), np.min(a_2))
 extremum = max(abs(min_val), abs(max_val))
@@ -98,8 +95,6 @@ vmin = -1
 vmax = 1
 
 l_2 = normalize(l_2, -extremum, extremum, vmin, vmax)
-# l_diff = normalize(l_diff, -extremum, extremum, vmin, vmax)
-# v_2 = normalize(v_2, -extremum, extremum, vmin, vmax)
 v_l_diff = normalize(v_l_diff, -extremum, extremum, vmin, vmax)
 a_2 = normalize(a_2, -extremum, extremum, vmin, vmax)
 
@@ -108,44 +103,26 @@ fig, axs = plt.subplots(1, 3, figsize=(9, 3), sharex=True, sharey=True,
                         gridspec_kw={'wspace': 0.15, 'width_ratios': [1, 1, 1.094]})
 fraction = 0.046
 pad = 0.04
-extent = np.array([0, n_size[0], n_size[0], 0])  # * base.pixel_size
+extent = np.array([0, n_size[0], n_size[0], 0])
 cmap = 'seismic'
 
 ax0 = axs[0]
-im0 = ax0.imshow(a_2, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im0 = ax0.imshow(a_2, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax0.set_title('$A$')
 kwargs0 = dict(transform=ax0.transAxes, ha='center', va='center', 
               bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
                         alpha=0.5, linewidth=0.0))
-# ax0.text(0.12, 0.6, '$A_{11}$', **kwargs0)
-# ax0.text(0.62, 0.6, '$A_{12}$', **kwargs0)
-# ax0.text(0.12, 0.1, '$A_{21}$', **kwargs0)
-# ax0.text(0.62, 0.1, '$A_{22}$', **kwargs0)
-
-# ax0.text(0.1, 0.58, '$A_{11}$', **kwargs0)
-# ax0.text(0.77, 0.79, '$A_{12}$', **kwargs0)
-# ax0.text(0.23, 0.21, '$A_{21}$', **kwargs0)
-# ax0.text(0.6, 0.08, '$A_{22}$', **kwargs0)
-
 ax0.text(0.09, 0.57, '$A_{11}$', **kwargs0)
 ax0.text(0.9, 0.92, '$A_{12}$', **kwargs0)
 ax0.text(0.09, 0.07, '$A_{21}$', **kwargs0)
 ax0.text(0.9, 0.42, '$A_{22}$', **kwargs0)
 
-# ax0.text(0.18, 0.64, '$A_{11}$', **kwargs0)
-# ax0.text(0.84, 0.84, '$A_{12}$', **kwargs0)
-# ax0.text(0.18, 0.15, '$A_{21}$', **kwargs0)
-# ax0.text(0.84, 0.34, '$A_{22}$', **kwargs0)
-
 ax1 = axs[1]
-im1 = ax1.imshow(l_2, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im1 = ax1.imshow(l_2, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax1.set_title('$L$')
 
 ax2 = axs[2]
-im2 = ax2.imshow(v_l_diff, cmap=cmap, extent=extent, 
-                 norm=colors.SymLogNorm(linthresh=0.1, vmin=vmin, vmax=vmax))
+im2 = ax2.imshow(v_l_diff, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax2.set_title('$V$')
 kwargs2 = dict(transform=ax2.transAxes, ha='center', va='center', 
               bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
@@ -154,7 +131,7 @@ ax2.text(0.18, 0.64, '$C_{11}$', **kwargs2)
 ax2.text(0.84, 0.84, '$A_{12}$', **kwargs2)
 ax2.text(0.18, 0.15, '$A_{21}$', **kwargs2)
 ax2.text(0.84, 0.34, '$C_{22}$', **kwargs2)
-fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad, ticks=[-1, -0.1, 0, 0.1, 1], format='%.1f')
+fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad)
 
 # Add text boxes with labels (a), (b), (c), ...
 labels = ['(a)', '(b)', '(c)']
@@ -167,3 +144,4 @@ for i, ax in enumerate(axs.flat):
 
 plt.savefig(filename, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
+print(f'Saved: {filename}')

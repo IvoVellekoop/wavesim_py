@@ -22,22 +22,27 @@ rcParams['mathtext.fontset'] = 'cm'
 
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
+    os.makedirs('paper_data', exist_ok=True)
+    os.makedirs('paper_figures', exist_ok=True)
     current_dir = 'paper_data/'
     figname = (f'paper_figures/fig6_dd_truncation.pdf')
 else:
     try:
+        os.makedirs('examples/paper_data', exist_ok=True)
+        os.makedirs('examples/paper_figures', exist_ok=True)
         current_dir = 'examples/paper_data/'
         figname = (f'examples/paper_figures/fig6_dd_truncation.pdf')
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 
 sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers (excluding boundaries)
-full_residuals = False
 
 wavelength = 1.  # Wavelength in micrometers
 pixel_size = wavelength/4  # Pixel size in wavelength units
-boundary_wavelengths = 10  # Boundary width in wavelengths
-boundary_widths = int(boundary_wavelengths * wavelength / pixel_size)  # Boundary width in pixels
+boundary_wavelengths = 5  # Boundary width in wavelengths
+boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]  # Boundary width in pixels
+# Periodic boundaries True (no wrapping correction) if boundary width is 0, else False (wrapping correction)
+periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
 n_dims = np.count_nonzero(sim_size != 1)  # Number of dimensions
 
 # Size of the simulation domain
@@ -58,7 +63,7 @@ else:
     n = random_refractive_index(n_size)  # Random refractive index
 
     # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-    n, boundary_array = preprocess((n**2).numpy(), boundary_widths)  # permittivity is n², but uses the same variable n
+    n, boundary_array = preprocess((n**2), boundary_widths)  # permittivity is n², but uses the same variable n
 
     print(f"Size of n: {n_size}")
     print(f"Size of n in GB: {n.nbytes / (1024**3):.2f}")
@@ -68,18 +73,20 @@ else:
 
     source = construct_source(n_size, boundary_array)
 
-    domain_ref =  HelmholtzDomain(permittivity=n, periodic=(True, True, True), 
+    domain_ref =  HelmholtzDomain(permittivity=n, periodic=periodic, 
                                 wavelength=wavelength, pixel_size=pixel_size)
 
     start_ref = time()
     # Field u and state object with information about the run
     u_ref, iterations_ref, residual_norm_ref = run_algorithm(domain_ref, source, 
-                                                            max_iterations=1000, 
-                                                            full_residuals=full_residuals)
+                                                            max_iterations=10000)
     sim_time_ref = time() - start_ref
-    u_ref = u_ref.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
+    print(f'\nTime {sim_time_ref:2.2f} s; Iterations {iterations_ref}; Residual norm {residual_norm_ref:.3e}')
+    # crop the field to the region of interest
+    u_ref = u_ref[*(slice(boundary_widths[i], 
+                    u_ref.shape[i] - boundary_widths[i]) for i in range(3))].cpu().numpy()
 
-    n_ext = np.array(n_size) + 2*boundary_widths
+    n_ext = np.array(n_size) + 2*boundary_array
     corrs = np.arange(n_ext[0] // 4 + 1)
     print(f"Number of correction points: {corrs[-1]}")
 
@@ -88,10 +95,6 @@ else:
     sim_time = []
 
     n_domains = (2, 1, 1)  # number of domains in each direction
-    n_domains = np.array(n_domains)  # number of domains in each direction
-    periodic = np.where(n_domains == 1, True, False)  # True for 1 domain in that direction, False otherwise
-    n_domains = tuple(n_domains)
-    periodic = tuple(periodic)
 
     for n_boundary in corrs:
         print(f'n_boundary {n_boundary}/{corrs[-1]}', end='\r')
@@ -100,10 +103,12 @@ else:
 
         start_n = time()
         u_n, iterations_n, residual_norm_n = run_algorithm(domain_n, source, 
-                                                        max_iterations=1000, 
-                                                        full_residuals=full_residuals)
+                                                        max_iterations=10000)
         sim_time_n = time() - start_n
-        u_n = u_n.squeeze()[*([slice(boundary_widths, -boundary_widths)] * n_dims)].cpu().numpy()
+        print(f'\nTime {sim_time_n:2.2f} s; Iterations {iterations_n}; Residual norm {residual_norm_n:.3e}')
+        # crop the field to the region of interest
+        u_n = u_n[*(slice(boundary_widths[i], 
+                      u_n.shape[i] - boundary_widths[i]) for i in range(3))].cpu().numpy()
 
         ure_list.append(relative_error(u_n, u_ref))
         iterations.append(iterations_n)
@@ -120,7 +125,7 @@ else:
 
 
 # Plot
-length = int(0.9 * len(ure_list))
+length = int(len(ure_list) * 2/3)
 x = np.arange(length)
 ncols = 3
 figsize = (12, 3)
@@ -131,24 +136,27 @@ ax0 = axs[0]
 ax0.semilogy(x, ure_list[:length], 'r', lw=1., marker='x', markersize=3)
 ax0.set_xlabel('Number of correction points')
 ax0.set_ylabel('Relative Error')
-ax0.set_xticks(np.arange(0, length, 10))
+ax0.set_xticks(np.arange(0, round(length,-1)+1, 10))
 ax0.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax0.grid(True, which='major', linestyle='--', linewidth=0.5)
+ax0.grid(True, which='minor', linestyle=':', linewidth=0.3)
+ax0.yaxis.set_minor_locator(LogLocator(numticks=12,subs=np.arange(2,10)))
 
 ax1 = axs[1]
-ax1.plot(x, iterations[:length], 'g', lw=1., marker='+', markersize=3)
+start = 4
+ax1.plot(x[start:], iterations[start:length], 'g', lw=1., marker='+', markersize=3)
 ax1.set_xlabel('Number of correction points')
 ax1.set_ylabel('Iterations')
-ax1.set_xticks(np.arange(0, length, 10))
-ax1.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
+ax1.set_xticks(np.arange(0, round(length,-1)+1, 10))
+ax1.set_xlim([start-1, length+1])
 ax1.grid(True, which='major', linestyle='--', linewidth=0.5)
 
 ax2 = axs[2]
-ax2.plot(x, sim_time[:length], 'b', lw=1., marker='*', markersize=3)
+ax2.plot(x[start:], sim_time[start:length], 'b', lw=1., marker='*', markersize=3)
 ax2.set_xlabel('Number of correction points')
 ax2.set_ylabel('Time (s)')
-ax2.set_xticks(np.arange(0, length, 10))
-ax2.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
+ax2.set_xticks(np.arange(0, round(length,-1)+1, 10))
+ax2.set_xlim([start-1, length+1])
 ax2.grid(True, which='major', linestyle='--', linewidth=0.5)
 
 # Add text boxes with labels (a), (b), (c), ...
@@ -158,3 +166,4 @@ for i, ax in enumerate(axs.flat):
 
 plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
+print(f'Saved: {figname}')

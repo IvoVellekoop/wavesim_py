@@ -245,7 +245,7 @@ def _sparse_split(tensor: torch.Tensor, sizes: Sequence[int], dim: int) -> np.nd
             v = np.array(
                 value_list[i].cpu().numpy())  # should not be necessary, workaround for access violation bug in torch
             value_list[i] = torch.sparse_coo_tensor(indices, v, tuple(sz))
-            print(indices, indices.dtype, value_list[i], value_list[i].shape, sz)
+            # print(indices, indices.dtype, value_list[i], value_list[i].shape, sz)
             value_list[i].to_dense()  # for troubleshooting access violation
         return value_list
 
@@ -398,8 +398,8 @@ def normalize(x, min_val=None, max_val=None, a=0, b=1):
     :return: Normalized x
     """
     if min_val is None:
-        min_val = np.min(x)
+        min_val = x.min()
     if max_val is None:
-        max_val = np.max(x)
+        max_val = x.max()
     normalized_x = (x - min_val) / (max_val - min_val) * (b - a) + a
     return normalized_x

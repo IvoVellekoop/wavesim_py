@@ -9,8 +9,12 @@ from . import allclose
 @pytest.mark.parametrize("size", [(5, 4, 6), (7, 15, 32), (3, 5, 6)])
 @pytest.mark.parametrize("n_domains", [(1, 2, 3), (3, 3, 3), (2, 4, 1)])
 @pytest.mark.parametrize("type", ['full', 'sparse', 'hybrid1', 'hybrid2'])
-def test_partition_combine(size: tuple[int, int, int], n_domains: tuple[int, int, int], type: str):
-    x = torch.randn(size, dtype=torch.complex64) + 1j * torch.randn(size, dtype=torch.complex64)
+@pytest.mark.parametrize("expanded", [False, True])
+def test_partition_combine(size: tuple[int, int, int], n_domains: tuple[int, int, int], type: str, expanded: bool):
+    if expanded:
+        x = torch.tensor(1.0, dtype=torch.complex64).expand(size)
+    else:
+        x = torch.randn(size, dtype=torch.complex64) + 1j * torch.randn(size, dtype=torch.complex64)
     if type == 'sparse':
         x[x.real < 0.5] = 0
         x = x.to_sparse()

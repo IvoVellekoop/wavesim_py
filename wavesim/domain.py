@@ -86,6 +86,11 @@ class Domain(metaclass=ABCMeta):
         """Sets the source term for this domain."""
         pass
 
+    @abstractmethod
+    def create_empty_vdot(self):
+        """Create an empty tensor for the Vdot tensor"""
+        pass
+
     def coordinates_f(self, dim):
         """Returns the Fourier-space coordinates along the specified dimension"""
         shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]

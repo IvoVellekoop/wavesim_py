@@ -71,8 +71,7 @@ def construct_source(n_size, boundary_array):
     n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     indices = [[boundary_array[0]]]  # the start of the source (right at the boundary). Transpose list
     values = torch.ones(1, n_ext[1], n_ext[2])  # the source itself
-    source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
-    return source
+    return torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
 
 def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=False, device=None):

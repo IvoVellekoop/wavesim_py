@@ -138,13 +138,6 @@ class HelmholtzDomain(Domain):
             center = 0.5 * (r_min + r_max)  # + 0.5j * (i_min + i_max)
             V_norm = self.initialize_shift(center)
             self.initialize_scale(0.95j / V_norm)
-
-            empty_cache()  # free up memory before going to run_algorithm
-
-            # create an empty tensor to force the allocation of memory for the Vdot tensor
-            # always 8.1 MiB, irrespective of the domain size
-            self.empty_vdot = torch.empty((1024, 1036), dtype=self._x[0].dtype, device=self.device)
-            del self.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
         elif Vwrap is not None:
             # Use the provided wrapping matrices. This is used to ensure all subdomains use the same wrapping matrix
             self.Vwrap = [W.to(self.device) if W is not None else None for W in Vwrap]
@@ -175,6 +168,8 @@ class HelmholtzDomain(Domain):
         self.mnum1 = [0.0] * 2  # ... for 2nd medium call
         self.counter = 0  # counter to keep track of the number of iterations with increasing transfer correction norm
         self.active = True  # flag to indicate if the domain is active in the iteration
+
+        empty_cache()  # free up memory before going to run_algorithm
 
     # Functions implementing the domain interface
     # add_source()
@@ -391,6 +386,14 @@ class HelmholtzDomain(Domain):
         x_kernel *= -torch.pi ** 2 / self.pixel_size ** 2
         f_kernel = torch.fft.fftn(x_kernel).to(torch.complex64)
         return -f_kernel.real
+
+    def create_empty_vdot(self):
+        """Creates an empty tensor to force the allocation of memory for the Vdot tensor.
+
+        This tensor is always 8.1 MiB, irrespective of the domain size.
+        """
+        self.empty_vdot = torch.empty((1024, 2500), dtype=self._x[0].dtype, device=self.device)
+        del self.empty_vdot  # frees up the memory, but keeps the segment, so it can be re-used
 
 
 def _make_wrap_matrix(L_kernel, n_boundary):

@@ -20,6 +20,7 @@ def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, thres
     domain.set_source(source)
 
     # compute initial residual norm (with preconditioned source) for normalization
+    domain.create_empty_vdot()  # create empty slot for Vdot tensor. Always 8.1 MiB
     domain.add_source(slot_x, weight=1.)  # [x] = y
     preconditioner(domain, slot_x, slot_x)  # [x] = B(L+1)⁻¹y
     init_norm_inv = 1 / domain.inner_product(slot_x, slot_x)  # inverse of initial norm: 1 / norm([x])

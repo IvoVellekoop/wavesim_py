@@ -2,7 +2,7 @@
 Helmholtz 1D analytical test
 ============================
 Test to compare the result of Wavesim to analytical results. 
-Compare 1D free-space propagation with analytic solution .
+Compare 1D free-space propagation with analytic solution.
 """
 
 import torch

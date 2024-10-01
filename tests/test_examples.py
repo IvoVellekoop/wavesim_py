@@ -3,13 +3,11 @@ import os
 import torch
 import numpy as np
 from scipy.io import loadmat
-from scipy.signal.windows import gaussian, tukey
 from PIL.Image import BILINEAR, fromarray, open
 from wavesim.helmholtzdomain import HelmholtzDomain
-from wavesim.maxwelldomain import MaxwellDomain
 from wavesim.multidomain import MultiDomain
 from wavesim.iteration import run_algorithm
-from wavesim.utilities import create_sphere, pad_boundaries, preprocess, relative_error
+from wavesim.utilities import pad_boundaries, preprocess, relative_error
 
 if os.path.basename(os.getcwd()) == 'tests':
     os.chdir('..')

@@ -341,37 +341,6 @@ def analytical_solution(n_size0, pixel_size, wavelength=None):
     return u_theory[n_size0:-n_size0]
 
 
-## Mie sphere
-def create_sphere(n_size, pixel_size, sphere_radius, sphere_index, bg_index, center=None):
-    """
-    Returns a 3-D matrix of refractive indices for single sphere and the coordinate ranges.
-    The refractive index will be sphere_index inside a sphere and bg_index outside the sphere, 
-    with radius sphere_radius (in micrometers) and pixel_size (in micrometers).
-
-    Args:
-        n_size: Number of points in each dimension (Nx, Ny, Nz)
-        pixel_size: Pixel size in micrometers
-        sphere_radius: Sphere radius in micrometers
-        sphere_index: Refractive index of the sphere
-        bg_index: Background refractive index
-        center: Center of the sphere (default: [0, 0, 0])
-    """
-
-    center = [0, 0, 0] if center is None else center
-
-    # Calculate coordinate ranges
-    center = (np.array(n_size) / 2) * pixel_size + center
-    x_range = np.reshape((np.arange(1, n_size[1] + 1) * pixel_size - center[0]), (1, n_size[1], 1))
-    y_range = np.reshape((np.arange(1, n_size[0] + 1) * pixel_size - center[1]), (n_size[0], 1, 1))
-    z_range = np.reshape((np.arange(1, n_size[2] + 1) * pixel_size - center[2]), (1, 1, n_size[2]))
-
-    # Calculate refractive index
-    inside = (x_range ** 2 + y_range ** 2 + z_range ** 2) < sphere_radius ** 2
-    n = np.ones(n_size) * bg_index + inside * (sphere_index - bg_index)
-
-    return n, x_range, y_range, z_range
-
-
 def is_zero(x):
     """ Check if x is zero
 

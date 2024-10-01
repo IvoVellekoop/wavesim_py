@@ -1,7 +1,7 @@
 Acknowledgements
 ----------------
 
-We would like to thank ... This work was supported by the European Research Council's Proof of Concept Grant n° [101069402].
+This work was supported by the European Research Council's Proof of Concept Grant n° [101069402].
 
 Conflict of interest statement
 ------------------------------

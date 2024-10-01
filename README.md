@@ -53,8 +53,7 @@ You can run the code with just three inputs:
 Helmholtz 1D analytical test
 ============================
 Test to compare the result of Wavesim to analytical results. 
-Compare 1D free-space propagation with analytic solution 
-(see analytical_solution in __init__.py) .
+Compare 1D free-space propagation with analytic solution .
 """
 
 import torch
@@ -71,7 +70,7 @@ from __init__ import plot
 
 # Parameters
 wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
+n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
 n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
 boundary_widths = 16  # width of the boundary in pixels
 
@@ -137,7 +136,7 @@ Parameters in the `run_algorithm()` function
 
 ## Acknowledgements
 
-We would like to thank … This work was supported by the European Research Council’s Proof of Concept Grant n° [101069402].
+This work was supported by the European Research Council’s Proof of Concept Grant n° [101069402].
 
 ## Conflict of interest statement
 

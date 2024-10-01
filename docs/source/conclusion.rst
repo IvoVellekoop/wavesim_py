@@ -5,6 +5,6 @@ We have introduced a domain decomposition of the modified Born series (MBS) appr
 
 Code availability
 -----------------
-The code for Wavesim is available on GitHub :cite:`wavesimgithub`, it is licensed under the BSD 3-Clause license. When using Wavesim in your work, please cite :cite:`osnabrugge2016convergent, osnabrugge2021` and this current paper. Examples and documentation for this project are available at `Read the Docs <https://wavesim.readthedocs.io/en/latest/>`_ :cite:`wavesimdocumentation`.
+The code for Wavesim is available on GitHub :cite:`wavesimgithub`, it is licensed under the BSD 3-Clause license. When using Wavesim in your work, please cite :cite:`osnabrugge2016convergent, osnabrugge2021ultra` and this current paper. Examples and documentation for this project are available at `Read the Docs <https://wavesim.readthedocs.io/en/latest/>`_ :cite:`wavesimdocumentation`.
 
 %endmatter%

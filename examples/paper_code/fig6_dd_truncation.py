@@ -1,19 +1,17 @@
 import os
 import sys
-import torch
 import numpy as np
 from time import time
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import LogLocator
-from matplotlib import rc, rcParams, colors
+from matplotlib import rc, rcParams
+from matplotlib.ticker import LogLocator, MultipleLocator
 
 sys.path.append(".")
 sys.path.append("..")
 from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
 from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
 from wavesim.iteration import run_algorithm  # to run the wavesim iteration
-from wavesim.utilities import preprocess, normalize, relative_error
+from wavesim.utilities import preprocess, relative_error
 from __init__ import random_refractive_index, construct_source
 
 font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
@@ -139,17 +137,19 @@ ax0.set_ylabel('Relative Error')
 ax0.set_xticks(np.arange(0, round(length,-1)+1, 10))
 ax0.set_xlim([-2 if n_dims == 3 else -10, length + 1 if n_dims == 3 else length + 9])
 ax0.grid(True, which='major', linestyle='--', linewidth=0.5)
-ax0.grid(True, which='minor', linestyle=':', linewidth=0.3)
+ax0.grid(True, which='minor', linestyle=':', linewidth=0.3, axis='y')
 ax0.yaxis.set_minor_locator(LogLocator(numticks=12,subs=np.arange(2,10)))
+ax0.xaxis.set_minor_locator(MultipleLocator(1))
 
 ax1 = axs[1]
-start = 4
+start = 3
 ax1.plot(x[start:], iterations[start:length], 'g', lw=1., marker='+', markersize=3)
 ax1.set_xlabel('Number of correction points')
 ax1.set_ylabel('Iterations')
 ax1.set_xticks(np.arange(0, round(length,-1)+1, 10))
 ax1.set_xlim([start-1, length+1])
 ax1.grid(True, which='major', linestyle='--', linewidth=0.5)
+ax1.xaxis.set_minor_locator(MultipleLocator(1))
 
 ax2 = axs[2]
 ax2.plot(x[start:], sim_time[start:length], 'b', lw=1., marker='*', markersize=3)
@@ -158,6 +158,7 @@ ax2.set_ylabel('Time (s)')
 ax2.set_xticks(np.arange(0, round(length,-1)+1, 10))
 ax2.set_xlim([start-1, length+1])
 ax2.grid(True, which='major', linestyle='--', linewidth=0.5)
+ax2.xaxis.set_minor_locator(MultipleLocator(1))
 
 # Add text boxes with labels (a), (b), (c), ...
 labels = ['(a)', '(b)', '(c)']

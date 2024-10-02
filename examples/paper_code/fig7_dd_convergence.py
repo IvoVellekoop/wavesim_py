@@ -1,11 +1,11 @@
 import os
 import sys
-import torch
 import numpy as np
 from time import time
 from itertools import product
 import matplotlib.pyplot as plt
 from matplotlib import rc, rcParams
+from matplotlib.ticker import MultipleLocator
 
 sys.path.append(".")
 sys.path.append("..")
@@ -120,14 +120,20 @@ ax[0].set_ylabel('Domains in y direction')
 plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.04)
 ax[0].set_title('Iterations vs Number of domains')
 ax[0].text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax[0].transAxes)
-ax[0].minorticks_on()
+ax[0].xaxis.set_minor_locator(MultipleLocator(1))
+ax[0].yaxis.set_minor_locator(MultipleLocator(1))
+ax[0].set_xticks(np.arange(2, x+1, 2))
+ax[0].set_yticks(np.arange(2, y+1, 2))
 
 im1 = ax[1].imshow(np.flipud(times), cmap=cmap, extent=[0.5, x+0.5, 0.5, y+0.5])
 ax[1].set_xlabel('Domains in x direction')
 plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.04)
 ax[1].set_title('Time vs Number of domains')
 ax[1].text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax[1].transAxes)
-ax[1].minorticks_on()
+ax[1].xaxis.set_minor_locator(MultipleLocator(1))
+ax[1].yaxis.set_minor_locator(MultipleLocator(1))
+ax[1].set_xticks(np.arange(2, x+1, 2))
+ax[1].set_yticks(np.arange(2, y+1, 2))
 
 plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')

@@ -198,7 +198,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     if plt_norm == 'linear':
         plt_norm_ = colors.Normalize(vmin=vmin, vmax=vmax)
     elif plt_norm == 'log':
-        vmin = 1.e-4
+        vmin = 1.e-3
         plt_norm_ = colors.LogNorm(vmin=vmin, vmax=vmax)
     elif plt_norm == 'power':
         plt_norm_ = colors.PowerNorm(gamma=0.1, vmin=vmin, vmax=vmax)

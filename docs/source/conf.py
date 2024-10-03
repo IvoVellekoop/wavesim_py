@@ -42,8 +42,8 @@ latex_elements = {
                 propagation in complex structures. The major limitation of MBS is that the size of the structure 
                 is limited by the working memory of a single computer or graphics processing unit (GPU). 
                 Through this package, we present a domain decomposition method that removes this limitation. We 
-                decompose large problems over subdomains while maintaining the accuracy, memory efficiency, and guaranteed monotonic convergence of the method. With this paclage, we have been able to obtain a 
-                factor of $1.9$ increase in size over the previous MBS simulations through a 3D simulation using 2 GPUs. For the Helmholtz problem, we can solve a complex structure of size $326 \times 326 \times 326$ wavelengths in just 415 seconds on a dual-GPU system.
+                decompose large problems over subdomains while maintaining the accuracy, memory efficiency, and guaranteed monotonic convergence of the method. With this work, we have been able to obtain a 
+                factor of $1.93$ increase in size over the single-domain MBS simulations without domain decomposition through a 3D simulation using 2 GPUs. For the Helmholtz problem, we solved a complex structure of size $315 \times 315 \times 315$ wavelengths in just 379 seconds on a dual-GPU system.
             }
         }
         \maketitle

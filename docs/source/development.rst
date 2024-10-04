@@ -5,16 +5,16 @@ Wavesim Development
 
 Running the tests and examples
 --------------------------------------------------
-To download the source code, including tests and examples, clone the repository from GitHub :cite:`wavesimgithub`. Wavesim uses `poetry` :cite:`Poetry` for package management, so you have to download and install Poetry first. Then, navigate to the location where you want to store the source code, and execute the following commands to clone the repository, set up the poetry environment, and run the tests.
+To download the source code, including tests and examples, clone the repository from GitHub :cite:`wavesim_py`. Wavesim uses `poetry` :cite:`Poetry` for package management, so you have to download and install Poetry first. Then, navigate to the location where you want to store the source code, and execute the following commands to clone the repository, set up the poetry environment, and run the tests.
 
 .. code-block:: shell
 
-    git clone https://github.com/IvoVellekoop/anysim_cluster
-    cd anysim_cluster
+    git clone https://github.com/IvoVellekoop/wavesim_py
+    cd wavesim_py
     poetry install --with dev --with docs
     poetry run pytest
 
-The examples are located in the ``examples`` directory. Note that a lot of functionality is also demonstrated in the automatic tests located in the ``tests`` directory. As an alternative to downloading the source code, the samples can also be copied directly from the example gallery on the documentation website :cite:`readthedocsWavesim`.
+The examples are located in the ``examples`` directory. Note that a lot of functionality is also demonstrated in the automatic tests located in the ``tests`` directory. As an alternative to downloading the source code, the samples can also be copied directly from the example gallery on the documentation website :cite:`readthedocs_Wavesim`.
 
 Building the documentation
 --------------------------------------------------
@@ -44,4 +44,4 @@ Note that for building the pdf version of the documentation, you need to have `x
 
 Reporting bugs and contributing
 --------------------------------------------------
-Bugs can be reported through the GitHub issue tracking system. Better than reporting bugs, we encourage users to *contribute bug fixes, optimizations, and other improvements*. These contributions can be made in the form of a pull request :cite:`zandonellaMassiddaOpenScience2022`, which will be reviewed by the development team and integrated into the package when appropriate. Please contact the current development team through GitHub :cite:`wavesimgithub` to coordinate such contributions.
+Bugs can be reported through the GitHub issue tracking system. Better than reporting bugs, we encourage users to *contribute bug fixes, optimizations, and other improvements*. These contributions can be made in the form of a pull request :cite:`zandonellaMassiddaOpenScience2022`, which will be reviewed by the development team and integrated into the package when appropriate. Please contact the current development team through GitHub :cite:`wavesim_py` or the `www.wavesim.org <https://www.wavesim.org/>`_ forum to coordinate such contributions.

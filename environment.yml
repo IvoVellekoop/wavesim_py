@@ -13,3 +13,4 @@ dependencies:
   - pytorch-cuda
   - torchvision
   - porespy
+  - scikit-image<0.23

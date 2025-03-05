@@ -12,3 +12,4 @@ dependencies:
   - pytorch
   - pytorch-cuda
   - torchvision
+  - porespy

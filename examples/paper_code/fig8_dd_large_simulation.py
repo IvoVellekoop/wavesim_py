@@ -21,10 +21,10 @@ sim_size = 315 * np.array([1, 1, 1])  # Simulation size in micrometers (excludin
 full_residuals = True
 
 # Run the simulations
-sim_gpu = sim_3d_random(filename, sim_size, n_domains=(2, 1, 1), full_residuals=full_residuals)
-sim_cpu = sim_3d_random(filename, sim_size, n_domains=None, n_boundary=0, full_residuals=full_residuals, 
+sim_gpu = sim_3d_random(filename, sim_size, n_domains=(2, 1, 1), r=24, clearance=24, full_residuals=full_residuals)
+sim_cpu = sim_3d_random(filename, sim_size, n_domains=None, n_boundary=0, r=24, clearance=24, full_residuals=full_residuals, 
                         device='cpu')
 
 # plot the field
-plot_validation(figname, sim_cpu, sim_gpu, plt_norm='log')
+plot_validation(figname, sim_cpu, sim_gpu, plt_norm='log', inset=True)
 print('Done.')

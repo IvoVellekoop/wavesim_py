@@ -21,8 +21,8 @@ sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers (excluding
 full_residuals = True
 
 # Run the simulations
-sim_ref = sim_3d_random(filename, sim_size, n_domains=None, n_boundary=0, full_residuals=full_residuals)
-sim = sim_3d_random(filename, sim_size, n_domains=(3, 1, 1), full_residuals=full_residuals)
+sim_ref = sim_3d_random(filename, sim_size, n_domains=None, n_boundary=0, r=12, clearance=0, full_residuals=full_residuals)
+sim = sim_3d_random(filename, sim_size, n_domains=(3, 1, 1), r=12, clearance=0, full_residuals=full_residuals)
 
 # plot the field
 plot_validation(figname, sim_ref, sim, plt_norm='log')

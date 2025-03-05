@@ -13,7 +13,7 @@ from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is
 from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
 from wavesim.iteration import run_algorithm  # to run the anysim iteration
 from wavesim.utilities import preprocess
-from __init__ import random_refractive_index, construct_source
+from __init__ import random_spheres_refractive_index, construct_source
 
 font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
 rc('font', **font)
@@ -62,7 +62,7 @@ else:
             boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)]*2 + [0]
 
         periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
-        n = random_refractive_index(n_size)  # Random refractive index
+        n = random_spheres_refractive_index(n_size, r=12, clearance=0)  # Random refractive index
 
         # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
         n, boundary_array = preprocess((n**2), boundary_widths)  # permittivity is n², but uses the same variable n

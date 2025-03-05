@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from time import time
 from torch.fft import fftn, ifftn, fftshift
+from porespy.generators import random_spheres
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import LogLocator
@@ -21,6 +22,14 @@ font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
 rc('font', **font)
 rcParams['mathtext.fontset'] = 'cm'
 
+
+def random_spheres_refractive_index(n_size, n_medium=1.33, r=24, clearance=0):
+    n = random_spheres(im_or_shape=n_size, r=r, clearance=clearance, seed=12345)
+    n = np.array(n, dtype=np.complex64)
+    n[n == 1] = n_medium + 0.01j
+    n[n == 0] = 1.0
+    return n
+    
 
 def random_refractive_index(n_size):
     torch.manual_seed(0)  # Set the random seed for reproducibility
@@ -74,13 +83,13 @@ def construct_source(n_size, boundary_array):
     return torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
 
-def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=False, device=None):
+def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0, full_residuals=False, device=None):
     """Run a simulation with the given parameters and save the results to a file"""
 
     wavelength = 1.  # Wavelength in micrometers
     pixel_size = wavelength / 4  # Pixel size in wavelength units
     boundary_wavelengths = 5  # Boundary width in wavelengths
-    boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]  # Boundary width in pixels
+    boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)] * 3  #, 0, 0]  # Boundary width in pixels
     # Periodic boundaries True (no wrapping correction) if boundary width is 0, else False (wrapping correction)
     periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
     n_dims = np.count_nonzero(sim_size != 1)  # Number of dimensions
@@ -98,6 +107,9 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=Fa
     else:
         for i in range(n_dims):
             filename += f'{n_domains[i]}'
+        filename += f'_nb{int(n_boundary * pixel_size)}'
+    filename += f'_r{int(r * pixel_size)}'
+    filename += f'_clearance{int(clearance * pixel_size)}'
 
     if os.path.exists(filename + '.npz'):
         print(f"File {filename}.npz already exists. Loading data from file.")
@@ -110,7 +122,7 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=Fa
     else:
         print(f"File {filename}.npz does not exist. Running simulation.")
 
-        n = random_refractive_index(n_size)  # Random refractive index
+        n = random_spheres_refractive_index(n_size, r=r, clearance=clearance)  # Random spheres refractive index
 
         # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
         n, boundary_array = preprocess((n ** 2),
@@ -158,7 +170,7 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, full_residuals=Fa
                 pixel_size=pixel_size)
 
 
-def plot_validation(figname, sim_ref, sim, plt_norm='log'):
+def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     assert sim_ref['n_size'] == sim['n_size'], 'n_size do not match'
     assert sim_ref['boundary_widths'] == sim['boundary_widths'], 'boundary_widths do not match'
     assert sim_ref['pixel_size'] == sim['pixel_size'], 'pixel_size do not match'
@@ -170,10 +182,6 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     n = sim_ref['n'][:, :, size[2] // 2].T
     u_ref = np.abs(sim_ref['u'])[:, :, size[2] // 2].T
     u = np.abs(sim['u'])[:, :, size[2] // 2].T
-
-    # threshold = 1.e-10
-    # u_ref[u_ref < threshold] = threshold
-    # u[u < threshold] = threshold
 
     residuals1 = sim_ref['residual_norm']
     residuals2 = sim['residual_norm']
@@ -190,15 +198,17 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     ncols = 4
     max_val = max(np.max(u_ref), np.max(u))
     min_val = min(np.min(u_ref), np.min(u))
-    u_ref = normalize(u_ref, min_val=min_val, max_val=max_val) + min_val
-    u = normalize(u, min_val=min_val, max_val=max_val) + min_val
+
+    u_ref = normalize(u_ref, min_val=min_val, max_val=max_val)
+    u = normalize(u, min_val=min_val, max_val=max_val)
+
+    vmin = 1.e-3
     vmax = 1.
-    vmin = 0. + min_val if plt_norm == 'log' else 0.
+    cmap = 'inferno'
 
     if plt_norm == 'linear':
         plt_norm_ = colors.Normalize(vmin=vmin, vmax=vmax)
     elif plt_norm == 'log':
-        vmin = 1.e-3
         plt_norm_ = colors.LogNorm(vmin=vmin, vmax=vmax)
     elif plt_norm == 'power':
         plt_norm_ = colors.PowerNorm(gamma=0.1, vmin=vmin, vmax=vmax)
@@ -214,7 +224,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     yticks = np.arange(0, extent[2] + 1, np.round(extent[2] // 5, -1 if extent[1] // 5 >= 10 else 0))
 
     ax0 = fig.add_subplot(gs_n[0])
-    im0 = ax0.imshow(n, cmap='jet', extent=extent)
+    im0 = ax0.imshow(n, cmap=cmap, extent=extent)
     cbar0 = plt.colorbar(mappable=im0, ax=ax0, fraction=fraction, pad=pad)
     cbar0.ax.set_title(r'$n$')
     ax0.set_xlabel(r'$x~(\lambda)$')
@@ -224,7 +234,6 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     ax0.set_yticks(yticks)
     ax0.text(0.5, -0.36, '(a)', transform=ax0.transAxes, horizontalalignment='center')
 
-    cmap = 'jet'
     col = 0
     ax1 = fig.add_subplot(gs[col])
     ax1.imshow(u_ref, cmap=cmap, extent=extent, norm=plt_norm_)
@@ -240,33 +249,60 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     im2 = ax2.imshow(u, cmap=cmap, extent=extent, norm=plt_norm_)
     cbar2 = plt.colorbar(mappable=im2, ax=ax2, fraction=fraction, pad=pad)
     cbar2.ax.set_title(r'$|\mathbf{x}|$')
-    # if plt_norm == 'power':
-    #     cbar2.set_ticks([0, 1.e-5, 1.e-4, 1.e-3, 1.e-2, 1.e-1, 1.0])
-    #     cbar2.set_ticklabels([r'$0.0$', r'$10^{-5}$', r'$10^{-4}$', r'$10^{-3}$', r'$10^{-2}$', r'$10^{-1}$', r'$10^0$'])
     domain_size = (np.asarray(n_size) + 2 * boundary_widths) / np.asarray(n_domains)
     domain_size = np.round(domain_size).astype(int)
 
+    if inset:
+        x1, x2, y1, y2 = 10, 60, 50, 100  # subregion of the original image
+        for ax, data in zip([ax0, ax1, ax2], [n, u_ref, u]):
+            axins = ax.inset_axes(
+                [0.55, 0.55, 0.47, 0.47],
+                xlim=(x1, x2), ylim=(y1, y2), xticklabels=[], yticklabels=[])
+            axins.imshow(data, extent=extent, cmap=cmap, norm=plt_norm_ if not ax == ax0 else None)
+            axins.set_xticks([])
+            axins.set_yticks([])
+            c = 'red'
+            lw = 1.
+            # set axes edge color as c
+            for spine in axins.spines.values():
+                spine.set_color(c)
+                spine.set_linewidth(lw)
+            # draw a bbox of the region of the inset axes in the parent axes without connecting lines
+            rect, lines = ax.indicate_inset_zoom(axins, edgecolor=c, alpha=1., lw=lw)
+            for line in lines:
+                line.set_alpha(0.)
+            if ax == ax2:
+                for i in range(n_domains[0] - 1):
+                    axins.axvline(x=((i + 1) * domain_size[0] - boundary_widths[0]) * pixel_size,
+                                c='k', ls='dashdot', lw=1.)
+                for i in range(n_domains[1] - 1):
+                    axins.axhline(y=((i + 1) * domain_size[1] - boundary_widths[1]) * pixel_size,
+                                c='k', ls='dashdot', lw=1.)
+
     if n_domains[0] > 1:
         ax2.axvline(x=(domain_size[0] - boundary_widths[0]) * pixel_size,
-                    c='gray', ls='dashdot', lw=1., label=f'Subdomain\n boundaries')
+                    c='k', ls='dashdot', lw=1., label=f'Subdomain\n boundary')
     if n_domains[1] > 1:
         ax2.axhline(y=(domain_size[1] - boundary_widths[1]) * pixel_size,
-                    c='gray', ls='dashdot', lw=1., label=f'Subdomain\n boundaries')
+                    c='k', ls='dashdot', lw=1., label=f'Subdomain\n boundary')
     for i in range(1, n_domains[0] - 1):
         ax2.axvline(x=((i + 1) * domain_size[0] - boundary_widths[0]) * pixel_size,
-                    c='gray', ls='dashdot', lw=1.)
+                    c='k', ls='dashdot', lw=1.)
     for i in range(1, n_domains[1] - 1):
         ax2.axhline(y=((i + 1) * domain_size[1] - boundary_widths[1]) * pixel_size,
-                    c='gray', ls='dashdot', lw=1.)
+                    c='k', ls='dashdot', lw=1.)
     total_domains = np.prod(n_domains)
     if total_domains > 1:
         handles, labels = ax2.get_legend_handles_labels()
-        ax2.legend(handles=handles[-1:], labels=labels[-1:])
+        ax2.legend(handles=handles[-1:], labels=labels[-1:], 
+                   loc='lower left', bbox_to_anchor=(0.28, -0.02),  # inside the plot
+                #    bbox_to_anchor=(0.6, -0.1),  # outside the plot
+                   borderpad=0.2, handlelength=1.3, handletextpad=0.4, framealpha=0.7)
     ax2.set_xlabel(r'$x~(\lambda)$')
     ax2.set_xticks(xticks)
     ax2.set_yticks(yticks)
     ax2.set_yticklabels([])
-    ax2.set_title(f'Domains = {n_domains[:2]}')
+    ax2.set_title(f'Domains = {n_domains}')
     txt = '(c)'
     ax2.text(0.5, -0.36, txt, transform=ax2.transAxes, horizontalalignment='center')
     col += 1
@@ -275,7 +311,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     ax3.loglog(np.arange(1, iterations1 + 1),
                residuals1, lw=1.5, label='Domain = 1')
     ax3.loglog(np.arange(1, iterations2 + 1), residuals2, lw=2., c='k',
-               ls='dashed', label=f'Domains = {n_domains[:2]}')
+               ls='dashed', label=f'Domains = {n_domains}')
 
     ax3.xaxis.set_major_locator(LogLocator(numticks=15))
     ax3.xaxis.set_minor_locator(LogLocator(numticks=15, subs=np.arange(2, 10)))
@@ -289,7 +325,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log'):
     y_max = max(2.e+0, 1.2 * np.nanmax(residuals1), 1.2 * np.nanmax(residuals2))
     ax3.set_ylim([y_min, y_max])
 
-    ax3.legend()
+    ax3.legend(framealpha=0.6, borderpad=0.2, handlelength=1.3, handletextpad=0.4, labelspacing=0.3)
     ax3.set_title(f'Residual')
     ax3.set_ylabel('Residual')
     ax3.set_xlabel('Iterations')

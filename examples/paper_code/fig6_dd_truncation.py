@@ -142,7 +142,7 @@ ax0.yaxis.set_minor_locator(LogLocator(numticks=12,subs=np.arange(2,10)))
 ax0.xaxis.set_minor_locator(MultipleLocator(1))
 
 ax1 = axs[1]
-start = 3
+start = 4
 ax1.plot(x[start:], iterations[start:length], 'g', lw=1., marker='+', markersize=3)
 ax1.set_xlabel('Number of correction points')
 ax1.set_ylabel('Iterations')

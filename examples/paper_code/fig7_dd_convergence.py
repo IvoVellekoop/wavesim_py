@@ -112,7 +112,7 @@ times = [float(times[i].split(' ')[2]) for i in range(len(times))]
 times = np.reshape(times, (x, y), order='F')
 
 fig, ax = plt.subplots(figsize=(9, 3), nrows=1, ncols=2, sharey=True, gridspec_kw={'wspace': 0.05})
-cmap = 'jet'
+cmap = 'inferno'
 
 im0 = ax[0].imshow(np.flipud(iterations), cmap=cmap, extent=[0.5, x+0.5, 0.5, y+0.5])
 ax[0].set_xlabel('Domains in x direction')

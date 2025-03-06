@@ -128,7 +128,7 @@ x = np.arange(length)
 ncols = 3
 figsize = (12, 3)
 
-fig, axs = plt.subplots(1, ncols, figsize=figsize, gridspec_kw={'hspace': 0., 'wspace': 0.25})
+fig, axs = plt.subplots(1, ncols, figsize=figsize, gridspec_kw={'hspace': 0., 'wspace': 0.29})
 
 ax0 = axs[0]
 ax0.semilogy(x, ure_list[:length], 'r', lw=1., marker='x', markersize=3)

@@ -92,7 +92,7 @@ np.savez_compressed(f'{file_name}.npz', u=u)  # save the field
 # %% plot the field
 extent = np.array([0, n_size[0], n_size[1], 0])*pixel_size
 u = normalize(np.abs(u[:, :, u.shape[2]//2].T))
-plt.imshow(u, cmap='hot_r', extent=extent, norm=colors.LogNorm())
+plt.imshow(u, cmap='inferno', extent=extent, norm=colors.LogNorm())
 plt.xlabel(r'$x~(\mu m)$')
 plt.ylabel(r'$y~(\mu m)$')
 cbar = plt.colorbar(fraction=0.046, pad=0.04)

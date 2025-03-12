@@ -129,14 +129,16 @@ def plot(x, x_ref, re=None, normalize_x=True):
             a = None
             b = None
 
+        cmap = 'inferno'
+
         plt.figure(figsize=(10, 5))
         plt.subplot(121)
-        plt.imshow(x_ref, cmap='hot_r', vmin=a, vmax=b)
+        plt.imshow(x_ref, cmap=cmap, vmin=a, vmax=b)
         plt.colorbar(fraction=0.046, pad=0.04)
         plt.title('Reference')
 
         plt.subplot(122)
-        plt.imshow(x, cmap='hot_r', vmin=a, vmax=b)
+        plt.imshow(x, cmap=cmap, vmin=a, vmax=b)
         plt.colorbar(fraction=0.046, pad=0.04)
         plt.title('Computed')
 

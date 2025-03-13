@@ -21,8 +21,8 @@ sys.path.append(root_dir)
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 project = 'wavesim'
 copyright = '2024, Ivo Vellekoop, and Swapnil Mache, University of Twente'
-author = 'Swapnil Mache, Ivo M. Vellekoop'
-release = '0.1.0'
+# author = 'Swapnil Mache, Ivo M. Vellekoop'
+release = '0.1.0-alpha.1'
 html_title = "Wavesim - A Python package for wave propagation simulation"
 
 # -- latex configuration -----------------------------------------------------
@@ -31,9 +31,11 @@ latex_elements = {
         \usepackage{authblk}
      """,
     'maketitle': r"""
-        \author[1]{Swapnil~Mache}
-        \author[1]{Ivo~M.~Vellekoop} 
+        \author[1,2]{Swapnil~Mache}
+        \author[1*]{Ivo~M.~Vellekoop} 
         \affil[1]{University of Twente, Biomedical Photonic Imaging, TechMed Institute, P. O. Box 217, 7500 AE Enschede, The Netherlands}
+        \affil[2]{Currently at: Rayfos Ltd., Winton House, Winton Square, Basingstoke, United Kingdom}
+        \affil[*]{Corresponding author: i.m.vellekoop@utwente.nl}
         \publishers{%
             \normalfont\normalsize%
             \parbox{0.8\linewidth}{%
@@ -43,7 +45,7 @@ latex_elements = {
                 is limited by the working memory of a single computer or graphics processing unit (GPU). 
                 Through this package, we present a domain decomposition method that removes this limitation. We 
                 decompose large problems over subdomains while maintaining the accuracy, memory efficiency, and guaranteed monotonic convergence of the method. With this work, we have been able to obtain a 
-                factor of $1.93$ increase in size over the single-domain MBS simulations without domain decomposition through a 3D simulation using 2 GPUs. For the Helmholtz problem, we solved a complex structure of size $315 \times 315 \times 315$ wavelengths in just 379 seconds on a dual-GPU system.
+                factor of $1.93$ increase in size over the single-domain MBS simulations without domain decomposition through a 3D simulation using 2 GPUs. For the Helmholtz problem, we solved a complex structure of size $315 \times 315 \times 315$ wavelengths in just 1.4 hours on a dual-GPU system.
             }
         }
         \maketitle
@@ -55,13 +57,14 @@ latex_elements = {
     'extraclassoptions': 'notitlepage',
 }
 latex_docclass = {
-    # 'manual': 'scrreprt',
     'manual': 'scrartcl',
     'howto': 'scrartcl',
 }
-latex_documents = [('index_latex', 'wavesim.tex',
-                    'Wavesim - A Python package for wave propagation simulation',
-                    'Swapnil Mache', 'howto')]
+latex_documents = [("index_latex", 
+                    "wavesim.tex",
+                    "Wavesim - A Python package for wave propagation simulation",
+                    "", 
+                    "howto")]
 latex_toplevel_sectioning = 'section'
 bibtex_default_style = 'unsrt'
 bibtex_bibfiles = ['references.bib']
@@ -69,9 +72,16 @@ numfig = True
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-extensions = ['sphinx.ext.napoleon', 'sphinx.ext.autodoc', 'sphinx.ext.mathjax',
-              'sphinx.ext.viewcode', 'sphinx_autodoc_typehints', 'sphinxcontrib.bibtex', 
-              'sphinx.ext.autosectionlabel', 'sphinx_markdown_builder', 'sphinx_gallery.gen_gallery']
+extensions = ['sphinx.ext.napoleon', 
+              'sphinx.ext.autodoc', 
+              'sphinx.ext.mathjax',
+              'sphinx.ext.viewcode', 
+              'sphinx_autodoc_typehints', 
+              'sphinxcontrib.bibtex', 
+              'sphinx.ext.autosectionlabel', 
+              'sphinx_markdown_builder', 
+              'sphinx_gallery.gen_gallery']
+
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'acknowledgements.rst', 'sg_execution_times.rst']
 master_doc = ''
@@ -86,7 +96,6 @@ autodoc_preserve_defaults = True
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 html_theme = 'sphinx_rtd_theme'
-# html_static_path = ['_static']
 
 # -- Options for sphinx-gallery ----------------------------------------------
 # https://sphinx-gallery.github.io/stable/configuration.html
@@ -113,15 +122,19 @@ def setup(app):
     """Setup function for the Sphinx extension."""
     # register event handlers
     # app.connect("autodoc-skip-member", skip)
-    app.connect("build-finished", copy_readme)
+    app.connect("build-finished", build_finished)
     app.connect("builder-inited", builder_inited)
     app.connect("source-read", source_read)
+    # # app.connect("autodoc-skip-member", skip)
+    # app.connect("build-finished", copy_readme)
+    # app.connect("builder-inited", builder_inited)
+    # app.connect("source-read", source_read)
 
     # monkey-patch the MarkdownTranslator class to support citations
     # TODO: this should be done in the markdown builder itself
     cls = MarkdownBuilder.default_translator_class
-    cls.visit_citation = visit_citation
-    cls.visit_label = visit_label
+    # cls.visit_citation = visit_citation
+    # cls.visit_label = visit_label
 
 
 def source_read(app, docname, source):
@@ -147,9 +160,29 @@ def builder_inited(app):
         app.config.master_doc = 'index_markdown'
 
 
-def copy_readme(app, exception):
-    """Copy the readme file to the root of the documentation directory."""
-    if exception is None and app.builder.name == 'markdown':
-        source_file = Path(app.outdir) / 'readme.md'
-        destination_dir = Path(app.confdir).parents[1] / 'README.md'
+def build_finished(app, exception):
+    if exception:
+        return
+
+    if app.builder.name == "markdown":
+        # Copy the readme file to the root of the documentation directory.
+        source_file = Path(app.outdir) / "readme.md"
+        destination_dir = Path(app.confdir).parents[1] / "README.md"
         shutil.copy(source_file, destination_dir)
+
+    elif app.builder.name == "latex":
+        # The latex builder adds an empty author field to the title page.
+        # This code removes it.
+        # Define the path to the .tex file
+        tex_file = Path(app.outdir) / "wavesim.tex"
+
+        # Read the file
+        with open(tex_file, "r") as file:
+            content = file.read()
+
+        # Remove \author{} from the file
+        content = content.replace(r"\author{}", "")
+
+        # Write the modified content back to the file
+        with open(tex_file, "w") as file:
+            file.write(content)

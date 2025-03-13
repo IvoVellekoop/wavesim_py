@@ -9,7 +9,7 @@ build:
     post_create_environment:
       - pip install poetry
       - pip install poetry-plugin-export
-      - poetry export -f requirements.txt -o requirements.txt --with docs --without opengl
+      - poetry export -f requirements.txt -o requirements.txt --with docs,dev
       - cat requirements.txt
 
 python:

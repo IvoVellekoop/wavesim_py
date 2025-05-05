@@ -132,11 +132,11 @@ Once the virtual environment is set up with all the required packages, you are r
 
 You can run the code with just three inputs:
 
-* :attr:`~.Domain.permittivity`, i.e. refractive index distribution squared (a 4-dimensional array on a regular grid),
-
-* :attr:`~.Domain.source`, the same size as permittivity.
+* :attr:`~.Domain.permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
 
 * :attr:`~.Domain.periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [``True``] or not [``False``], and
+
+* :attr:`~.Domain.source`, the same size as permittivity.
 
 :numref:`helmholtz_1d_analytical` shows a simple example of a 1D problem with a homogeneous medium (`helmholtz_1d_analytical.py <https://github.com/IvoVellekoop/wavesim_py/blob/main/examples/helmholtz_1d_analytical.py>`_) to explain these and other inputs.
 
@@ -145,7 +145,7 @@ You can run the code with just three inputs:
     :language: python
     :caption: ``helmholtz_1d_analytical.py``. A simple example of a 1D problem with a homogeneous medium.
 
-Apart from the inputs :attr:`~.Domain.permittivity`, :attr:`~.Domain.source`, and :attr:`~.Domain.periodic`, all other parameters have defaults. Details about these are given below (with the default values, if defined).
+Apart from the inputs :attr:`~.Domain.permittivity`, :attr:`~.Domain.source`, and :attr:`~.Domain.periodic`, all other parameters have defaults. Details about all parameters are given below (with the default values, if defined).
 
 Parameters in the :class:`~.domain.Domain` class: :class:`~.helmholtzdomain.HelmholtzDomain` (for a single domain without domain decomposition) or :class:`~.multidomain.MultiDomain` (to solve a problem with domain decomposition)
 
@@ -155,7 +155,7 @@ Parameters in the :class:`~.domain.Domain` class: :class:`~.helmholtzdomain.Helm
 
 * :attr:`~.pixel_size` ``:float = 0.25``: points per wavelength.
 
-* :attr:`~.wavelength` ``:float = None``: wavelength: wavelength in micrometer (um). If not given, i.e. ``None``, it is calculated as ``1/pixel_size = 4 um``.
+* :attr:`~.wavelength` ``:float = None``: wavelength in micrometer (um). If not given, i.e. ``None``, it is calculated as ``1/pixel_size = 4 um``.
 
 * :attr:`~.n_domains` ``: tuple[int, int, int] = (1, 1, 1)``: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If ``(1, 1, 1)``, indicates no domain decomposition.
 

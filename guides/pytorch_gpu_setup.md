@@ -23,7 +23,7 @@
 
 2. Obtain the appropriate (depending on the build (prefer stable), os, package (here conda), language (here, Python), and compute platform (CPU or CUDA versions for GPU)) command to run from https://pytorch.org/. Example:
     ```
-    conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+    python -m pip install torch  --index-url https://download.pytorch.org/whl/cu126
     ```
 
 3. Check that pytorch works (and with GPU) with the following series of commands in a WSL (Ubuntu) window/session, inside the conda pytorch environment

@@ -11,6 +11,5 @@ dependencies:
   - pytest
   - pytorch
   - pytorch-cuda
-  - torchvision
   - porespy
   - scikit-image<0.23

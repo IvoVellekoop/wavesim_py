@@ -1,14 +1,24 @@
-[tool.poetry]
+[project]
 name = "wavesim"
 version = "0.1.0a1"
 description = "A library for simulating wave propagation using the modified Born series"
-authors = ["Ivo Vellekoop <i.m.vellekoop@utwente.nl>", "Swapnil Mache <s.mache@utwente.nl>"]
+authors = [ {name = "Ivo Vellekoop", email = "i.m.vellekoop@utwente.nl"}, 
+            {name = "Swapnil Mache", email = "s.mache@utwente.nl"} ]
 readme = "README.md"
 repository = "https://github.com/IvoVellekoop/wavesim_py"
 documentation = "https://wavesim.readthedocs.io/en/latest/"
 classifiers = [
     'Programming Language :: Python :: 3',
     'Operating System :: OS Independent',
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy<2.0.0",
+    "matplotlib>=3.9.1",
+    "scipy>=1.14.0",
+    "porespy",
+    "scikit-image<0.23",
+    "torch"
 ]
 
 [build-system]
@@ -17,18 +27,11 @@ build-backend = "poetry.core.masonry.api"
 
 [[tool.poetry.source]]
 name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu121"
+url = "https://download.pytorch.org/whl/cu126"
 priority = "explicit"
 
 [tool.poetry.dependencies]
-python = "^3.11,<3.13"
-numpy = "<2.0.0"
-matplotlib = "^3.9.1"
-scipy = "^1.14.0"
-torch = {version = "2.3.1+cu121", source = "pytorch-gpu"}
-torchvision = {version = "0.18.1+cu121", source = "pytorch-gpu"}
-porespy = "*"
-scikit-image = "<0.23"
+torch = { source = "pytorch-gpu" }
 
 [tool.poetry.group.dev]
 optional = true

@@ -22,7 +22,7 @@ sys.path.append(root_dir)
 project = 'wavesim'
 copyright = '2024, Ivo Vellekoop, and Swapnil Mache, University of Twente'
 # author = 'Swapnil Mache, Ivo M. Vellekoop'
-release = '0.1.0-alpha.1'
+release = '0.1.0-alpha.2'
 html_title = "Wavesim - A Python package for wave propagation simulation"
 
 # -- latex configuration -----------------------------------------------------

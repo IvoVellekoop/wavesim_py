@@ -23,10 +23,10 @@ rc('font', **font)
 rcParams['mathtext.fontset'] = 'cm'
 
 
-def random_spheres_refractive_index(n_size, n_medium=1.33, r=24, clearance=0):
+def random_spheres_refractive_index(n_size, n_medium=1.33, k_medium=0.01, r=24, clearance=0):
     n = random_spheres(im_or_shape=n_size, r=r, clearance=clearance, seed=12345)
     n = np.array(n, dtype=np.complex64)
-    n[n == 1] = n_medium + 0.01j
+    n[n == 1] = n_medium + k_medium*1j
     n[n == 0] = 1.0
     return n
     
@@ -83,13 +83,25 @@ def construct_source(n_size, boundary_array):
     return torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
 
 
-def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0, full_residuals=False, device=None):
+def sim_3d_random(
+    filename, 
+    sim_size, 
+    n_domains, 
+    n_boundary=8, 
+    n_medium=1.33, 
+    k_medium=0.01, 
+    r=24, 
+    clearance=0, 
+    full_residuals=False, 
+    device=None
+):
     """Run a simulation with the given parameters and save the results to a file"""
 
     wavelength = 1.  # Wavelength in micrometers
     pixel_size = wavelength / 4  # Pixel size in wavelength units
     boundary_wavelengths = 5  # Boundary width in wavelengths
-    boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)] * 3  #, 0, 0]  # Boundary width in pixels
+    # boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)] * 3  #, 0, 0]  # Boundary width in pixels
+    boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size), 0, 0]  # Boundary width in pixels
     # Periodic boundaries True (no wrapping correction) if boundary width is 0, else False (wrapping correction)
     periodic = tuple(np.where(np.array(boundary_widths) == 0, True, False))
     n_dims = np.count_nonzero(sim_size != 1)  # Number of dimensions
@@ -101,7 +113,11 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0
 
     for i in range(n_dims):
         filename += f'{sim_size[i]}_'
-    filename += f'bw{boundary_wavelengths}_domains'
+    # filename += f'bw{boundary_wavelengths}_domains'
+    filename += f'bw'
+    for i in range(n_dims):
+        filename += f'{boundary_wavelengths * (not periodic[i])}_'
+    filename += f'domains'
     if n_domains is None:
         filename += '111'
     else:
@@ -122,7 +138,7 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0
     else:
         print(f"File {filename}.npz does not exist. Running simulation.")
 
-        n = random_spheres_refractive_index(n_size, r=r, clearance=clearance)  # Random spheres refractive index
+        n = random_spheres_refractive_index(n_size, n_medium=n_medium, k_medium=k_medium, r=r, clearance=clearance)  # Random spheres refractive index
 
         # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
         n, boundary_array = preprocess((n ** 2),

@@ -3,7 +3,7 @@ import numpy as np
 from itertools import product
 import matplotlib.pyplot as plt
 from matplotlib import rc, rcParams, colors
-from matplotlib.ticker import MultipleLocator
+from matplotlib.image import NonUniformImage
 
 from __init__ import sim_3d_random
 
@@ -16,13 +16,13 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
     filename = 'paper_data/ri_fig5_dd_validation_'
-    figname = 'paper_figures/ri_fig5_dd_validation.pdf'
+    figname = 'paper_figures/ri_fig5_dd_validation'
 else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
         filename = 'examples/paper_data/ri_fig5_dd_validation_'
-        figname = 'examples/paper_figures/ri_fig5_dd_validation.pdf'
+        figname = 'examples/paper_figures/ri_fig5_dd_validation'
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 
@@ -64,44 +64,87 @@ data = np.loadtxt(f'{filename}.txt', dtype=str, delimiter=';')
 
 times = [data[i, 1] for i in range(len(data))]
 times = np.array([float(times[i].split(' ')[2]) for i in range(len(times))])
-times = np.reshape(times, (len(n_range), len(k_range)), order='F')
+times = np.reshape(times, (len(k_range), len(n_range)), order='F')
 
 iterations = [data[i, 2] for i in range(len(data))]
 iterations = np.array([int(iterations[i].split(' ')[2]) for i in range(len(iterations))])
-iterations = np.reshape(iterations, (len(n_range), len(k_range)), order='F')
+iterations = np.reshape(iterations, (len(k_range), len(n_range)), order='F')
 
-print('iterations\n', iterations)
-print('times\n', times)
+# Plot the results
+xtick_label = [1.0, 2.0, 3.0, 4.0, 5.0]
+xtick_idx = [np.where(n_range == i)[0][0] for i in xtick_label]
+ytick_label = [0., 0.1, 1., 5., 9.]
+ytick_idx = [np.where(k_range == i)[0][0] for i in ytick_label]
 
-fig, ax = plt.subplots(figsize=(9, 3), nrows=1, ncols=2, sharey=True, gridspec_kw={'wspace': 0.25})
+xtick_label_ = [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.5, 3.5, 4.5]
+xtick_idx_ = [np.where(n_range == i)[0][0] for i in xtick_label_]
+ytick_label_ = [0.02, 0.04, 0.06, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 3.0, 7.0]
+ytick_idx_ = [np.where(k_range == i)[0][0] for i in ytick_label_]
+
+fig, ax = plt.subplots(figsize=(9, 3), nrows=1, ncols=2, gridspec_kw={'wspace': 0.25}, sharex=True, sharey=True)
 cmap = 'inferno'
-gamma = .4
 
-im0 = ax[0].imshow(np.flipud(iterations), cmap=cmap, norm=colors.LogNorm(), aspect='auto', extent=[0.95, n_range[-1]+0.05, -0.005, k_range[-1]+0.005])
-ax[0].set_xlabel(r'$n$')
-ax[0].set_ylabel(r'$k$')
-cbar0 = plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.04)
-# cbar0.set_ticks([200, 300, 400, 500, 1000, 1500])
-# cbar0.set_ticklabels([200, 300, 400, 500, 1000, 1500])
-ax[0].set_title('Iterations vs Refractive index')
-ax[0].text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax[0].transAxes)
-ax[0].xaxis.set_minor_locator(MultipleLocator(1))
-ax[0].yaxis.set_minor_locator(MultipleLocator(1))
-# ax[0].set_xticks(np.arange(n_range[0], n_range[-1]+0.05, 0.1))
-# ax[0].set_yticks(np.arange(k_range[0], k_range[-1]+0.005, 0.01))
+ax0 = ax[0]
+im0 = ax0.imshow(iterations, cmap=cmap, norm=colors.LogNorm(), aspect='auto')
+ax0.set_xlabel(r'$n$')
+ax0.set_ylabel(r'$k$')
+cbar0 = plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.02)
+ax0.set_title('Iterations vs Refractive index')
+ax0.text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax0.transAxes)
+ax0.set_xticks(xtick_idx, xtick_label)
+ax0.set_xticks(xtick_idx_, xtick_label_, minor=True, fontdict={'fontsize':5})
+ax0.set_yticks(ytick_idx, ytick_label)
+ax0.set_yticks(ytick_idx_, ytick_label_, minor=True, fontdict={'fontsize':5})
+ax0.invert_yaxis()
 
-im1 = ax[1].imshow(np.flipud(times), cmap=cmap, norm=colors.LogNorm(), aspect='auto', extent=[0.95, n_range[-1]+0.05, -0.005, k_range[-1]+0.005])
-ax[1].set_xlabel(r'$n$')
-cbar1 = plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.04)
-# cbar1.set_ticks([10, 20, 40, 60, 80])
-# cbar1.set_ticklabels([10, 20, 40, 60, 80])
-ax[1].set_title('Time vs Refractive index')
-ax[1].text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax[1].transAxes)
-ax[1].xaxis.set_minor_locator(MultipleLocator(1))
-ax[1].yaxis.set_minor_locator(MultipleLocator(1))
-# ax[1].set_xticks(np.arange(n_range[0], n_range[-1]+0.05, 0.1))
-# ax[1].set_yticks(np.arange(k_range[0], k_range[-1]+0.005, 0.01))
+ax1 = ax[1]
+im1 = ax1.imshow(times, cmap=cmap, norm=colors.LogNorm(), aspect='auto')
+ax1.set_xlabel(r'$n$')
+cbar1 = plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.02)
+ax1.set_title('Time vs Refractive index')
+ax1.text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax1.transAxes)
+ax1.set_xticks(xtick_idx, xtick_label)
+ax1.set_xticks(xtick_idx_, xtick_label_, minor=True, fontdict={'fontsize':5})
+ax1.invert_yaxis()
 
-plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
+plt.savefig(f'{figname}.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
+
+
+xticks = [1.0, 2.0, 3.0, 4.0, 5.0]
+yticks = [0.0, 1.0, 3.0, 5.0, 7.0, 9.0]
+
+fig, ax = plt.subplots(figsize=(9, 3), nrows=1, ncols=2, gridspec_kw={'wspace': 0.25}, sharex=True, sharey=True)
+cmap = 'inferno'
+x0 = n_range[0] - 0.1/2
+x1 = n_range[-1] + 0.5/2
+y0 = k_range[0] - 0.02/2
+y1 = k_range[-1] + 2.0/2
+
+ax0 = ax[0]
+im0 = NonUniformImage(ax0, interpolation='nearest', cmap=cmap, extent=(x0, x1, y0, y1), norm=colors.LogNorm())
+im0.set_data(n_range, k_range, iterations)
+ax0.add_image(im0)
+ax0.set_xlim(x0, x1)
+ax0.set_ylim(y0, y1)
+ax0.set_xlabel(r'$n$')
+ax0.set_ylabel(r'$k$')
+cbar0 = plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.02)
+ax0.set_title('Iterations vs Refractive index')
+ax0.text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax0.transAxes)
+ax0.set_xticks(xticks)
+ax0.set_yticks(yticks)
+
+ax1 = ax[1]
+im1 = NonUniformImage(ax1, interpolation='nearest', cmap=cmap, extent=(x0, x1, y0, y1), norm=colors.LogNorm())
+im1.set_data(n_range, k_range, times)
+ax1.add_image(im1)
+ax1.set_xlabel(r'$n$')
+cbar1 = plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.02)
+ax1.set_title('Time vs Refractive index')
+ax1.text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax1.transAxes)
+
+plt.savefig(f'{figname}_interp.pdf', bbox_inches='tight', pad_inches=0.03, dpi=300)
+plt.close('all')
+
 print(f'Saved: {figname}')

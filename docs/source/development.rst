@@ -31,7 +31,6 @@ Note that for building the pdf version of the documentation, you need to have `x
 
 .. code-block:: shell
 
-    poetry shell
     cd docs
     make clean
     make html

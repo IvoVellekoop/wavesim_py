@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 import numpy as np
 from time import time
 from torch.fft import fftn, ifftn, fftshift
@@ -10,13 +9,15 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import LogLocator
 from matplotlib import rc, rcParams, colors
 
+import wavesim.engine.functions
+
 sys.path.append(".")
 sys.path.append("..")
-from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
+from wavesim.helmholtzdomain import Helmholtz  # when number of domains is 1
 from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
-from wavesim.iteration import run_algorithm  # to run the wavesim iteration
-from wavesim.utilities import preprocess, normalize, relative_error
-
+from wavesim.iteration import preconditioned_richardson  # to run the wavesim iteration
+from wavesim.utilities import add_absorbing_boundaries, normalize
+from tests import relative_error
 
 font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
 rc('font', **font)
@@ -33,13 +34,14 @@ def random_spheres_refractive_index(n_size, n_medium=1.33, r=24, clearance=0):
 
 def random_refractive_index(n_size):
     torch.manual_seed(0)  # Set the random seed for reproducibility
-    n = (1.0 + torch.rand(n_size, dtype=torch.float32) +
-         0.03j * torch.rand(n_size, dtype=torch.float32))  # Random refractive index
+    n = (
+        1.0 + torch.rand(n_size, dtype=torch.float32) + 0.03j * torch.rand(n_size, dtype=torch.float32)
+    )  # Random refractive index
     n = smooth_n(n, n_size)  # Low pass filter to remove sharp edges
     n.real = normalize(n.real, a=1.0, b=2.0)  # Normalize to [1, 2]
     n.imag = normalize(n.imag, a=0.0, b=0.03)  # Normalize to [0, 0.05]
     # make sure that the imaginary part of n² is positive
-    mask = (n ** 2).imag < 0
+    mask = (n**2).imag < 0
     n.imag[mask] *= -1.0
 
     n[0:5, :, :] = 1
@@ -51,12 +53,12 @@ def smooth_n(n, n_size):
     """Low pass filter to remove sharp edges"""
     n_fft = fftn(n)
     w = (window(n_size[1]).T @ window(n_size[0])).T[:, :, None] * (window(n_size[2])).view(1, 1, n_size[2])
-    n = ifftn(torch.multiply(n_fft, fftshift(w)))
+    n = ifftn(wavesim.engine.functions.multiply(n_fft, fftshift(w)))
     n = torch.clamp(n.real, min=1.0) + 1.0j * torch.clamp(n.imag, min=0.0)
 
-    assert (n ** 2).imag.min() >= 0, 'Imaginary part of n² is negative'
-    assert n.shape == n_size, 'n and n_size do not match'
-    assert n.dtype == torch.complex64, 'n is not complex64'
+    assert (n**2).imag.min() >= 0, "Imaginary part of n² is negative"
+    assert n.shape == n_size, "n and n_size do not match"
+    assert n.dtype == torch.complex64, "n is not complex64"
     return n
 
 
@@ -67,26 +69,25 @@ def window(x):
     cr = cl
     if c0 + cl + cr != x:
         c0 = x - cl - cr
-    return torch.cat((torch.zeros(1, cl),
-                      torch.ones(1, c0),
-                      torch.zeros(1, cr)), dim=1)
+    return torch.cat((torch.zeros(1, cl), torch.ones(1, c0), torch.zeros(1, cr)), dim=1)
 
 
 def construct_source(n_size, boundary_array):
-    """ Set up source, with size same as n + 2*boundary_widths, 
-        and a plane wave source on one edge of the domain """
+    """Set up source, with size same as n + 2*edge_widths,
+    and a plane wave source on one edge of the domain"""
     # TODO: use CSR format instead?
     # TODO: source size should not include boundaries (framework should shift source to correct position)
     n_ext = tuple(np.array(n_size) + 2 * boundary_array)
     indices = [[boundary_array[0]]]  # the start of the source (right at the boundary). Transpose list
     values = torch.ones(1, n_ext[1], n_ext[2])  # the source itself
-    return torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
+    source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
+    return source
 
 
 def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0, full_residuals=False, device=None):
     """Run a simulation with the given parameters and save the results to a file"""
 
-    wavelength = 1.  # Wavelength in micrometers
+    wavelength = 1.0  # Wavelength in micrometers
     pixel_size = wavelength / 4  # Pixel size in wavelength units
     boundary_wavelengths = 5  # Boundary width in wavelengths
     boundary_widths = [round(boundary_wavelengths * wavelength / pixel_size)] * 3  #, 0, 0]  # Boundary width in pixels
@@ -100,10 +101,10 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0
     n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 
     for i in range(n_dims):
-        filename += f'{sim_size[i]}_'
-    filename += f'bw{boundary_wavelengths}_domains'
+        filename += f"{sim_size[i]}_"
+    filename += f"bw{boundary_wavelengths}_domains"
     if n_domains is None:
-        filename += '111'
+        filename += "111"
     else:
         for i in range(n_dims):
             filename += f'{n_domains[i]}'
@@ -111,63 +112,81 @@ def sim_3d_random(filename, sim_size, n_domains, n_boundary=8, r=24, clearance=0
     filename += f'_r{int(r * pixel_size)}'
     filename += f'_clearance{int(clearance * pixel_size)}'
 
-    if os.path.exists(filename + '.npz'):
+    if os.path.exists(filename + ".npz"):
         print(f"File {filename}.npz already exists. Loading data from file.")
-        data = np.load(filename + '.npz')
-        n = data['n']
-        u = data['u']
-        sim_time = data['sim_time']
-        iterations = data['iterations']
-        residual_norm = data['residual_norm']
+        data = np.load(filename + ".npz")
+        n = data["n"]
+        u = data["u"]
+        sim_time = data["sim_time"]
+        iterations = data["iterations"]
+        residual_norm = data["residual_norm"]
     else:
         print(f"File {filename}.npz does not exist. Running simulation.")
 
         n = random_spheres_refractive_index(n_size, r=r, clearance=clearance)  # Random spheres refractive index
 
-        # return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-        n, boundary_array = preprocess((n ** 2),
-                                       boundary_widths)  # permittivity is n², but uses the same variable n
+        # return permittivity (n²) with boundaries, and edge_widths in format (ax0, ax1, ax2)
+        n, boundary_array, roi = add_absorbing_boundaries(
+            (n**2), boundary_widths, strength=1.0
+        )  # permittivity is n², but uses the same variable n
 
         print(f"Size of n: {n_size}")
         print(f"Size of n in GB: {n.nbytes / (1024 ** 3):.2f}")
-        assert n.imag.min() >= 0, 'Imaginary part of n² is negative'
-        assert (n.shape == np.asarray(n_size) + 2 * boundary_array).all(), 'n and n_size do not match'
-        assert n.dtype == np.complex64, f'n is not complex64, but {n.dtype}'
+        assert n.imag.min() >= 0, "Imaginary part of n² is negative"
+        assert (n.shape == np.asarray(n_size) + 2 * boundary_array).all(), "n and n_size do not match"
+        assert n.dtype == np.complex64, f"n is not complex64, but {n.dtype}"
 
         source = construct_source(n_size, boundary_array)
 
         if n_domains is None:  # single domain
-            domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
-                                     pixel_size=pixel_size, n_boundary=n_boundary, device=device)
+            domain = Helmholtz(
+                permittivity=n,
+                periodic=periodic,
+                wavelength=wavelength,
+                pixel_size=pixel_size,
+                boundary_width=n_boundary,
+            )
             n_domains = (1, 1, 1)
         else:
-            domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength,
-                                 pixel_size=pixel_size, n_domains=n_domains, n_boundary=n_boundary)
+            domain = MultiDomain(
+                permittivity=n,
+                periodic=periodic,
+                wavelength=wavelength,
+                pixel_size=pixel_size,
+                n_domains=n_domains,
+                n_boundary=n_boundary,
+            )
 
         start = time()
         # Field u and state object with information about the run
-        u, iterations, residual_norm = run_algorithm(domain, source, max_iterations=10000,
-                                                     full_residuals=full_residuals)
+        u, iterations, residual_norm = preconditioned_richardson(
+            domain, source, max_iterations=10000, full_residuals=full_residuals
+        )
         sim_time = time() - start
 
         # crop the field to the region of interest
-        u = u[*(slice(boundary_widths[i], 
-                      u.shape[i] - boundary_widths[i]) for i in range(3))].cpu().numpy()
-        n = np.sqrt(n[*(slice(boundary_widths[i], 
-                      n.shape[i] - boundary_widths[i]) for i in range(3))].real)
+        u = u[*(slice(boundary_widths[i], u.shape[i] - boundary_widths[i]) for i in range(3))].cpu().numpy()
+        n = np.sqrt(n[*(slice(boundary_widths[i], n.shape[i] - boundary_widths[i]) for i in range(3))].real)
 
-        np.savez_compressed(f'{filename}.npz',
-                            n=n,
-                            u=u,
-                            sim_time=sim_time,
-                            iterations=iterations,
-                            residual_norm=residual_norm)
+        np.savez_compressed(
+            f"{filename}.npz", n=n, u=u, sim_time=sim_time, iterations=iterations, residual_norm=residual_norm
+        )
 
-    print(f'\nTime {sim_time:2.2f} s; Iterations {iterations}; '
-          f'Residual norm {residual_norm[-1] if full_residuals else residual_norm:.3e}')
-    return dict(n=n, u=u, sim_time=sim_time, iterations=iterations, residual_norm=residual_norm,
-                n_size=n_size, boundary_widths=boundary_widths, n_domains=n_domains,
-                pixel_size=pixel_size)
+    print(
+        f"\nTime {sim_time:2.2f} s; Iterations {iterations}; "
+        f"Residual norm {residual_norm[-1] if full_residuals else residual_norm:.3e}"
+    )
+    return dict(
+        n=n,
+        u=u,
+        sim_time=sim_time,
+        iterations=iterations,
+        residual_norm=residual_norm,
+        n_size=n_size,
+        boundary_widths=boundary_widths,
+        n_domains=n_domains,
+        pixel_size=pixel_size,
+    )
 
 
 def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
@@ -183,14 +202,14 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     u_ref = np.abs(sim_ref['u'])[:, :, size[2] // 2].T
     u = np.abs(sim['u'])[:, :, size[2] // 2].T
 
-    residuals1 = sim_ref['residual_norm']
-    residuals2 = sim['residual_norm']
-    iterations1 = sim_ref['iterations']
-    iterations2 = sim['iterations']
-    n_size = sim_ref['n_size']
-    boundary_widths = sim_ref['boundary_widths']
-    n_domains = sim['n_domains']
-    pixel_size = sim['pixel_size']
+    residuals1 = sim_ref["residual_norm"]
+    residuals2 = sim["residual_norm"]
+    iterations1 = sim_ref["iterations"]
+    iterations2 = sim["iterations"]
+    n_size = sim_ref["n_size"]
+    boundary_widths = sim_ref["edge_widths"]
+    n_domains = sim["n_domains"]
+    pixel_size = sim["pixel_size"]
     boundary_widths = np.array([boundary_widths] * 3) if np.isscalar(boundary_widths) else np.array(boundary_widths)
 
     extent = np.array([0, n_size[0], n_size[1], 0]) * pixel_size
@@ -206,11 +225,11 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     vmax = 1.
     cmap = 'inferno'
 
-    if plt_norm == 'linear':
+    if plt_norm == "linear":
         plt_norm_ = colors.Normalize(vmin=vmin, vmax=vmax)
     elif plt_norm == 'log':
         plt_norm_ = colors.LogNorm(vmin=vmin, vmax=vmax)
-    elif plt_norm == 'power':
+    elif plt_norm == "power":
         plt_norm_ = colors.PowerNorm(gamma=0.1, vmin=vmin, vmax=vmax)
 
     fig = plt.figure(figsize=(12, 3))
@@ -226,23 +245,23 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     ax0 = fig.add_subplot(gs_n[0])
     im0 = ax0.imshow(n, cmap=cmap, extent=extent)
     cbar0 = plt.colorbar(mappable=im0, ax=ax0, fraction=fraction, pad=pad)
-    cbar0.ax.set_title(r'$n$')
-    ax0.set_xlabel(r'$x~(\lambda)$')
-    ax0.set_ylabel(r'$y~(\lambda)$')
-    ax0.set_title('Refractive index')
+    cbar0.ax.set_title(r"$n$")
+    ax0.set_xlabel(r"$x~(\lambda)$")
+    ax0.set_ylabel(r"$y~(\lambda)$")
+    ax0.set_title("Refractive index")
     ax0.set_xticks(xticks)
     ax0.set_yticks(yticks)
-    ax0.text(0.5, -0.36, '(a)', transform=ax0.transAxes, horizontalalignment='center')
+    ax0.text(0.5, -0.36, "(a)", transform=ax0.transAxes, horizontalalignment="center")
 
     col = 0
     ax1 = fig.add_subplot(gs[col])
     ax1.imshow(u_ref, cmap=cmap, extent=extent, norm=plt_norm_)
-    ax1.set_xlabel(r'$x~(\lambda)$')
-    ax1.set_title('Domain = 1')
+    ax1.set_xlabel(r"$x~(\lambda)$")
+    ax1.set_title("Domain = 1")
     ax1.set_xticks(xticks)
     ax1.set_yticks(yticks)
     ax1.set_yticklabels([])
-    ax1.text(0.5, -0.36, '(b)', transform=ax1.transAxes, horizontalalignment='center')
+    ax1.text(0.5, -0.36, "(b)", transform=ax1.transAxes, horizontalalignment="center")
 
     col += 1
     ax2 = fig.add_subplot(gs[col])
@@ -317,12 +336,12 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     ax3.xaxis.set_minor_locator(LogLocator(numticks=15, subs=np.arange(2, 10)))
     ax3.yaxis.set_major_locator(LogLocator(numticks=15))
     ax3.yaxis.set_minor_locator(LogLocator(numticks=15, subs=np.arange(2, 10)))
-    ax3.grid(which='major', axis='both', linestyle='-', linewidth=0.5)
-    ax3.grid(which='minor', axis='x', linestyle=':', linewidth=0.5)
+    ax3.grid(which="major", axis="both", linestyle="-", linewidth=0.5)
+    ax3.grid(which="minor", axis="x", linestyle=":", linewidth=0.5)
 
-    ax3.set_yticks([1.e+0, 1.e-2, 1.e-4, 1.e-6])
-    y_min = min(6.e-7, 0.8 * np.nanmin(residuals1), 0.8 * np.nanmin(residuals2))
-    y_max = max(2.e+0, 1.2 * np.nanmax(residuals1), 1.2 * np.nanmax(residuals2))
+    ax3.set_yticks([1.0e0, 1.0e-2, 1.0e-4, 1.0e-6])
+    y_min = min(6.0e-7, 0.8 * np.nanmin(residuals1), 0.8 * np.nanmin(residuals2))
+    y_max = max(2.0e0, 1.2 * np.nanmax(residuals1), 1.2 * np.nanmax(residuals2))
     ax3.set_ylim([y_min, y_max])
 
     ax3.legend(framealpha=0.6, borderpad=0.2, handlelength=1.3, handletextpad=0.4, labelspacing=0.3)
@@ -332,5 +351,5 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     txt = '(d)'
     ax3.text(0.5, -0.36, txt, transform=ax3.transAxes, horizontalalignment='center')
 
-    plt.savefig(figname, bbox_inches='tight', pad_inches=0.03, dpi=300)
-    plt.close('all')
+    plt.savefig(figname, bbox_inches="tight", pad_inches=0.03, dpi=300)
+    plt.close("all")

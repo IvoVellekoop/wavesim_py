@@ -171,7 +171,6 @@ cython_debug/
 *.ipynb
 *.json
 *.mp4
-*.pdf
 *.png
 *.sh
 .vscode
@@ -179,7 +178,11 @@ __pycache__
 logs
 *.nsys-rep
 *.sqlite
+*.h5
 
 # Ignore certain files in the docs directory
 auto_examples
 sg_execution_times.rst
+
+
+/poetry.lock

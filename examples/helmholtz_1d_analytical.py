@@ -5,54 +5,57 @@ Test to compare the result of Wavesim to analytical results.
 Compare 1D free-space propagation with analytic solution.
 """
 
-import torch
 import numpy as np
 from time import time
+
 import sys
 sys.path.append(".")
-from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
-from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
-from wavesim.iteration import run_algorithm  # to run the wavesim iteration
-from wavesim.utilities import analytical_solution, preprocess, relative_error
-from __init__ import plot
-
+from wavesim.utilities.create_source import point_source
+from wavesim.simulate import simulate
+from tests import analytical_solution, all_close, relative_error
+from examples import plot_computed_and_reference
 
 # Parameters
-wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
-n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
-boundary_widths = 16  # width of the boundary in pixels
+wavelength = 0.5  # wavelength in micrometer (μm)
+pixel_size = wavelength / 10  # pixel size in micrometer (μm)
 
-# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
+# Create a refractive index map
+sim_size = 128  # size of simulation domain in x direction in micrometer (μm)
+n_size = (int(sim_size / pixel_size), 1, 1)  # We want to set up a 1D simulation, so y and z are 1.
+permittivity = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index squared) of 1
 
-# Source term. This way is more efficient than dense tensor
-indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
-values = torch.tensor([1.0])  # Amplitude: 1
-n_ext = tuple(np.array(n_size) + 2*boundary_array)
-source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
-
-# Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
-# 1-domain, periodic boundaries (without wrapping correction)
-periodic = (True, True, True)  # periodic boundaries, wrapped field.
-domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-# # OR. Uncomment to test domain decomposition
-# periodic = (False, True, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
+# Create a point source at the center of the domain
+source_values, source_position = point_source(
+    position=[sim_size//2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
+    pixel_size=pixel_size
+)
 
 # Run the wavesim iteration and get the computed field
 start = time()
-u_computed, iterations, residual_norm = run_algorithm(domain, source, max_iterations=2000)
-end = time() - start
-print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
-u_computed = u_computed.squeeze().cpu().numpy()[boundary_widths:-boundary_widths]
-u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
+u, iterations, residual_norm = simulate(
+    permittivity=permittivity, 
+    sources=[ (source_values, source_position) ], 
+    wavelength=wavelength, 
+    pixel_size=pixel_size, 
+    boundary_width=5,  # Boundary width in micrometer (μm) 
+    periodic=(False, True, True)  # Periodic boundary conditions in the y and z directions
+)
+sim_time = time() - start
+print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")
+print(f"(Residual norm {residual_norm:.2e})")
+
+# Compute the analytical solution
+c = np.arange(0, sim_size, pixel_size)
+c = c - c[source_position[0]]
+u_ref = analytical_solution(c, wavelength)
 
 # Compute relative error with respect to the analytical solution
-re = relative_error(u_computed, u_ref)
-print(f'Relative error: {re:.2e}')
-threshold = 1.e-3
-assert re < threshold, f"Relative error higher than {threshold}"
+re = relative_error(u, u_ref)
+print(f"Relative error with reference: {re:.2e}")
 
 # Plot the results
-plot(u_computed, u_ref, re)
+plot_computed_and_reference(u, u_ref, pixel_size, re)
+
+threshold = 1.0e-3
+assert re < threshold, f"Relative error higher than {threshold}"
+assert all_close(u, u_ref, rtol=4e-2)

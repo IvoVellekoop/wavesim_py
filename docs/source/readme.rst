@@ -18,7 +18,7 @@ What is Wavesim?
 
 Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method :cite:`yee1966numerical, taflove1995computational, oskooi2010meep, nabavi2007new`, Wavesim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  :cite:`osnabrugge2016convergent, vettenburg2023universal`.
 
-This package :cite:`wavesim_py` is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition :cite:`mache2024domain`. With this new framework, we simulated a complex 3D structure of a remarkable :math:`315\times 315\times 315` wavelengths :math:`\left( 3.1\cdot 10^7 \right)` in size in just :math:`1.4` hours by solving over two GPUs. This represents a factor of :math:`1.93` increase over the largest possible simulation on a single GPU without domain decomposition. 
+This package :cite:`wavesim_py` is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition :cite:`mache2024domain`, and time-harmonic Maxwell's equations for non-magnetic and non-birefringent materials. With this new framework, we simulated a complex 3D structure of a remarkable :math:`315\times 315\times 315` wavelengths :math:`\left( 3.1\cdot 10^7 \right)` in size in just :math:`1.4` hours by solving over two GPUs. This represents a factor of :math:`1.93` increase over the largest possible simulation on a single GPU without domain decomposition. 
 
 When using Wavesim in your work, please cite:
 
@@ -39,7 +39,7 @@ Examples and documentation for this project are available at `Read the Docs <htt
 Installation
 ----------------------------------------------
 
-Wavesim requires `Python >=3.11.0 and <3.13.0 <https://www.python.org/downloads/>`_ and uses `PyTorch <https://pytorch.org/>`_ for GPU acceleration.
+Wavesim requires `Python 3.11.0 and above <https://www.python.org/downloads/>`_ and uses `CuPy <https://cupy.dev/>`_ for GPU acceleration.
 
 First, clone the repository and navigate to the directory::
 
@@ -128,15 +128,17 @@ We recommend using `Miniconda <https://docs.anaconda.com/miniconda/>`_ (a much l
 Running the code
 ----------------
 
-Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the ``examples`` `directory <https://github.com/IvoVellekoop/wavesim_py/tree/main/examples>`_ for the basic steps needed to run a simulation. The directory contains examples of 1D, 2D, and 3D problems. 
+Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the ``examples`` `directory <https://github.com/IvoVellekoop/wavesim_py/tree/main/examples>`_ for the basic steps needed to run a simulation. The directory contains examples of 1D, 2D, and 3D problems, for the Helmholtz equation and Maxwell's equations for non-magnetic and non-birefringent materials. 
 
-You can run the code with just three inputs:
+You can run the code with just four inputs to the :attr:`~.wavesim.simulate` function:
 
 * :attr:`~.Domain.permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
 
-* :attr:`~.Domain.periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [``True``] or not [``False``], and
+* :attr:`~.Domain.sources`, list of sources.
 
-* :attr:`~.Domain.source`, the same size as permittivity.
+* :attr:`~.wavelength` ``:float``: wavelength in micrometer (μm).
+
+* :attr:`~.pixel_size` ``:float``: pixel size in micrometer (μm).
 
 :numref:`helmholtz_1d_analytical` shows a simple example of a 1D problem with a homogeneous medium (`helmholtz_1d_analytical.py <https://github.com/IvoVellekoop/wavesim_py/blob/main/examples/helmholtz_1d_analytical.py>`_) to explain these and other inputs.
 
@@ -145,44 +147,42 @@ You can run the code with just three inputs:
     :language: python
     :caption: ``helmholtz_1d_analytical.py``. A simple example of a 1D problem with a homogeneous medium.
 
-Apart from the inputs :attr:`~.Domain.permittivity`, :attr:`~.Domain.source`, and :attr:`~.Domain.periodic`, all other parameters have defaults. Details about all parameters are given below (with the default values, if defined).
-
-Parameters in the :class:`~.domain.Domain` class: :class:`~.helmholtzdomain.HelmholtzDomain` (for a single domain without domain decomposition) or :class:`~.multidomain.MultiDomain` (to solve a problem with domain decomposition)
+Apart from the inputs :attr:`~.Domain.permittivity`, :attr:`~.Domain.sources`, :attr:`~.pixel_size`, and :attr:`~.wavelength`, all other parameters have defaults. Details about all parameters are given below (with the default values, if defined).
 
 * :attr:`~.Domain.permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 
-* :attr:`~.Domain.periodic`: indicates for each dimension whether the simulation is periodic (``True``) or not (``False``). For periodic dimensions, i.e., :attr:`~.Domain.periodic` ``= [True, True, True]``, the field is wrapped around the domain.
+* :attr:`~.Domain.sources`: list of sources, where each source is a tuple of (array of complex numbers containing source values, position). The array of complex numbers is the source data. Must be a 3D array of complex numbers, and smaller than or equal to permittivity.shape. The position should be a tuple of 3 or 4 integers, the position of the source in pixels (3 integers for solving the Helmholtz equation (scalar), and 4 integers (polarization axis, x, y, z) for solving time-harmonic Maxwell's equations for non-magnetic and non-birefringent materials (vector)).
 
-* :attr:`~.pixel_size` ``:float = 0.25``: points per wavelength.
+* :attr:`~.wavelength` ``:float``: wavelength in micrometer (μm).
 
-* :attr:`~.wavelength` ``:float = None``: wavelength in micrometer (um). If not given, i.e. ``None``, it is calculated as ``1/pixel_size = 4 um``.
+* :attr:`~.pixel_size` ``:float``: pixel size in micrometer (μm). Pixel size must be < wavelength/2, but we recommend using a pixel size of wavelength/4.
 
-* :attr:`~.n_domains` ``: tuple[int, int, int] = (1, 1, 1)``: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If ``(1, 1, 1)``, indicates no domain decomposition.
+* :attr:`~.boundary_width` ``: float = 1.``: width of the absorbing boundaries in micrometer (μm). The boundaries are placed on the outside of the domain defined by permittivity.
 
-* :attr:`~.n_boundary` ``: int = 8``: number of points used in the wrapping and domain transfer correction. Applicable when :attr:`~.Domain.periodic` is False in a dimension, or ``n_domains > 1`` in a dimension.
+* :attr:`~.Domain.periodic` ``: tuple[bool, bool, bool] = (False, False, False)``: indicates for each dimension whether the simulation is periodic (``True``) or not (``False``). For periodic dimensions, i.e., :attr:`~.Domain.periodic` ``= [True, True, True]``, the field is wrapped around the domain.
 
-* :attr:`~.device` ``: str = None``: 
+* :attr:`~.use_gpu` ``: bool = True``: if true use CupyArray for GPU acceleration, else NumpyArray.
 
-    *  ``'cpu'`` to use the cpu, 
+* :attr:`~.n_domains` ``: tuple[int, int, int] = None``: number of domains in each direction (None for single domain).
 
-    * ``'cuda:x'`` to use a specific cuda device
+* :attr:`~.max_iterations` ``: int = 100000``: maximum number of iterations.
 
-    * ``'cuda'`` or a list of strings, e.g., ``['cuda:0', 'cuda:1']``, to distribute the simulation over the available/given cuda devices in a round-robin fashion
-    
-    * ``None``, which is equivalent to ``'cuda'`` if cuda devices are available, and ``'cpu'`` if they are not.
+* :attr:`~.threshold` ``: float = 1.e-6``: threshold for the residual norm for stopping the iteration.
 
-* :attr:`~.debug` ``: bool = False``: set to ``True`` for testing to return :attr:`~.inverse_propagator_kernel` as output.
+* :attr:`~.alpha` ``: float = 0.75``: relaxation parameter for the preconditioned Richardson method.
 
-Parameters in the :func:`run_algorithm` function
+* :attr:`~.full_residuals` ``: bool = False``: when True, returns list of residuals for all iterations. Otherwise, only returns the residual for the final iteration.
 
-* :attr:`~.domain`: the domain object created by HelmholtzDomain() or MultiDomain()
+* :attr:`~.crop_boundaries` ``: bool = True``: if True, crop the boundaries of the field to remove the absorbing boundaries.
 
-* :attr:`~.Domain.source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
+* :attr:`~.callback` ``: Optional[Callable]``: callback function that is called after each iteration.
 
-* :attr:`~.alpha` ``: float = 0.75``: relaxation parameter for the Richardson iteration
+The :attr:`~.wavesim.simulate` function returns the field, the number of iterations, and the residual norm.
 
-* :attr:`~.max_iterations` ``: int = 1000``: maximum number of iterations
+* :attr:`~.u` ``: np.ndarray``: the field in the simulation domain.
 
-* :attr:`~.threshold` ``: float = 1.e-6``: threshold for the residual norm for stopping the iteration
+* :attr:`~.iterations` ``: int``: number of iterations taken to converge.
+
+* :attr:`~.residual_norm` ``: float|[float, ...]``: norm of the residual at convergence if :attr:`~.full_residuals` ``= False``, or list of the norms of the reisduals at every iteration.
 
 %endmatter%

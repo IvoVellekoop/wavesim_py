@@ -1,15 +1,11 @@
 name: wavesim
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
 dependencies:
-  - python>=3.11.0,<3.13.0
-  - numpy<2.0.0
-  - matplotlib
-  - scipy
-  - pytest
-  - pytorch
-  - pytorch-cuda
-  - porespy
-  - scikit-image<0.23
+    - python>3.11.0
+    - numpy
+    - matplotlib
+    - scipy
+    - pytest
+    - numba
+    - cupy

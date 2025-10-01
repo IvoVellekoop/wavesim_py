@@ -8,7 +8,7 @@
 
 Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method [[1](#id27), [2](#id21), [3](#id16), [4](#id15)], Wavesim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  [[5](#id17), [6](#id23)].
 
-This package [[7](#id25)] is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition [[8](#id13)]. With this new framework, we simulated a complex 3D structure of a remarkable $315\times 315\times 315$ wavelengths $\left( 3.1\cdot 10^7 \right)$ in size in just $1.4$ hours by solving over two GPUs. This represents a factor of $1.93$ increase over the largest possible simulation on a single GPU without domain decomposition.
+This package [[7](#id25)] is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition [[8](#id13)], and time-harmonic Maxwell’s equations for non-magnetic and non-birefringent materials. With this new framework, we simulated a complex 3D structure of a remarkable $315\times 315\times 315$ wavelengths $\left( 3.1\cdot 10^7 \right)$ in size in just $1.4$ hours by solving over two GPUs. This represents a factor of $1.93$ increase over the largest possible simulation on a single GPU without domain decomposition.
 
 When using Wavesim in your work, please cite:
 
@@ -22,7 +22,7 @@ Examples and documentation for this project are available at [Read the Docs](htt
 
 ## Installation
 
-Wavesim requires [Python >=3.11.0 and <3.13.0](https://www.python.org/downloads/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
+Wavesim requires [Python 3.11.0 and above](https://www.python.org/downloads/) and uses [CuPy](https://cupy.dev/) for GPU acceleration.
 
 First, clone the repository and navigate to the directory:
 
@@ -110,13 +110,14 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
 
 ## Running the code
 
-Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the `examples` [directory](https://github.com/IvoVellekoop/wavesim_py/tree/main/examples) for the basic steps needed to run a simulation. The directory contains examples of 1D, 2D, and 3D problems.
+Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the `examples` [directory](https://github.com/IvoVellekoop/wavesim_py/tree/main/examples) for the basic steps needed to run a simulation. The directory contains examples of 1D, 2D, and 3D problems, for the Helmholtz equation and Maxwell’s equations for non-magnetic and non-birefringent materials.
 
-You can run the code with just three inputs:
+You can run the code with just four inputs to the `simulate` function:
 
-* `permittivity`, i.e. refractive index distribution squared (a 4-dimensional array on a regular grid),
-* `source`, the same size as permittivity.
-* `periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [`True`] or not [`False`], and
+* `permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
+* `sources`, list of sources.
+* `wavelength` `:float`: wavelength in micrometer (μm).
+* `pixel_size` `:float`: pixel size in micrometer (μm).
 
 [Listing 1.1](#helmholtz-1d-analytical) shows a simple example of a 1D problem with a homogeneous medium ([helmholtz_1d_analytical.py](https://github.com/IvoVellekoop/wavesim_py/blob/main/examples/helmholtz_1d_analytical.py)) to explain these and other inputs.
 
@@ -129,83 +130,84 @@ Test to compare the result of Wavesim to analytical results.
 Compare 1D free-space propagation with analytic solution.
 """
 
-import torch
 import numpy as np
 from time import time
+
 import sys
 sys.path.append(".")
-from wavesim.helmholtzdomain import HelmholtzDomain  # when number of domains is 1
-from wavesim.multidomain import MultiDomain  # for domain decomposition, when number of domains is >= 1
-from wavesim.iteration import run_algorithm  # to run the wavesim iteration
-from wavesim.utilities import analytical_solution, preprocess, relative_error
-from __init__ import plot
-
+from wavesim.utilities.create_source import point_source
+from wavesim.simulate import simulate
+from tests import analytical_solution, all_close, relative_error
+from examples import plot_computed_and_reference
 
 # Parameters
-wavelength = 1.  # wavelength in micrometer (um)
-n_size = (256, 1, 1)  # size of simulation domain (in pixels in x, y, and z direction)
-n = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index²) map
-boundary_widths = 16  # width of the boundary in pixels
+wavelength = 0.5  # wavelength in micrometer (μm)
+pixel_size = wavelength / 10  # pixel size in micrometer (μm)
 
-# return permittivity (n²) with boundaries, and boundary_widths in format (ax0, ax1, ax2)
-n, boundary_array = preprocess(n**2, boundary_widths)  # permittivity is n², but uses the same variable n
+# Create a refractive index map
+sim_size = 128  # size of simulation domain in x direction in micrometer (μm)
+n_size = (int(sim_size / pixel_size), 1, 1)  # We want to set up a 1D simulation, so y and z are 1.
+permittivity = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive index squared) of 1
 
-# Source term. This way is more efficient than dense tensor
-indices = torch.tensor([[0 + boundary_array[i] for i, v in enumerate(n_size)]]).T  # Location: center of the domain
-values = torch.tensor([1.0])  # Amplitude: 1
-n_ext = tuple(np.array(n_size) + 2*boundary_array)
-source = torch.sparse_coo_tensor(indices, values, n_ext, dtype=torch.complex64)
-
-# Set up the domain operators (HelmholtzDomain() or MultiDomain() depending on number of domains)
-# 1-domain, periodic boundaries (without wrapping correction)
-periodic = (True, True, True)  # periodic boundaries, wrapped field.
-domain = HelmholtzDomain(permittivity=n, periodic=periodic, wavelength=wavelength)
-# # OR. Uncomment to test domain decomposition
-# periodic = (False, True, True)  # wrapping correction
-# domain = MultiDomain(permittivity=n, periodic=periodic, wavelength=wavelength, n_domains=(3, 1, 1))
+# Create a point source at the center of the domain
+source_values, source_position = point_source(
+    position=[sim_size//2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
+    pixel_size=pixel_size
+)
 
 # Run the wavesim iteration and get the computed field
 start = time()
-u_computed, iterations, residual_norm = run_algorithm(domain, source, max_iterations=2000)
-end = time() - start
-print(f'\nTime {end:2.2f} s; Iterations {iterations}; Residual norm {residual_norm:.3e}')
-u_computed = u_computed.squeeze().cpu().numpy()[boundary_widths:-boundary_widths]
-u_ref = analytical_solution(n_size[0], domain.pixel_size, wavelength)
+u, iterations, residual_norm = simulate(
+    permittivity=permittivity, 
+    sources=[ (source_values, source_position) ], 
+    wavelength=wavelength, 
+    pixel_size=pixel_size, 
+    boundary_width=5,  # Boundary width in micrometer (μm) 
+    periodic=(False, True, True)  # Periodic boundary conditions in the y and z directions
+)
+sim_time = time() - start
+print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")
+print(f"(Residual norm {residual_norm:.2e})")
+
+# Compute the analytical solution
+c = np.arange(0, sim_size, pixel_size)
+c = c - c[source_position[0]]
+u_ref = analytical_solution(c, wavelength)
 
 # Compute relative error with respect to the analytical solution
-re = relative_error(u_computed, u_ref)
-print(f'Relative error: {re:.2e}')
-threshold = 1.e-3
-assert re < threshold, f"Relative error higher than {threshold}"
+re = relative_error(u, u_ref)
+print(f"Relative error with reference: {re:.2e}")
 
 # Plot the results
-plot(u_computed, u_ref, re)
+plot_computed_and_reference(u, u_ref, pixel_size, re)
+
+threshold = 1.0e-3
+assert re < threshold, f"Relative error higher than {threshold}"
+assert all_close(u, u_ref, rtol=4e-2)
 ```
 
-Apart from the inputs `permittivity`, `source`, and `periodic`, all other parameters have defaults. Details about these are given below (with the default values, if defined).
-
-Parameters in the `Domain` class: `HelmholtzDomain` (for a single domain without domain decomposition) or `MultiDomain` (to solve a problem with domain decomposition)
+Apart from the inputs `permittivity`, `sources`, `pixel_size`, and `wavelength`, all other parameters have defaults. Details about all parameters are given below (with the default values, if defined).
 
 * `permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
-* `periodic`: indicates for each dimension whether the simulation is periodic (`True`) or not (`False`). For periodic dimensions, i.e., `periodic` `= [True, True, True]`, the field is wrapped around the domain.
-* `pixel_size` `:float = 0.25`: points per wavelength.
-* `wavelength` `:float = None`: wavelength: wavelength in micrometer (um). If not given, i.e. `None`, it is calculated as `1/pixel_size = 4 um`.
-* `n_domains` `: tuple[int, int, int] = (1, 1, 1)`: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If `(1, 1, 1)`, indicates no domain decomposition.
-* `n_boundary` `: int = 8`: number of points used in the wrapping and domain transfer correction. Applicable when `periodic` is False in a dimension, or `n_domains > 1` in a dimension.
-* `device` `: str = None`:
-  > * `'cpu'` to use the cpu,
-  > * `'cuda:x'` to use a specific cuda device
-  > * `'cuda'` or a list of strings, e.g., `['cuda:0', 'cuda:1']`, to distribute the simulation over the available/given cuda devices in a round-robin fashion
-  > * `None`, which is equivalent to `'cuda'` if cuda devices are available, and `'cpu'` if they are not.
-* `debug` `: bool = False`: set to `True` for testing to return `inverse_propagator_kernel` as output.
+* `sources`: list of sources, where each source is a tuple of (array of complex numbers containing source values, position). The array of complex numbers is the source data. Must be a 3D array of complex numbers, and smaller than or equal to permittivity.shape. The position should be a tuple of 3 or 4 integers, the position of the source in pixels (3 integers for solving the Helmholtz equation (scalar), and 4 integers (polarization axis, x, y, z) for solving time-harmonic Maxwell’s equations for non-magnetic and non-birefringent materials (vector)).
+* `wavelength` `:float`: wavelength in micrometer (μm).
+* `pixel_size` `:float`: pixel size in micrometer (μm). Pixel size must be < wavelength/2, but we recommend using a pixel size of wavelength/4.
+* `boundary_width` `: float = 1.`: width of the absorbing boundaries in micrometer (μm). The boundaries are placed on the outside of the domain defined by permittivity.
+* `periodic` `: tuple[bool, bool, bool] = (False, False, False)`: indicates for each dimension whether the simulation is periodic (`True`) or not (`False`). For periodic dimensions, i.e., `periodic` `= [True, True, True]`, the field is wrapped around the domain.
+* `use_gpu` `: bool = True`: if true use CupyArray for GPU acceleration, else NumpyArray.
+* `n_domains` `: tuple[int, int, int] = None`: number of domains in each direction (None for single domain).
+* `max_iterations` `: int = 100000`: maximum number of iterations.
+* `threshold` `: float = 1.e-6`: threshold for the residual norm for stopping the iteration.
+* `alpha` `: float = 0.75`: relaxation parameter for the preconditioned Richardson method.
+* `full_residuals` `: bool = False`: when True, returns list of residuals for all iterations. Otherwise, only returns the residual for the final iteration.
+* `crop_boundaries` `: bool = True`: if True, crop the boundaries of the field to remove the absorbing boundaries.
+* `callback` `: Optional[Callable]`: callback function that is called after each iteration.
 
-Parameters in the `run_algorithm()` function
+The `simulate` function returns the field, the number of iterations, and the residual norm.
 
-* `domain`: the domain object created by HelmholtzDomain() or MultiDomain()
-* `source`: source term, a 3-dimensional array, with the same size as permittivity. Set up amplitude(s) at the desired location(s), following the same principle as permittivity for 1, 2, or 3-dimensional problems.
-* `alpha` `: float = 0.75`: relaxation parameter for the Richardson iteration
-* `max_iterations` `: int = 1000`: maximum number of iterations
-* `threshold` `: float = 1.e-6`: threshold for the residual norm for stopping the iteration
+* `u` `: np.ndarray`: the field in the simulation domain.
+* `iterations` `: int`: number of iterations taken to converge.
+* `residual_norm` `: float|[float, ...]`: norm of the residual at convergence if `full_residuals` `= False`, or list of the norms of the reisduals at every iteration.
 
 ## Acknowledgements
 

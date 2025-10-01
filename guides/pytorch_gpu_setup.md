@@ -1,16 +1,20 @@
 ## [Setting up NVIDIA CUDA on WSL (Windows Subsystem for Linux)](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
 
 ### Main steps
-1. Install NVIDIA Driver for GPU support. Select and download appropriate [driver](https://www.nvidia.com/Download/index.aspx) for GPU and Operating system
+
+1. Install NVIDIA Driver for GPU support. Select and download
+   appropriate [driver](https://www.nvidia.com/Download/index.aspx) for GPU and Operating system
 
 2. Install WSL 2 (follow instruction in [2.2. Step 2](https://docs.nvidia.com/cuda/wsl-user-guide/index.html))
 
-3. Install CUDA Toolkit using WSL-Ubuntu Package, following the [command line instructions](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local).
+3. Install CUDA Toolkit using WSL-Ubuntu Package, following
+   the [command line instructions](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local).
 
 ## Install pytorch-gpu
 
-1. If doing this for the first time (or perhaps just in general), preferably do this in a separate conda environment, so that if anything breaks during installation, this new conda environment can just be trashed without losing anything.
-        
+1. If doing this for the first time (or perhaps just in general), preferably do this in a separate conda environment, so
+   that if anything breaks during installation, this new conda environment can just be trashed without losing anything.
+
     * Create a new conda environment
     ```
     conda create --name <environment name>
@@ -21,15 +25,17 @@
     conda env create -f <filename>.yml
     ```
 
-2. Obtain the appropriate (depending on the build (prefer stable), os, package (here conda), language (here, Python), and compute platform (CPU or CUDA versions for GPU)) command to run from https://pytorch.org/. Example:
+2. Obtain the appropriate (depending on the build (prefer stable), os, package (here conda), language (here, Python),
+   and compute platform (CPU or CUDA versions for GPU)) command to run from https://pytorch.org/. Example:
     ```
     python -m pip install torch  --index-url https://download.pytorch.org/whl/cu126
     ```
 
-3. Check that pytorch works (and with GPU) with the following series of commands in a WSL (Ubuntu) window/session, inside the conda pytorch environment
+3. Check that pytorch works (and with GPU) with the following series of commands in a WSL (Ubuntu) window/session,
+   inside the conda pytorch environment
     ```
     python
-    import torch
+    
     ```
 
     * To check if pytorch works
@@ -42,7 +48,7 @@
     ```
     torch.cuda.is_available()
     ```
-    Output should be: "True"
+   Output should be: "True"
 
 ### Monitoring GPU usage
 
@@ -51,6 +57,8 @@
     sudo apt install nvtop
     ```
 
-* For WSL, nvtop installed using above approach might not work. Instead, [build from source](https://github.com/Syllo/nvtop#nvtop-build)
+* For WSL, nvtop installed using above approach might not work.
+  Instead, [build from source](https://github.com/Syllo/nvtop#nvtop-build)
 
-* For Windows, nvtop is not available, but an alternate tool [nvitop](https://pypi.org/project/nvitop/) can be used instead.
+* For Windows, nvtop is not available, but an alternate tool [nvitop](https://pypi.org/project/nvitop/) can be used
+  instead.

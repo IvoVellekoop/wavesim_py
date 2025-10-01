@@ -1,114 +1,89 @@
-import torch
 from abc import ABCMeta, abstractmethod
+from typing import Iterable
+
+import numpy as np
+
+from wavesim.engine.array import Array, Factory, array_like
+from wavesim.engine.index_utils import shape_like
 
 
 class Domain(metaclass=ABCMeta):
     """Base class for all simulation domains
 
-    This base class defines the interface for operations that are common for all simulation types, 
-    and for MultiDomain.
-    todo: the design using slots minimizes memory use, but it is a suboptimal design because it 
-    mixes mutable and immutable state. This design should be revisited so that the Domain is 
-    immutable, and the code that runs the algorithms performs the memory management.
+    This base class defines the interface for operations that are common for all simulation types,
+    and for single or multi domain simulations.
+
+    Domain provides an interface for algorithms to use, without knowing anything about the type of simulation
+     (e.g. Helmholtz or Maxwell), the domain size, decomposition, floating point accuracy, etc.
     """
 
-    def __init__(self, pixel_size: float, shape, device):
-        self.pixel_size = pixel_size
-        self.scale = None
-        self.shift = None
-        self.shape = shape
-        self.device = device
+    def __init__(
+        self,
+        *,
+        pixel_size: float,
+        shape: shape_like,
+        allocator: Factory,
+        periodic: Iterable[bool],
+        wavelength: float,
+    ):
+        self.pixel_size = float(pixel_size)
+        self.shape = tuple(shape)
+        self.allocator = allocator
+        self.periodic = tuple(periodic)
+        self.wavelength = wavelength
+        self.k02 = (2.0 * np.pi / self.wavelength) ** 2
+        self.scale = 0.0  # to be set by child classes
+
+    @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    def allocate(self, data: array_like | None = None, **kwargs) -> Array:
+        return self.allocator.__call__(data, copy=True, **kwargs)
 
     @abstractmethod
-    def add_source(self, slot, weight: float):
-        pass
+    def medium(self, x: Array, /, *, out: Array):
+        """Applies the operator B=1-V.
 
-    @abstractmethod
-    def clear(self, slot):
-        """Clears the data in the specified slot"""
-        pass
-
-    @abstractmethod
-    def get(self, slot: int, copy=False):
-        """Returns the data in the specified slot.
-
-        :param slot: slot from which to return the data
-        :param copy: if True, returns a copy of the data. Otherwise, may return the original data possible.
-
-        Note that this data may be overwritten by the next call to domain.
+        Args:
+            x: The input array
+            out: The output array
         """
         pass
 
     @abstractmethod
-    def set(self, slot, data):
-        """Copy the date into the specified slot"""
-        pass
+    def propagator(self, x: Array, /, *, out: Array):
+        """Applies the operator (L+1)^-1 x."""
+        ...
 
     @abstractmethod
-    def inner_product(self, slot_a, slot_b):
-        """Computes the inner product of two data vectors
-
-        Note:
-            The vectors may be represented as multidimensional arrays,
-            but these arrays must be contiguous for this operation to work.
-            Although it would be possible to use flatten(), this would create a
-            copy when the array is not contiguous, causing a hidden performance hit.
-        """
-        pass
-
-    @abstractmethod
-    def medium(self, slot_in, slot_out, mnum):
-        """Applies the operator 1-Vscat."""
-        pass
-
-    @abstractmethod
-    def mix(self, weight_a, slot_a, weight_b, slot_b, slot_out):
-        """Mixes two data arrays and stores the result in the specified slot"""
-        pass
-
-    @abstractmethod
-    def propagator(self, slot_in, slot_out):
-        """Applies the operator (L+1)^-1 x.
-        """
-        pass
-
-    @abstractmethod
-    def inverse_propagator(self, slot_in, slot_out):
+    def inverse_propagator(self, x: Array, /, *, out: Array):
         """Applies the operator (L+1) x .
 
         This operation is not needed for the Wavesim algorithm, but is provided for testing purposes,
         and can be used to evaluate the residue of the solution.
         """
-        pass
-
-    @abstractmethod
-    def set_source(self, source):
-        """Sets the source term for this domain."""
-        pass
-
-    @abstractmethod
-    def create_empty_vdot(self):
-        """Create an empty tensor for the Vdot tensor"""
-        pass
+        ...
 
     def coordinates_f(self, dim):
         """Returns the Fourier-space coordinates along the specified dimension"""
-        shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        return (2 * torch.pi * torch.fft.fftfreq(self.shape[dim], self.pixel_size, device=self.device, 
-                                                 dtype=torch.float64)).reshape(shapes[dim]).to(torch.complex64)
+        # todo: make part of Array (include pixel size property)
+        return (2 * np.pi * np.fft.fftfreq(self.shape[dim], self.pixel_size)).reshape(_shapes[dim])
 
-    def coordinates(self, dim, type: str = 'linear'):
+    def coordinates(self, dim, coordinate_type: str = "linear"):
         """Returns the real-space coordinates along the specified dimension, starting at 0"""
-        shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-        x = torch.arange(self.shape[dim], device=self.device, dtype=torch.float64) * self.pixel_size
-        if type == 'periodic':
+        x = self.pixel_size * np.arange(self.shape[dim])
+        if coordinate_type == "periodic":
             x -= self.pixel_size * (self.shape[dim] // 2)
-            x = torch.fft.ifftshift(x)  # todo: or fftshift?
-        elif type == 'centered':
+            x = np.fft.ifftshift(x)
+        elif coordinate_type == "centered":
             x -= self.pixel_size * (self.shape[dim] // 2)
-        elif type == 'linear':
+        elif coordinate_type == "linear":
             pass
         else:
-            raise ValueError(f"Unknown type {type}")
+            raise ValueError(f"Unknown type {coordinate_type}")
 
-        return x.reshape(shapes[dim])
+        return x.reshape(_shapes[dim])
+
+
+_shapes = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]

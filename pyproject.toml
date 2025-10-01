@@ -1,6 +1,6 @@
 [project]
 name = "wavesim"
-version = "0.1.0a2"
+version = "0.2.0a1"
 description = "A library for simulating wave propagation using the modified Born series"
 authors = [ {name = "Ivo Vellekoop", email = "i.m.vellekoop@utwente.nl"}, 
             {name = "Swapnil Mache", email = "s.mache@utwente.nl"} ]
@@ -25,13 +25,16 @@ dependencies = [
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[[tool.poetry.source]]
-name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu126"
-priority = "explicit"
+[tool.black]
+line-length = 120
 
 [tool.poetry.dependencies]
-torch = { source = "pytorch-gpu" }
+# no explicit numpy dependency is stated so that pip can figure out the version to install
+# based on the requirements of cupy, scipy, and numba
+python = "^3.11"
+scipy = "^1.15.0"
+numba = ">=0.60.0"
+cupy-cuda12x = "^13.4.1"
 
 [tool.poetry.group.dev]
 optional = true

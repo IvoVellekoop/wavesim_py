@@ -1,56 +1,106 @@
+from typing import Callable, Optional
+
+from wavesim.engine.array import Array, mix, scale, norm_squared, subtract
 from .domain import Domain
-from .utilities import is_zero
 
 
-def run_algorithm(domain: Domain, source, alpha=0.75, max_iterations=1000, threshold=1.e-6, full_residuals=False):
-    """ WaveSim update
+def preconditioned_richardson(
+    domain: Domain,
+    source: Array,
+    /,
+    *,
+    alpha: float = 0.75,
+    max_iterations: int = 1000,
+    threshold: float = 1.0e-6,
+    full_residuals: bool = False,
+    callback: Optional[Callable] = None,
+    **kwargs,
+):
+    """
+    WaveSim algorithm
 
-    :param domain: Helmholtz base parameters
-    :param source: source field
-    :param alpha: relaxation parameter for the Richardson iteration
-    :param max_iterations: maximum number of iterations
-    :param threshold: threshold for the residual norm
-    :param full_residuals: when True, returns list of residuals for all iterations. Otherwise, returns final residual
-    :return: u, iteration count, residuals """
+    Args:
+        domain (Domain): Helmholtz base parameters
+        source (Array): source field
+        alpha (float): relaxation parameter for the Richardson iteration
+        max_iterations (int): maximum number of iterations
+        threshold (float): threshold for the residual norm
+        full_residuals (bool): when True, returns list of residuals for all iterations. 
+                               Otherwise, returns final residual
+        callback (Callable): callback function that is called after each iteration.
+            The callback function should accept the following arguments:
+            - The domain
+            - The iteration number. At the end of the iteration, will be called with -1
+            - The current field
+            - Keyword only arguments:
+                - tmp: A temporary array that can be used by the callback
+                - residual_norm: The relative residual norm squared
+                - max_iterations: the maximum number of iterations
+                - threshold: the threshold for the residual norm squared
+                - anything passed in **kwargs
+            The callback function should return a boolean value:
+            - True: Continue the iteration.
+            - False: Stop the iteration.
+
+    Returns:
+        tuple: u, iteration count, residuals
+    """
+    if max_iterations <= 0:
+        raise ValueError("max_iterations must be positive")
 
     # Reset the field u to zero
-    slot_x = 0
-    slot_tmp = 1
-    domain.clear(slot_x)
-    domain.set_source(source)
+    x = domain.allocate(0.0)
+    tmp = domain.allocate()
+    callback_kwargs = dict(
+        kwargs,
+        tmp=tmp,
+        max_iterations=max_iterations,
+        threshold=threshold,
+    )
 
     # compute initial residual norm (with preconditioned source) for normalization
-    domain.create_empty_vdot()  # create empty slot for Vdot tensor. Always 8.1 MiB
-    domain.add_source(slot_x, weight=1.)  # [x] = y
-    preconditioner(domain, slot_x, slot_x)  # [x] = B(L+1)⁻¹y
-    init_norm_inv = 1 / domain.inner_product(slot_x, slot_x)  # inverse of initial norm: 1 / norm([x])
-    domain.clear(slot_x)  # Clear [x]
+    preconditioner(domain, source, out=tmp)  # tmp = B(L+1)⁻¹y
+    init_norm = norm_squared(tmp)  # |tmp|²
 
     # save list of residuals if requested
     residuals = [] if full_residuals else None
 
     for i in range(max_iterations):
-        residual_norm = preconditioned_iteration(domain, slot_x, slot_x, slot_tmp, alpha, compute_norm2=True)
+        # x = x + α Γ⁻¹ (y - A x)
         # normalize residual norm with preconditioned source (i.e., with norm of B(L+1)⁻¹y)
-        residual_norm = residual_norm * init_norm_inv  # norm(B(x - (L+1)⁻¹ (B·x + c·y))) / norm(B(L+1)⁻¹y)
-        print('.', end='', flush=True) if (i + 1) % 100 == 0 else None
+        residual_norm = (
+            preconditioned_iteration(domain, x, source=source, out=x, tmp=tmp, alpha=alpha, compute_norm2=True)
+            / init_norm
+        )
+
+        # callback
+        if callback:
+            continue_loop = callback(domain, i + 1, x, residual_norm=residual_norm, **callback_kwargs)
+            if not continue_loop:
+                break
+
         residuals.append(residual_norm) if full_residuals else None
         if residual_norm < threshold:
             break
 
+    if callback:
+        callback(domain, -1, x, residual_norm=residual_norm, **callback_kwargs)  # noqa
+
     # return u and u_iter cropped to roi, residual arrays, and state object with information on run
-    return domain.get(slot_x), (i + 1), residuals if full_residuals else residual_norm
+    return x.gather(), i + 1, residuals if full_residuals else residual_norm  # noqa
 
 
-def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_tmp: int = 1, alpha=0.75,
-                             compute_norm2=False):
-    """ Run one preconditioned iteration.
+def preconditioned_iteration(
+    domain, x: Array, *, source: Array, out: Array, tmp: Array, alpha=0.75, compute_norm2=False
+) -> float:
+    """Run one preconditioned iteration.
 
     Args:
         domain: Domain object
-        slot_in: slot holding input x. This slot will be overwritten!
-        slot_out: output slot that will receive the result
-        slot_tmp: slot for temporary storage. Cannot be equal to slot_in, may be equal to slot_out
+        x: input vector. *This array will be overwritten!*
+        out: output slot that will receive the result, may be equal to x
+        source: slot holding the source term
+        tmp: slot for temporary storage, will be overwritten. Cannot be equal to x, may be equal to slot_out
         alpha: relaxation parameter for the Richardson iteration
         compute_norm2: when True, returns the squared norm of the residual. Otherwise, returns 0.0
 
@@ -65,38 +115,42 @@ def preconditioned_iteration(domain, slot_in: int = 0, slot_out: int = 0, slot_t
             = x + α B [(L+1)⁻¹ (c y + B x) - x]
             = x - α B x + α B (L+1)⁻¹ (c y + B x)
     """
-    if slot_tmp == slot_in:
-        raise ValueError("slot_in and slot_tmp should be different")
+    if tmp is x:
+        raise ValueError("x and slot_tmp should be different")
 
-    domain.medium(slot_in, slot_tmp, mnum=0)  # [tmp] = B·x
-    domain.add_source(slot_tmp, domain.scale)  # [tmp] = B·x + c·y
-    domain.propagator(slot_tmp, slot_tmp)  # [tmp] = (L+1)⁻¹ (B·x + c·y)
-    domain.mix(1.0, slot_in, -1.0, slot_tmp, slot_tmp)  # [tmp] = x - (L+1)⁻¹ (B·x + c·y)
-    domain.medium(slot_tmp, slot_tmp, mnum=1)  # [tmp] = B(x - (L+1)⁻¹ (B·x + c·y))
+    medium, propagator = domain.medium, domain.propagator
+
+    medium(x, out=tmp)  # [tmp] = B·x
+    scale(-domain.scale, source, offset=tmp, out=tmp)  # [tmp] = B·x + c·y
+    propagator(tmp, out=tmp)  # [tmp] = (L+1)⁻¹ (B·x + c·y)
+    subtract(x, tmp, out=tmp)  # [tmp] = x - (L+1)⁻¹ (B·x + c·y)
+    medium(tmp, out=tmp)  # [tmp] = B(x - (L+1)⁻¹ (B·x + c·y))
+
     # optionally compute norm of residual of preconditioned system
-    retval = domain.inner_product(slot_tmp, slot_tmp) if compute_norm2 else 0.0
-    domain.mix(1.0, slot_in, -alpha, slot_tmp, slot_out)  # [out] = x - α B x + α B (L+1)⁻¹ (B·x + c·y)
+    retval = norm_squared(tmp) if compute_norm2 else 0.0
+
+    scale(-alpha, tmp, offset=x, out=out)  # [out] = x - α B x + α B (L+1)⁻¹ (B·x + c·y)
     return retval
 
 
-def forward(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates the forward operator A= c⁻¹ (L + V)
+def forward(domain: Domain, x: Array, *, out: Array):
+    """Evaluates the forward operator A= c⁻¹ (L + V)
 
     Args:
         domain: Domain object
-        slot_in: slot holding input x. This slot will be overwritten!
-        slot_out: output slot that will receive A x
-     """
-    if slot_in == slot_out:
-        raise ValueError("slot_in and slot_out must be different")
+        x: Input.This array will be overwritten!
+        out: output slot that will receive A x
+    """
+    if x is out:
+        raise ValueError("input and output must be different")
 
-    domain.medium(slot_in, slot_out)  # (1-V) x
-    domain.inverse_propagator(slot_in, slot_in)  # (L+1) x
-    domain.mix(1.0 / domain.scale, slot_in, -1.0 / domain.scale, slot_out, slot_out)  # c⁻¹ (L+V) x
+    domain.medium(x, out=out)  # (1-V) x
+    domain.inverse_propagator(x, out=x)  # (L+1) x
+    mix(1.0 / domain.scale, x, -1.0 / domain.scale, out, out=out)  # c⁻¹ (L+V) x
 
 
-def preconditioned_operator(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates the preconditioned operator Γ⁻¹ A
+def preconditioned_operator(domain: Domain, x: Array, *, out: Array):
+    """Evaluates the preconditioned operator Γ⁻¹ A
 
     Where Γ⁻¹ = c B (L+1)⁻¹
 
@@ -114,58 +168,26 @@ def preconditioned_operator(domain: Domain, slot_in: int, slot_out: int):
 
     Args:
         domain: Domain object
-        slot_in: slot holding input x. This slot will be overwritten!
-        slot_out: output slot that will receive A x
+        x: slot holding input x. This slot will be overwritten!
+        out: output slot that will receive A x
     """
-    if slot_in == slot_out:
-        raise ValueError("slot_in and slot_out must be different")
+    if x is out:
+        raise ValueError("x and slot_out must be different")
 
-    domain.medium(slot_in, slot_in)  # B x
-    domain.propagator(slot_in, slot_out)  # (L+1)⁻¹ B x
-    domain.medium(slot_out, slot_out)  # B (L+1)⁻¹ B x
-    domain.mix(1.0, slot_in, -1.0, slot_out, slot_out)  # B - B (L+1)⁻¹ B x
+    domain.medium(x, out=x)  # B x
+    domain.propagator(x, out=out)  # (L+1)⁻¹ B x
+    domain.medium(out, out=out)  # B (L+1)⁻¹ B x
+    subtract(x, out, out=out)  # B - B (L+1)⁻¹ B x
 
 
-def preconditioner(domain: Domain, slot_in: int, slot_out: int):
-    """ Evaluates Γ⁻¹ = c B(L+1)⁻¹
+def preconditioner(domain: Domain, x: Array, *, out: Array):
+    """Evaluates Γ⁻¹ = c B(L+1)⁻¹
 
     Args:
         domain: Domain object
-        slot_in: slot holding input x. This slot will be overwritten!
-        slot_out: output slot that will receive A x
+        x: Input.
+        out: output array that will receive A x
     """
-    domain.propagator(slot_in, slot_in)  # (L+1)⁻¹ x
-    domain.medium(slot_in, slot_out)  # B (L+1)⁻¹ x
-    domain.mix(0.0, slot_out, domain.scale, slot_out, slot_out)  # c B (L+1)⁻¹ x
-
-
-def domain_operator(domain: Domain, function: str, **kwargs):
-    """Constructs various operators by combining calls to 'medium', 'propagator', etc.
-
-    todo: this is currently very inefficient because of the overhead of copying data to and from the device
-    """
-
-    def potential_(domain, slot_in, slot_out):
-        domain.medium(slot_in, slot_out)
-        domain.mix(1.0, slot_in, -1.0, slot_out, slot_out)
-
-    fn = {
-        'medium': domain.medium,
-        'propagator': domain.propagator,
-        'inverse_propagator': domain.inverse_propagator,
-        'potential': potential_,
-        'forward': lambda slot_in, slot_out: forward(domain, slot_in, slot_out),
-        'preconditioned_operator': lambda slot_in, slot_out: preconditioned_operator(domain, slot_in, slot_out),
-        'preconditioner': lambda slot_in, slot_out: preconditioner(domain, slot_in, slot_out),
-        'richardson': lambda slot_in, slot_out: preconditioned_iteration(domain, slot_in, slot_out, slot_out, **kwargs)
-    }[function]
-
-    def operator_(x):
-        if is_zero(x):
-            domain.clear(0)
-        else:
-            domain.set(0, x)
-        fn(0, 1)
-        return domain.get(1, copy=True)
-
-    return operator_
+    domain.propagator(x, out=out)  # (L+1)⁻¹ x
+    domain.medium(out, out=out)  # B (L+1)⁻¹ x
+    scale(domain.scale, out, out=out)  # c B (L+1)⁻¹ x

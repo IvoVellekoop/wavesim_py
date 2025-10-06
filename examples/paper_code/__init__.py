@@ -269,7 +269,7 @@ def plot_validation(figname, sim_ref, sim, plt_norm='log', inset=False):
     domain_size = np.round(domain_size).astype(int)
 
     if inset:
-        x1, x2, y1, y2 = 10, 60, 50, 100  # subregion of the original image
+        x1, x2, y1, y2 = 10, 60, 100, 50  # subregion of the original image
         for ax, data in zip([ax0, ax1, ax2], [n, u_ref, u]):
             axins = ax.inset_axes(
                 [0.55, 0.55, 0.47, 0.47],

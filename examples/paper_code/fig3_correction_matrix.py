@@ -117,11 +117,11 @@ ax2.plot(fc2, 'k', label='Field')  # 2-domain, with wrapping field
 ax2.axvspan(c, n_size - 1, color='gray', alpha=0.3)  # Patch to demarcate 2nd subdomain
 
 # difference between unwrapped and wrapped fields
-ax2.plot(diff_[:t], 'r--', label='Corrections')  # wrapping correction
-ax2.text(0.14, 0.5, '$C_{11}$', color='r', transform=ax2.transAxes, ha='center')
+ax2.plot(diff_[:t], 'r--', label='Difference with (a)')  # wrapping correction
+# ax2.text(0.14, 0.5, '$C_{11}$', color='r', transform=ax2.transAxes, ha='center')
 
 ax2.plot(np.arange(c, c + t), diff_[c:c + t], 'r--')  # transfer correction
-ax2.text(0.62, 0.23, '$A_{12}$', color='r', transform=ax2.transAxes, ha='center')
+# ax2.text(0.62, 0.23, '$A_{12}$', color='r', transform=ax2.transAxes, ha='center')
 
 ax2.set_xlim([-1, n_size])
 ax2.set_xticks(np.arange(0, n_size + 1, 5))
@@ -144,10 +144,18 @@ plt.savefig(filename, bbox_inches='tight', pad_inches=0.03, dpi=300)
 plt.close('all')
 
 # Print min and max a_12 values. min/max should be <<1% (for truncation to make sense)
-min_a_12 = a_12[0, -1]
-max_a_12 = a_12[-1, 0]
+min_a_12 = abs(a_12[0, -1])
+max_a_12 = abs(a_12[-1, 0])
 percent = (min_a_12/max_a_12) * 100
 print(f'Wrapping artifact amplitudes: Min {min_a_12:.3f}, Max {max_a_12:.3f}')
 print(f'Min/Max of A_{12} = {percent:.2f} %')
 assert percent < 1, f"Min/Max of A_{12} ratio exceeds 1%: {percent:.2f} %"
+
+# Print min and max values for 'first' row of a_12
+min_a_12_ = abs(a_12[-1, -1])
+max_a_12_ = abs(a_12[-1, 0])
+percent_ = (min_a_12_/max_a_12_) * 100
+print(f'Wrapping artifact amplitudes (max row of A_{12}): Min {min_a_12_:.3f}, Max {max_a_12_:.3f}')
+print(f'Min/Max of max row of A_{12} = {percent_:.2f} %')
 print('Done.')
+

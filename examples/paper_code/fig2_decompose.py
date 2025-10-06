@@ -127,10 +127,10 @@ ax2.set_title('$V$')
 kwargs2 = dict(transform=ax2.transAxes, ha='center', va='center', 
               bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
                         alpha=0.5, linewidth=0.0))
-ax2.text(0.18, 0.64, '$C_{11}$', **kwargs2)
+# ax2.text(0.18, 0.64, '$C_{11}$', **kwargs2)
 ax2.text(0.84, 0.84, '$A_{12}$', **kwargs2)
 ax2.text(0.18, 0.15, '$A_{21}$', **kwargs2)
-ax2.text(0.84, 0.34, '$C_{22}$', **kwargs2)
+# ax2.text(0.84, 0.34, '$C_{22}$', **kwargs2)
 fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad)
 
 # Add text boxes with labels (a), (b), (c), ...

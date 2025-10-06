@@ -92,7 +92,7 @@ cmap = 'seismic'
 
 ax0 = axs[0]
 im0 = ax0.imshow(a_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
-ax0.set_title('$A$ (truncated corrections)')
+ax0.set_title('$A$ (truncated blocks)')
 
 ax1 = axs[1]
 im1 = ax1.imshow(l_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
@@ -100,7 +100,7 @@ ax1.set_title('$L$')
 
 ax2 = axs[2]
 im2 = ax2.imshow(v_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
-ax2.set_title('$V$ (truncated corrections)')
+ax2.set_title('$V$ (truncated blocks)')
 fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad, ticks=[-1, -0.5, 0, 0.5, 1], format='%.1f')
 
 # Add text boxes with labels (a), (b), (c), ...

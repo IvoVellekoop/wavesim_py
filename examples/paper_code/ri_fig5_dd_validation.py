@@ -1,3 +1,13 @@
+"""
+Refractive indices
+==================
+Repeat the experiment for 1 domain in figure 5 (domain decomposition 
+validation), but for different refractive index values.
+The real part (n) varies from 1 to 5, and the imaginary part (k) varies
+from 0 to 9 (nonuniform spacing for both n and k, starting with small 
+increments for smaller values, and much larger for larger values).
+"""
+
 import os
 import numpy as np
 from itertools import product

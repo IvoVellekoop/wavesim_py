@@ -7,7 +7,7 @@ from wavesim.iteration import domain_operator, preconditioned_iteration, precond
 from wavesim.utilities import analytical_solution, preprocess, relative_error
 from . import allclose, random_vector, random_refractive_index
 
-"""Tests to compare the result of Wavesim to analytical results"""
+"""Tests to compare the result of WaveSim to analytical results"""
 
 
 def test_no_propagation():

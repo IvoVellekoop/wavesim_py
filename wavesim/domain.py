@@ -76,7 +76,7 @@ class Domain(metaclass=ABCMeta):
     def inverse_propagator(self, slot_in, slot_out):
         """Applies the operator (L+1) x .
 
-        This operation is not needed for the Wavesim algorithm, but is provided for testing purposes,
+        This operation is not needed for the WaveSim algorithm, but is provided for testing purposes,
         and can be used to evaluate the residue of the solution.
         """
         pass

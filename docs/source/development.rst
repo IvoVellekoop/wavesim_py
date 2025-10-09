@@ -1,11 +1,11 @@
 .. _section-development:
 
-Wavesim Development
+WaveSim Development
 ==============================================
 
 Running the tests and examples
 --------------------------------------------------
-To download the source code, including tests and examples, clone the repository from GitHub :cite:`wavesim_py`. Wavesim uses `poetry` :cite:`Poetry` for package management, so you have to download and install Poetry first. Then, navigate to the location where you want to store the source code, and execute the following commands to clone the repository, set up the poetry environment, and run the tests.
+To download the source code, including tests and examples, clone the repository from GitHub :cite:`wavesim_py`. WaveSim uses `poetry` :cite:`Poetry` for package management, so you have to download and install Poetry first. Then, navigate to the location where you want to store the source code, and execute the following commands to clone the repository, set up the poetry environment, and run the tests.
 
 .. code-block:: shell
 
@@ -29,9 +29,10 @@ Building the documentation
 
 Note that for building the pdf version of the documentation, you need to have `xelatex` installed, which comes with the MiKTeX distribution of LaTeX :cite:`MiKTeX`. Then, run the following commands to build the html and pdf versions of the documentation, and to auto-generate `README.md`.
 
+Note that for Windows, you might have to install `make`. You can install it through the `chocolatey package manager <https://chocolatey.org/install>`_ by running ``choco install make``.
+
 .. code-block:: shell
 
-    poetry shell
     cd docs
     make clean
     make html

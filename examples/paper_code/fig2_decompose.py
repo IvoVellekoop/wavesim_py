@@ -112,14 +112,19 @@ ax0.set_title('$A$')
 kwargs0 = dict(transform=ax0.transAxes, ha='center', va='center', 
               bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
                         alpha=0.5, linewidth=0.0))
-ax0.text(0.09, 0.57, '$A_{11}$', **kwargs0)
-ax0.text(0.9, 0.92, '$A_{12}$', **kwargs0)
-ax0.text(0.09, 0.07, '$A_{21}$', **kwargs0)
-ax0.text(0.9, 0.42, '$A_{22}$', **kwargs0)
+ax0.text(0.13, 0.605, '$A_{11}$', **kwargs0)
+ax0.text(0.75, 0.75, '$A_{12}$', **kwargs0)
+ax0.text(0.25, 0.25, '$A_{21}$', **kwargs0)
+ax0.text(0.87, 0.395, '$A_{22}$', **kwargs0)
 
 ax1 = axs[1]
 im1 = ax1.imshow(l_2, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
 ax1.set_title('$L$')
+kwargs1 = dict(transform=ax1.transAxes, ha='center', va='center', 
+              bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
+                        alpha=0.5, linewidth=0.0))
+ax1.text(0.13, 0.605, '$L_{11}$', **kwargs1)
+ax1.text(0.87, 0.395, '$L_{22}$', **kwargs1)
 
 ax2 = axs[2]
 im2 = ax2.imshow(v_l_diff, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
@@ -127,10 +132,10 @@ ax2.set_title('$V$')
 kwargs2 = dict(transform=ax2.transAxes, ha='center', va='center', 
               bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
                         alpha=0.5, linewidth=0.0))
-# ax2.text(0.18, 0.64, '$C_{11}$', **kwargs2)
-ax2.text(0.84, 0.84, '$A_{12}$', **kwargs2)
-ax2.text(0.18, 0.15, '$A_{21}$', **kwargs2)
-# ax2.text(0.84, 0.34, '$C_{22}$', **kwargs2)
+ax2.text(0.13, 0.605, '$V_{11}$', **kwargs2)
+ax2.text(0.75, 0.75, '$A_{12}$', **kwargs2)
+ax2.text(0.25, 0.25, '$A_{21}$', **kwargs2)
+ax2.text(0.87, 0.395, '$V_{22}$', **kwargs2)
 fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad)
 
 # Add text boxes with labels (a), (b), (c), ...

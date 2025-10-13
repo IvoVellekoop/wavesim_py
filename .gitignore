@@ -183,3 +183,5 @@ logs
 # Ignore certain files in the docs directory
 auto_examples
 sg_execution_times.rst
+
+/poetry.lock

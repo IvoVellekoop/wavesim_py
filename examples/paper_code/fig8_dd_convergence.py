@@ -19,24 +19,22 @@ font = {'family': 'serif', 'serif': ['Times New Roman'], 'size': 13}
 rc('font', **font)
 rcParams['mathtext.fontset'] = 'cm'
 
-sim = 50
-
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
-    filename = f'paper_data/fig7_dd_convergence_{sim}_with_trick.txt'
-    figname = f'paper_figures/fig7_dd_convergence_{sim}_with_trick.pdf'
+    filename = f'paper_data/fig8_dd_convergence.txt'
+    figname = f'paper_figures/fig8_dd_convergence.pdf'
 else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = f'examples/paper_data/fig7_dd_convergence_{sim}_with_trick.txt'
-        figname = (f'examples/paper_figures/fig7_dd_convergence_{sim}_with_trick.pdf')
+        filename = f'examples/paper_data/fig8_dd_convergence.txt'
+        figname = (f'examples/paper_figures/fig8_dd_convergence.pdf')
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 
-sim_size = sim * np.array([1, 1, 1])  # Simulation size in micrometers (excluding boundaries)
+sim_size = 50 * np.array([1, 1, 1])  # Simulation size in micrometers (excluding boundaries)
 wavelength = 1.  # Wavelength in micrometers
 pixel_size = wavelength/4  # Pixel size in wavelength units
 boundary_wavelengths = 5  # Boundary width in wavelengths

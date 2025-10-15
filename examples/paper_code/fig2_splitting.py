@@ -32,13 +32,13 @@ rcParams['mathtext.fontset'] = 'cm'
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_figures/fig1_splitting.pdf'
+    filename = 'paper_figures/fig2_splitting.pdf'
 else:
     try:
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_figures/fig1_splitting.pdf'
+        filename = 'examples/paper_figures/fig2_splitting.pdf'
     except FileNotFoundError:
-        filename = 'fig1_splitting.pdf'
+        filename = 'fig2_splitting.pdf'
 
 # Define problem parameters
 boundary_widths = 0

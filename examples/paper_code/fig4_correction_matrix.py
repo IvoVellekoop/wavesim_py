@@ -34,13 +34,13 @@ rcParams['mathtext.fontset'] = 'cm'
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_figures/fig3_correction_matrix.pdf'
+    filename = 'paper_figures/fig4_correction_matrix.pdf'
 else:
     try:
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_figures/fig3_correction_matrix.pdf'
+        filename = 'examples/paper_figures/fig4_correction_matrix.pdf'
     except FileNotFoundError:
-        filename = 'fig3_correction_matrix.pdf'
+        filename = 'fig4_correction_matrix.pdf'
 
 
 def coordinates_f_sq(n_, pixel_size=0.25):

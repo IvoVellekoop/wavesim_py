@@ -32,13 +32,13 @@ rcParams['mathtext.fontset'] = 'cm'
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_figures/fig4_truncate.pdf'
+    filename = 'paper_figures/fig5_truncate.pdf'
 else:
     try:
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_figures/fig4_truncate.pdf'
+        filename = 'examples/paper_figures/fig5_truncate.pdf'
     except FileNotFoundError:
-        filename = 'fig4_truncate.pdf'
+        filename = 'fig5_truncate.pdf'
 
 # Define problem parameters
 n_size = (40, 1, 1)

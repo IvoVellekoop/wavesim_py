@@ -1,7 +1,7 @@
 """
 Refractive indices
 ==================
-Repeat the experiment for 1 domain in figure 5 (domain decomposition 
+Repeat the experiment for 1 domain in figure 6 (domain decomposition 
 validation), but for different refractive index values.
 The real part (n) varies from 1 to 5, and the imaginary part (k) varies
 from 0 to 9 (nonuniform spacing for both n and k, starting with small 
@@ -25,14 +25,14 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_data/ri_fig5_dd_validation_'
-    figname = 'paper_figures/ri_fig5_dd_validation'
+    filename = 'paper_data/fig1_ri_'
+    figname = 'paper_figures/fig1_ri'
 else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_data/ri_fig5_dd_validation_'
-        figname = 'examples/paper_figures/ri_fig5_dd_validation'
+        filename = 'examples/paper_data/fig1_ri_'
+        figname = 'examples/paper_figures/fig1_ri'
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 

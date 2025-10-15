@@ -8,8 +8,8 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_data/fig8_dd_large_simulation_'
-    figname = f'paper_figures/fig8_dd_large_simulation_domains'
+    filename = 'paper_data/fig9_dd_large_simulation_'
+    figname = f'paper_figures/fig9_dd_large_simulation_domains'
     for i in range(3):
         figname += f'{n_domains[i]}'
     figname += '.pdf'
@@ -17,8 +17,8 @@ else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_data/fig8_dd_large_simulation_'
-        figname = 'examples/paper_figures/fig8_dd_large_simulation_domains'
+        filename = 'examples/paper_data/fig9_dd_large_simulation_'
+        figname = 'examples/paper_figures/fig9_dd_large_simulation_domains'
         for i in range(3):
             figname += f'{n_domains[i]}'
         figname += '.pdf'

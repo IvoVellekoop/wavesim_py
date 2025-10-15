@@ -65,7 +65,7 @@ else:
         sim_ref = sim_3d_random(fn, sim_size, n_domains=None, n_boundary=0, 
                                 n_medium=n_medium, k_medium=k_medium, r=12)
 
-        data = (f'n+ik: {n_medium}+{k_medium}j; Time {sim_ref['sim_time']:2.2f}; Iterations {sim_ref['iterations']}; Residual norm {sim_ref['residual_norm']:.3e}\n')
+        data = (f"n+ik: {n_medium}+{k_medium}j; Time {sim_ref['sim_time']:2.2f}; Iterations {sim_ref['iterations']}; Residual norm {sim_ref['residual_norm']:.3e}\n")
 
         with open(f'{filename}.txt', 'a') as file:
             file.write(data)
@@ -96,8 +96,8 @@ cmap = 'inferno'
 
 ax0 = ax[0]
 im0 = ax0.imshow(iterations, cmap=cmap, norm=colors.LogNorm(), aspect='auto')
-ax0.set_xlabel(r'$n$')
-ax0.set_ylabel(r'$k$')
+ax0.set_xlabel('real part of refractive index')
+ax0.set_ylabel('imaginary part')
 cbar0 = plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.02)
 ax0.set_title('Iterations vs Refractive index')
 ax0.text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax0.transAxes)
@@ -109,7 +109,7 @@ ax0.invert_yaxis()
 
 ax1 = ax[1]
 im1 = ax1.imshow(times, cmap=cmap, norm=colors.LogNorm(), aspect='auto')
-ax1.set_xlabel(r'$n$')
+ax1.set_xlabel('real part of refractive index')
 cbar1 = plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.02)
 ax1.set_title('Time vs Refractive index')
 ax1.text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax1.transAxes)
@@ -137,8 +137,8 @@ im0.set_data(n_range, k_range, iterations)
 ax0.add_image(im0)
 ax0.set_xlim(x0, x1)
 ax0.set_ylim(y0, y1)
-ax0.set_xlabel(r'$n$')
-ax0.set_ylabel(r'$k$')
+ax0.set_xlabel('real part of refractive index')
+ax0.set_ylabel('imaginary part')
 cbar0 = plt.colorbar(im0, label='Iterations', fraction=0.046, pad=0.02)
 ax0.set_title('Iterations vs Refractive index')
 ax0.text(0.5, -0.27, '(a)', color='k', ha='center', va='center', transform=ax0.transAxes)
@@ -149,7 +149,7 @@ ax1 = ax[1]
 im1 = NonUniformImage(ax1, interpolation='nearest', cmap=cmap, extent=(x0, x1, y0, y1), norm=colors.LogNorm())
 im1.set_data(n_range, k_range, times)
 ax1.add_image(im1)
-ax1.set_xlabel(r'$n$')
+ax1.set_xlabel('real part of refractive index')
 cbar1 = plt.colorbar(im1, label='Time (s)', fraction=0.046, pad=0.02)
 ax1.set_title('Time vs Refractive index')
 ax1.text(0.5, -0.27, '(b)', color='k', ha='center', va='center', transform=ax1.transAxes)

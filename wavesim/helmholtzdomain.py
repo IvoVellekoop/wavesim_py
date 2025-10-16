@@ -9,7 +9,7 @@ class HelmholtzDomain(Domain):
 
     The `Domain` object encapsulates all data that is stored on a single computation node 
     (e.g. a GPU or a node in a cluster), and provides methods to perform the basic operations 
-    that the Wavesim algorithm needs.
+    that the WaveSim algorithm needs.
 
     Note:
         Domain currently works only for the Helmholtz equation and the PyTorch backend.
@@ -46,7 +46,7 @@ class HelmholtzDomain(Domain):
             n_slots: number of arrays used for storing the field and temporary data.
             stand_alone: if True, the domain performs shifting and scaling of the scattering potential (based on the
                 permittivity of this domain alone). In this stand-alone mode, no wrapping corrections are applied,
-                 making it equivalent to the original Wavesim algorithm.
+                 making it equivalent to the original WaveSim algorithm.
                  Set to False when part of a multi-domain, where the all subdomains need to be considered together to
                  compute the shift and scale factors.
             Vwrap: optional wrapping matrix, when omitted and not in stand-alone mode, the matrix will be computed.
@@ -261,7 +261,7 @@ class HelmholtzDomain(Domain):
     def inverse_propagator(self, slot_in: int, slot_out: int):
         """Applies the operator (L+1) x .
 
-        This operation is not needed for the Wavesim algorithm, but is provided for testing purposes,
+        This operation is not needed for the WaveSim algorithm, but is provided for testing purposes,
         and can be used to evaluate the residue of the solution.
         """
         # todo: convert to on-the-fly computation

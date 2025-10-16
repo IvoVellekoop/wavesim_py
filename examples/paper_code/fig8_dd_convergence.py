@@ -23,14 +23,14 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
-    filename = f'paper_data/fig7_dd_convergence.txt'
-    figname = f'paper_figures/fig7_dd_convergence.pdf'
+    filename = f'paper_data/fig8_dd_convergence.txt'
+    figname = f'paper_figures/fig8_dd_convergence.pdf'
 else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = f'examples/paper_data/fig7_dd_convergence.txt'
-        figname = (f'examples/paper_figures/fig7_dd_convergence.pdf')
+        filename = f'examples/paper_data/fig8_dd_convergence.txt'
+        figname = (f'examples/paper_figures/fig8_dd_convergence.pdf')
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 

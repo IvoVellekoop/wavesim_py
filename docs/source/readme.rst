@@ -1,6 +1,6 @@
 .. _root_label:
 
-Wavesim
+WaveSim
 =====================================
 
 ..
@@ -13,14 +13,14 @@ Wavesim
        :alt: Documentation Status
 
 
-What is Wavesim?
+What is WaveSim?
 ----------------------------------------------
 
-Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method :cite:`yee1966numerical, taflove1995computational, oskooi2010meep, nabavi2007new`, Wavesim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  :cite:`osnabrugge2016convergent, vettenburg2023universal`.
+WaveSim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method :cite:`yee1966numerical, taflove1995computational, oskooi2010meep, nabavi2007new`, WaveSim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  :cite:`osnabrugge2016convergent, vettenburg2023universal`.
 
 This package :cite:`wavesim_py` is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition :cite:`mache2024domain`. With this new framework, we simulated a complex 3D structure of a remarkable :math:`315\times 315\times 315` wavelengths :math:`\left( 3.1\cdot 10^7 \right)` in size in just :math:`1.4` hours by solving over two GPUs. This represents a factor of :math:`1.93` increase over the largest possible simulation on a single GPU without domain decomposition. 
 
-When using Wavesim in your work, please cite:
+When using WaveSim in your work, please cite:
 
     :cite:`osnabrugge2016convergent` |osnabrugge2016|_
 
@@ -39,7 +39,7 @@ Examples and documentation for this project are available at `Read the Docs <htt
 Installation
 ----------------------------------------------
 
-Wavesim requires `Python >=3.11.0 and <3.13.0 <https://www.python.org/downloads/>`_ and uses `PyTorch <https://pytorch.org/>`_ for GPU acceleration.
+WaveSim requires `Python >=3.11.0 and <3.13.0 <https://www.python.org/downloads/>`_ and uses `PyTorch <https://pytorch.org/>`_ for GPU acceleration.
 
 First, clone the repository and navigate to the directory::
 

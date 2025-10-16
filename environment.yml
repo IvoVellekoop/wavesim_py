@@ -1,4 +1,4 @@
-name: wavesim
+name: pub_env
 channels:
   - pytorch
   - nvidia
@@ -12,4 +12,6 @@ dependencies:
   - pytorch
   - pytorch-cuda
   - porespy
+  - pypardiso
+  - ipython
   - scikit-image<0.23

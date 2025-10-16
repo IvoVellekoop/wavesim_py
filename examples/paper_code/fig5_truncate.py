@@ -32,13 +32,13 @@ rcParams['mathtext.fontset'] = 'cm'
 if os.path.basename(os.getcwd()) == 'paper_code':
     os.chdir('..')
     os.makedirs('paper_figures', exist_ok=True)
-    filename = 'paper_figures/fig4_truncate.pdf'
+    filename = 'paper_figures/fig5_truncate.pdf'
 else:
     try:
         os.makedirs('examples/paper_figures', exist_ok=True)
-        filename = 'examples/paper_figures/fig4_truncate.pdf'
+        filename = 'examples/paper_figures/fig5_truncate.pdf'
     except FileNotFoundError:
-        filename = 'fig4_truncate.pdf'
+        filename = 'fig5_truncate.pdf'
 
 # Define problem parameters
 n_size = (40, 1, 1)
@@ -92,15 +92,34 @@ cmap = 'seismic'
 
 ax0 = axs[0]
 im0 = ax0.imshow(a_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
-ax0.set_title('$A$ (truncated corrections)')
+ax0.set_title('$A$ (truncated blocks)')
+kwargs0 = dict(transform=ax0.transAxes, ha='center', va='center', 
+              bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
+                        alpha=0.5, linewidth=0.0))
+ax0.text(0.13, 0.605, '$A_{11}$', **kwargs0)
+ax0.text(0.75, 0.75, '$A_{12}$', **kwargs0)
+ax0.text(0.25, 0.25, '$A_{21}$', **kwargs0)
+ax0.text(0.87, 0.395, '$A_{22}$', **kwargs0)
 
 ax1 = axs[1]
 im1 = ax1.imshow(l_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
 ax1.set_title('$L$')
+kwargs1 = dict(transform=ax1.transAxes, ha='center', va='center', 
+              bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
+                        alpha=0.5, linewidth=0.0))
+ax1.text(0.13, 0.605, '$L_{11}$', **kwargs1)
+ax1.text(0.87, 0.395, '$L_{22}$', **kwargs1)
 
 ax2 = axs[2]
 im2 = ax2.imshow(v_c, cmap=cmap, extent=extent, norm=colors.SymLogNorm(linthresh=0.7, vmin=vmin, vmax=vmax))
-ax2.set_title('$V$ (truncated corrections)')
+ax2.set_title('$V$ (truncated blocks)')
+kwargs2 = dict(transform=ax2.transAxes, ha='center', va='center', 
+              bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.1', 
+                        alpha=0.5, linewidth=0.0))
+ax2.text(0.13, 0.605, '$V_{11}$', **kwargs2)
+ax2.text(0.75, 0.75, '$A_{12}$', **kwargs2)
+ax2.text(0.25, 0.25, '$A_{21}$', **kwargs2)
+ax2.text(0.87, 0.395, '$V_{22}$', **kwargs2)
 fig.colorbar(im2, ax=ax2, fraction=fraction, pad=pad, ticks=[-1, -0.5, 0, 0.5, 1], format='%.1f')
 
 # Add text boxes with labels (a), (b), (c), ...

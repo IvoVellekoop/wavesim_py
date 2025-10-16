@@ -1,16 +1,16 @@
 <a id="root-label"></a>
 
-# Wavesim
+# WaveSim
 
 <!-- NOTE: README.MD IS AUTO-GENERATED FROM DOCS/SOURCE/README.RST. DO NOT EDIT README.MD DIRECTLY. -->
 
-## What is Wavesim?
+## What is WaveSim?
 
-Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method [[1](#id27), [2](#id21), [3](#id16), [4](#id15)], Wavesim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  [[5](#id17), [6](#id23)].
+WaveSim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method [[1](#id27), [2](#id21), [3](#id16), [4](#id15)], WaveSim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  [[5](#id17), [6](#id23)].
 
 This package [[7](#id25)] is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition [[8](#id13)]. With this new framework, we simulated a complex 3D structure of a remarkable $315\times 315\times 315$ wavelengths $\left( 3.1\cdot 10^7 \right)$ in size in just $1.4$ hours by solving over two GPUs. This represents a factor of $1.93$ increase over the largest possible simulation on a single GPU without domain decomposition.
 
-When using Wavesim in your work, please cite:
+When using WaveSim in your work, please cite:
 
 > [[5](#id17)] [Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of computational physics, 322*, 113-124.](https://doi.org/10.1016/j.jcp.2016.06.034)
 
@@ -22,7 +22,7 @@ Examples and documentation for this project are available at [Read the Docs](htt
 
 ## Installation
 
-Wavesim requires [Python >=3.11.0 and <3.13.0](https://www.python.org/downloads/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
+WaveSim requires [Python >=3.11.0 and <3.13.0](https://www.python.org/downloads/) and uses [PyTorch](https://pytorch.org/) for GPU acceleration.
 
 First, clone the repository and navigate to the directory:
 
@@ -114,9 +114,9 @@ Once the virtual environment is set up with all the required packages, you are r
 
 You can run the code with just three inputs:
 
-* `permittivity`, i.e. refractive index distribution squared (a 4-dimensional array on a regular grid),
-* `source`, the same size as permittivity.
+* `permittivity`, i.e. refractive index distribution squared (a 3-dimensional array on a regular grid),
 * `periodic`, a tuple of three booleans to indicate whether the domain is periodic in each dimension [`True`] or not [`False`], and
+* `source`, the same size as permittivity.
 
 [Listing 1.1](#helmholtz-1d-analytical) shows a simple example of a 1D problem with a homogeneous medium ([helmholtz_1d_analytical.py](https://github.com/IvoVellekoop/wavesim_py/blob/main/examples/helmholtz_1d_analytical.py)) to explain these and other inputs.
 
@@ -125,7 +125,7 @@ You can run the code with just three inputs:
 """
 Helmholtz 1D analytical test
 ============================
-Test to compare the result of Wavesim to analytical results. 
+Test to compare the result of WaveSim to analytical results. 
 Compare 1D free-space propagation with analytic solution.
 """
 
@@ -182,14 +182,14 @@ assert re < threshold, f"Relative error higher than {threshold}"
 plot(u_computed, u_ref, re)
 ```
 
-Apart from the inputs `permittivity`, `source`, and `periodic`, all other parameters have defaults. Details about these are given below (with the default values, if defined).
+Apart from the inputs `permittivity`, `source`, and `periodic`, all other parameters have defaults. Details about all parameters are given below (with the default values, if defined).
 
 Parameters in the `Domain` class: `HelmholtzDomain` (for a single domain without domain decomposition) or `MultiDomain` (to solve a problem with domain decomposition)
 
 * `permittivity`: 3-dimensional array with refractive index-squared distribution in x, y, and z direction. To set up a 1 or 2-dimensional problem, leave the other dimension(s) as 1.
 * `periodic`: indicates for each dimension whether the simulation is periodic (`True`) or not (`False`). For periodic dimensions, i.e., `periodic` `= [True, True, True]`, the field is wrapped around the domain.
 * `pixel_size` `:float = 0.25`: points per wavelength.
-* `wavelength` `:float = None`: wavelength: wavelength in micrometer (um). If not given, i.e. `None`, it is calculated as `1/pixel_size = 4 um`.
+* `wavelength` `:float = None`: wavelength in micrometer (um). If not given, i.e. `None`, it is calculated as `1/pixel_size = 4 um`.
 * `n_domains` `: tuple[int, int, int] = (1, 1, 1)`: number of domains to split the simulation into. If the domain size is not divisible by n_domains, the last domain will be slightly smaller than the other ones. If `(1, 1, 1)`, indicates no domain decomposition.
 * `n_boundary` `: int = 8`: number of points used in the wrapping and domain transfer correction. Applicable when `periodic` is False in a dimension, or `n_domains > 1` in a dimension.
 * `device` `: str = None`:

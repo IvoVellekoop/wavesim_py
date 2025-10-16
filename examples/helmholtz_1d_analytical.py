@@ -1,7 +1,7 @@
 """
 Helmholtz 1D analytical test
 ============================
-Test to compare the result of Wavesim to analytical results. 
+Test to compare the result of WaveSim to analytical results. 
 Compare 1D free-space propagation with analytic solution.
 """
 

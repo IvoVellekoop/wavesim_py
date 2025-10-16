@@ -1,4 +1,4 @@
-Wavesim - A Python package for wave propagation simulation
+WaveSim - A Python package for wave propagation simulation
 ==========================================================
 
 .. toctree::

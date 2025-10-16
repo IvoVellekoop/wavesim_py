@@ -23,7 +23,7 @@ project = 'wavesim'
 copyright = '2024, Ivo Vellekoop, and Swapnil Mache, University of Twente'
 # author = 'Swapnil Mache, Ivo M. Vellekoop'
 release = '0.1.0-alpha.2'
-html_title = "Wavesim - A Python package for wave propagation simulation"
+html_title = "WaveSim - A Python package for wave propagation simulation"
 
 # -- latex configuration -----------------------------------------------------
 latex_elements = {
@@ -34,7 +34,7 @@ latex_elements = {
         \author[1,2]{Swapnil~Mache}
         \author[1*]{Ivo~M.~Vellekoop} 
         \affil[1]{University of Twente, Biomedical Photonic Imaging, TechMed Institute, P. O. Box 217, 7500 AE Enschede, The Netherlands}
-        \affil[2]{Currently at: Rayfos Ltd., Winton House, Winton Square, Basingstoke, United Kingdom}
+        \affil[2]{Previously at: Rayfos Ltd., Winton House, Winton Square, Basingstoke, United Kingdom}
         \affil[*]{Corresponding author: i.m.vellekoop@utwente.nl}
         \publishers{%
             \normalfont\normalsize%
@@ -62,7 +62,7 @@ latex_docclass = {
 }
 latex_documents = [("index_latex", 
                     "wavesim.tex",
-                    "Wavesim - A Python package for wave propagation simulation",
+                    "WaveSim - A Python package for wave propagation simulation",
                     "", 
                     "howto")]
 latex_toplevel_sectioning = 'section'

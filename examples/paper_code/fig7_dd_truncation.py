@@ -23,13 +23,13 @@ if os.path.basename(os.getcwd()) == 'paper_code':
     os.makedirs('paper_data', exist_ok=True)
     os.makedirs('paper_figures', exist_ok=True)
     current_dir = 'paper_data/'
-    figname = (f'paper_figures/fig6_dd_truncation.pdf')
+    figname = (f'paper_figures/fig7_dd_truncation.pdf')
 else:
     try:
         os.makedirs('examples/paper_data', exist_ok=True)
         os.makedirs('examples/paper_figures', exist_ok=True)
         current_dir = 'examples/paper_data/'
-        figname = (f'examples/paper_figures/fig6_dd_truncation.pdf')
+        figname = (f'examples/paper_figures/fig7_dd_truncation.pdf')
     except FileNotFoundError:
         print("Directory not found. Please run the script from the 'paper_code' directory.")
 
@@ -48,7 +48,7 @@ n_size = np.ones_like(sim_size, dtype=int)
 n_size[:n_dims] = sim_size[:n_dims] * wavelength / pixel_size  # Size of the simulation domain in pixels
 n_size = tuple(n_size.astype(int))  # Convert to integer for indexing
 
-filename = os.path.join(current_dir, f'fig6_dd_truncation.npz')
+filename = os.path.join(current_dir, f'fig7_dd_truncation.npz')
 if os.path.exists(filename):
     print(f"File {filename} already exists. Loading data...")
     data = np.load(filename)

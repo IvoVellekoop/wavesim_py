@@ -11,15 +11,6 @@ classifiers = [
     'Programming Language :: Python :: 3',
     'Operating System :: OS Independent',
 ]
-requires-python = ">=3.11,<3.13"
-dependencies = [
-    "numpy<2.0.0",
-    "matplotlib>=3.9.1",
-    "scipy>=1.14.0",
-    "porespy",
-    "scikit-image<0.23",
-    "torch"
-]
 
 [build-system]
 requires = ["poetry-core"]
@@ -41,6 +32,7 @@ optional = true
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
+matplotlib = "^3.0"
 
 [tool.poetry.group.docs]
 optional = true

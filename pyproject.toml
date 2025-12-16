@@ -5,43 +5,48 @@ description = "A library for simulating wave propagation using the modified Born
 authors = [ {name = "Ivo Vellekoop", email = "i.m.vellekoop@utwente.nl"}, 
             {name = "Swapnil Mache", email = "s.mache@utwente.nl"} ]
 readme = "README.md"
-repository = "https://github.com/IvoVellekoop/wavesim_py"
-documentation = "https://wavesim.readthedocs.io/en/latest/"
 classifiers = [
     'Programming Language :: Python :: 3',
     'Operating System :: OS Independent',
 ]
+requires-python = ">=3.11, <4.0"
+
+# no explicit numpy dependency is stated so that pip can figure out the version to install
+# based on the requirements of cupy, scipy, and numba
+dependencies = [
+    "scipy >= 1.15.0, < 2.0.0",
+    "numba >=0.60.0",
+    "cupy-cuda12x >=13.4.1"
+]
+
+[project.urls]
+repository = "https://github.com/IvoVellekoop/wavesim_py"
+documentation = "https://wavesim.readthedocs.io/en/latest/"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["wavesim"]
 
 [tool.black]
 line-length = 120
 
-[tool.poetry.dependencies]
-# no explicit numpy dependency is stated so that pip can figure out the version to install
-# based on the requirements of cupy, scipy, and numba
-python = "^3.11"
-scipy = "^1.15.0"
-numba = ">=0.60.0"
-cupy-cuda12x = "^13.4.1"
+[tool.uv.sources]
+wavesim = { path = "./wavesim" }
 
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
-matplotlib = "^3.0"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx = ">=4.1.2"
-sphinx_mdinclude = ">= 0.5.0"
-sphinx-rtd-theme = ">= 2.0.0"
-sphinx-autodoc-typehints = ">= 1.11.0"
-sphinxcontrib-bibtex = ">= 2.6.0"
-sphinx-markdown-builder = ">= 0.6.6"
-sphinx-gallery = ">= 0.15.0"
+[project.optional-dependencies]
+dev= [
+    "pytest >= 8.2.2",
+    "matplotlib >= 3.0",
+]
+docs= [
+    "sphinx >= 4.1.2",
+    "sphinx_mdinclude >= 0.5.0",
+    "sphinx-rtd-theme >= 2.0.0",
+    "sphinx-autodoc-typehints >= 1.11.0",
+    "sphinxcontrib-bibtex >= 2.6.0",
+    "sphinx-markdown-builder >= 0.6.6",
+    "sphinx-gallery >= 0.15.0"
+]

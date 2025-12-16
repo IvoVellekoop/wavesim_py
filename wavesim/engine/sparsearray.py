@@ -15,15 +15,27 @@ class SparseArray(Array):
     """
 
     def __init__(
-        self, data: Array | Sequence[Array], /, *, 
-        at: shape_like | Sequence[shape_like], 
-        shape: shape_like, 
-        dtype = None,
+        self,
+        data: Array | Sequence[Array],
+        /,
+        *,
+        at: shape_like | Sequence[shape_like],
+        shape: shape_like,
+        dtype=None,
     ):
-        self.data = (data,) if isinstance(data, Array) else tuple(data)
+        if isinstance(data, Array):
+            data = (data,)
+        else:
+            data = tuple(data)
+            if not all(isinstance(a, Array) for a in data):
+                raise TypeError("data must be an Array or a sequence of Arrays")
+
+        self.data = data
         self.positions = np.asarray(at).reshape(-1, len(shape))
         if len(self.data) != len(self.positions):
             raise ValueError("The number of arrays and positions must match")
+        if self.positions.dtype.kind != "i":
+            raise TypeError("Positions must be integers")
         if len(self.data) > 0:
             dtype = self.data[0].dtype
         elif dtype is None:

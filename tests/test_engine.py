@@ -512,3 +512,14 @@ def test_sparse(engine):
     assert all_close(sg[0:2, 5:8], a1)
     assert all_close(sg[3, 5:7], a2)
     assert all_close(sg[0, 0], 6)
+
+
+@pytest.mark.parametrize("engine", [numpy_engine])
+def test_sparse_incorrect_inputs(engine):
+    # incorrect array type
+    with pytest.raises(TypeError):
+        a = SparseArray([np.random.rand(2, 3)], at=[4, 3], shape=[10, 10])
+
+    # incorrect position
+    with pytest.raises(TypeError):
+        a = SparseArray([NumpyArray(np.random.rand(2, 3))], at=[4, 3.5], shape=[10, 10])

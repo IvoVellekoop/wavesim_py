@@ -1,3 +1,22 @@
+from . import create_medium
+from . import create_source
+from . import utilities
+from .create_medium import (
+    random_permittivity, 
+    sphere_permittivity, 
+    cuboids_permittivity
+)
+from .create_source import (
+    point_source,
+    plane_wave,
+    gaussian_beam,
+    source_angled,
+    expand_source_shape,
+    check_source_parameters,
+    polarization_
+)
+from .utilities import normalize
+
 from typing import Sequence
 
 import numpy as np
@@ -58,24 +77,6 @@ def add_absorbing_boundaries(
         lerp(edge, 1.0j * strength, profile, out=edge)
 
     return permittivity, tuple(slice(bw[0], -bw[1] if bw[1] > 0 else None) for bw in boundary_widths)
-
-
-def normalize(x: np.ndarray, min_val: float = None, max_val: float = None, a: float = 0, b: float = 1) -> float:
-    """Normalize x to the range [a, b]
-
-    :param x: Input array
-    :param min_val: Minimum value (of x)
-    :param max_val: Maximum value (of x)
-    :param a: Lower bound for normalization
-    :param b: Upper bound for normalization
-    :return: Normalized x
-    """
-    if min_val is None:
-        min_val = x.min()
-    if max_val is None:
-        max_val = x.max()
-    normalized_x = (x - min_val) / (max_val - min_val) * (b - a) + a
-    return normalized_x
 
 
 def laplace_kernel_1d(pixel_size: float, length: int) -> np.ndarray:

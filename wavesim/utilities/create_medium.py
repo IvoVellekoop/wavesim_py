@@ -5,7 +5,7 @@ from scipy.fft import fftn, ifftn, fftshift
 
 from wavesim.engine.index_utils import shape_like
 from wavesim.engine import Array
-from wavesim.utilities import normalize
+from .utilities import normalize
 
 
 def random_permittivity(shape: shape_like, pixel_size: float, seed = 0) -> Array:

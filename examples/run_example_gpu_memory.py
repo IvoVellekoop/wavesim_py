@@ -10,15 +10,11 @@ import cupy as cp
 import numpy as np
 from time import time
 
-import sys
-
-sys.path.append(".")
 from wavesim.engine import BlockArray, CupyArray, NumpyArray, SparseArray
 from wavesim.utilities.create_medium import random_permittivity
-from wavesim.utilities import add_absorbing_boundaries
+from wavesim.utilities import add_absorbing_boundaries, plot_computed
 from wavesim.helmholtzdomain import Helmholtz
 from wavesim.iteration import preconditioned_richardson
-from examples import plot_computed
 
 # Enable memory pool management
 pool = cp.get_default_memory_pool()

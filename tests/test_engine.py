@@ -31,7 +31,7 @@ from wavesim.engine import (
     matmul,
     CupyArray,
 )
-from . import all_close
+from wavesim.utilities import all_close
 
 
 def vector_generator(

@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from wavesim.helmholtzdomain import Helmholtz
-from tests import domain_operator, full_matrix
-from . import random_vector, random_permittivity, all_close
+from . import domain_operator, random_vector, random_permittivity
+from wavesim.utilities import all_close, full_matrix
 from wavesim.engine import add, subtract, BlockArray, clone, scale
 
 """ Performs checks on the operators represented as matrices (accretivity, norm)."""

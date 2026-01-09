@@ -9,12 +9,9 @@ import numpy as np
 from time import time
 from scipy.io import loadmat
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_source import gaussian_beam
 from wavesim.simulate import simulate
-from tests import relative_error
-from examples import plot_computed_and_reference
+from wavesim.utilities import relative_error, plot_computed_and_reference
 
 
 # Parameters

@@ -8,12 +8,10 @@ random refractive index map using the Helmholtz equation.
 import numpy as np
 from time import time
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_medium import random_permittivity
 from wavesim.utilities.create_source import point_source
 from wavesim.simulate import simulate
-from examples import plot_computed
+from wavesim.utilities import plot_computed
 
 # Parameters
 wavelength = 1.0  # Wavelength in micrometer (μm)

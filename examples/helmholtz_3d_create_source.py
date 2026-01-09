@@ -14,9 +14,8 @@ from time import time
 
 import sys
 sys.path.append(".")
-from wavesim.utilities import create_source
+from wavesim.utilities import create_source, plot_computed
 from wavesim.simulate import simulate
-from examples import plot_computed
 
 # Parameters
 wavelength = 1.0  # wavelength in micrometer (μm)

@@ -11,11 +11,8 @@ from time import time
 from scipy.io import loadmat
 from PIL.Image import fromarray, open, Resampling
 
-import sys
-sys.path.append(".")
 from wavesim.simulate import simulate
-from tests import all_close, relative_error
-from examples import plot_computed_and_reference
+from wavesim.utilities import relative_error, plot_computed_and_reference
 
 
 # Parameters

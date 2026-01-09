@@ -10,12 +10,9 @@ from time import time
 from scipy.io import loadmat
 from scipy.signal.windows import tukey
 
-import sys
-sys.path.append(".")
 from wavesim.simulate import simulate
 from wavesim.utilities.create_medium import sphere_permittivity
-from tests import relative_error
-from examples import plot_computed_and_reference
+from wavesim.utilities import relative_error, plot_computed_and_reference
 
 # Parameters
 wavelength = 1.0  # Wavelength in micrometer (μm)

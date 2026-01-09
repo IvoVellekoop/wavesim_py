@@ -5,12 +5,11 @@ from matplotlib import pyplot as plt
 
 from wavesim.engine import Array, scale, norm_squared, copy, add, SparseArray
 from wavesim.helmholtzdomain import Helmholtz
-from wavesim.utilities import add_absorbing_boundaries
+from wavesim.utilities import add_absorbing_boundaries, all_close, analytical_solution, relative_error
 from wavesim.utilities.create_source import point_source
 from wavesim.iteration import preconditioned_iteration, preconditioner, preconditioned_richardson
 from wavesim.simulate import simulate
-from tests import domain_operator, analytical_solution, relative_error
-from . import random_vector, all_close, random_permittivity
+from . import domain_operator, random_vector, random_permittivity
 
 """Tests to compare the result of Wavesim to analytical results"""
 

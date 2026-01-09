@@ -10,12 +10,10 @@ from cupy import asnumpy
 from time import time
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_medium import random_permittivity
 from wavesim.utilities.create_source import point_source
 from wavesim.simulate import simulate
-from examples import plot_computed
+from wavesim.utilities import plot_computed
 
 
 def simulation_callback(domain, iteration, x, residual_norm, **kwargs):

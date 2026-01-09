@@ -9,12 +9,10 @@ permittivity, by solving Maxwell's equations.
 import numpy as np
 from time import time
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_source import gaussian_beam
 from wavesim.utilities.create_medium import cuboids_permittivity
 from wavesim.simulate import simulate
-from examples import plot_computed
+from wavesim.utilities import plot_computed
 
 # Parameters
 material_1 = 2.9277 + 3.8315j  # Iron

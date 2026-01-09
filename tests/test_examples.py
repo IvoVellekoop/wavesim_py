@@ -6,8 +6,7 @@ from PIL.Image import fromarray, open, Resampling
 
 from wavesim.utilities.create_source import point_source
 from wavesim.simulate import simulate
-from tests import relative_error
-from . import all_close
+from wavesim.utilities import relative_error, all_close
 
 """ Tests to compare the result of wavesim_py with that of wavesim (MATLAB) """
 

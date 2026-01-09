@@ -1,9 +1,7 @@
 import numpy as np
 import pytest
-from matplotlib import pyplot as plt
 
 from wavesim.engine import (
-    Array,
     NumpyArray,
     copy,
     empty_like,
@@ -16,8 +14,8 @@ from wavesim.engine import (
     clone,
 )
 from wavesim.helmholtzdomain import Helmholtz
-from wavesim.utilities import laplace_kernel_1d, diff_kernel_1d
-from . import all_close, random_vector, random_permittivity
+from wavesim.utilities import all_close, diff_kernel_1d, laplace_kernel_1d
+from . import random_vector, random_permittivity
 
 """ Performs a set of basic consistency checks for the Domain class and the HelmholtzBase multi-domain class. """
 

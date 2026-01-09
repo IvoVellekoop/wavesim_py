@@ -9,11 +9,9 @@ import numpy as np
 from time import time
 from scipy.io import loadmat
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_source import gaussian_beam
 from wavesim.simulate import simulate
-from examples import plot_computed
+from wavesim.utilities import plot_computed
 
 # Parameters
 wavelength = 1.  # Wavelength in micrometer (μm)

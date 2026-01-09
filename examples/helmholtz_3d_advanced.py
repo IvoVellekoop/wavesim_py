@@ -11,11 +11,8 @@ The example also defines and used a simulation_callback.
 import numpy as np
 from time import time
 
-import sys
-sys.path.append(".")
-from wavesim.utilities import create_medium, create_source
+from wavesim.utilities import create_medium, create_source, plot_computed
 from wavesim.simulate import simulate
-from examples import plot_computed
 
 #indicative materials. Optical refractive index at 1 μm (unless otherwise specified)
 material_ITO = np.complex64(1.3061 + 0.012939j) # In2O3-SnO2 (Indium tin oxide, ITO)

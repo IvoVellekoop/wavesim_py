@@ -4,8 +4,8 @@ from random import choice
 
 from wavesim.engine import combine, edges, pad, NumpyArray, shape_like, BlockArray, block_edges
 from wavesim.utilities.create_source import point_source, gaussian_beam, plane_wave
-from wavesim.utilities import add_absorbing_boundaries, create_source
-from . import all_close, random_permittivity, random_vector
+from wavesim.utilities import add_absorbing_boundaries, all_close, create_source
+from . import random_vector
 
 """Test of the utility functions."""
 

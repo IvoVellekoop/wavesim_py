@@ -9,12 +9,10 @@ permittivity, by solving the Helmholtz equation.
 import numpy as np
 from time import time
 
-import sys
-sys.path.append(".")
 from wavesim.utilities.create_source import point_source
 from wavesim.utilities.create_medium import cuboids_permittivity
 from wavesim.simulate import simulate
-from examples import plot_computed
+from wavesim.utilities import plot_computed
 
 #indicative materials. Optical refractive index at 1 μm (unless otherwise specified)
 material_1 = 3.5750 + 0.00049020j  # Silicon

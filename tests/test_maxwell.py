@@ -9,7 +9,7 @@ from scipy.signal.windows import tukey
 from wavesim.utilities.create_medium import sphere_permittivity
 from wavesim.utilities.create_source import gaussian_beam
 from wavesim.simulate import simulate
-from . import relative_error_check
+from wavesim.utilities import relative_error_check
 
 """Tests to compare the results of wavesim_py Maxwell with that of wavesim (MATLAB)"""
 script_dir = Path(__file__).parent

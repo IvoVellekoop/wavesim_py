@@ -25,7 +25,7 @@ project = "wavesim"
 copyright = "2024, Ivo Vellekoop, and Swapnil Mache, University of Twente"
 # author = "Swapnil Mache, Ivo M. Vellekoop"
 release = "0.2.0a1"
-html_title = "Wavesim - A Python package for wave propagation simulation"
+html_title = "WaveSim - A Python package for wave propagation simulation"
 
 # -- latex configuration -----------------------------------------------------
 latex_elements = {
@@ -47,7 +47,7 @@ latex_elements = {
                 is limited by the working memory of a single computer or graphics processing unit (GPU). 
                 Through this package, we present a domain decomposition method that removes this limitation. We 
                 decompose large problems over subdomains while maintaining the accuracy, memory efficiency, and guaranteed monotonic convergence of the method. With this work, we have been able to obtain a 
-                factor of $1.93$ increase in size over the single-domain MBS simulations without domain decomposition through a 3D simulation using 2 GPUs. For the Helmholtz problem, we solved a complex structure of size $315 \times 315 \times 315$ wavelengths in just 1.4 hours on a dual-GPU system.
+                factor of $1.95$ increase in size over the single-domain MBS simulations without domain decomposition through a 3D simulation using 2 GPUs. For the Helmholtz problem, we solved a complex structure of size $320 \times 320 \times 320$ wavelengths in just 45 minutes on a dual-GPU system.
             }
         }
         \maketitle
@@ -64,7 +64,7 @@ latex_docclass = {
 }
 latex_documents = [("index_latex",
                     "wavesim.tex",
-                    "Wavesim - A Python package for wave propagation simulation",
+                    "WaveSim - A Python package for wave propagation simulation",
                     "",
                     "howto",)]
 latex_toplevel_sectioning = "section"

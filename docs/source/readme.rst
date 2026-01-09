@@ -1,6 +1,6 @@
 .. _root_label:
 
-Wavesim
+WaveSim
 =====================================
 
 ..
@@ -13,24 +13,24 @@ Wavesim
        :alt: Documentation Status
 
 
-What is Wavesim?
+What is WaveSim?
 ----------------------------------------------
 
-Wavesim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method :cite:`yee1966numerical, taflove1995computational, oskooi2010meep, nabavi2007new`, Wavesim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  :cite:`osnabrugge2016convergent, vettenburg2023universal`.
+WaveSim is a tool to simulate the propagation of waves in complex, inhomogeneous structures. Whereas most available solvers use the popular finite difference time domain (FDTD) method :cite:`yee1966numerical, taflove1995computational, oskooi2010meep, nabavi2007new`, WaveSim is based on the modified Born series (MBS) approach, which has lower memory requirements, no numerical dispersion, and is faster as compared to FDTD  :cite:`osnabrugge2016convergent, vettenburg2023universal`.
 
-This package :cite:`wavesim_py` is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition :cite:`mache2024domain`, and time-harmonic Maxwell's equations for non-magnetic and non-birefringent materials. With this new framework, we simulated a complex 3D structure of a remarkable :math:`315\times 315\times 315` wavelengths :math:`\left( 3.1\cdot 10^7 \right)` in size in just :math:`1.4` hours by solving over two GPUs. This represents a factor of :math:`1.93` increase over the largest possible simulation on a single GPU without domain decomposition. 
+This package :cite:`wavesim_py` is a Python implementation of the MBS approach for solving the Helmholtz equation in arbitrarily large media through domain decomposition :cite:`mache2025domain`, and time-harmonic Maxwell's equations for non-magnetic and non-birefringent materials. With this new framework, we simulated a complex 3D structure of a remarkable :math:`320\times 320\times 320` wavelengths :math:`\left( 3.28\cdot 10^7 \right)` in size in just :math:`45` minutes by solving over two GPUs. This represents a factor of :math:`1.95` increase over the largest possible simulation on a single GPU without domain decomposition. 
 
-When using Wavesim in your work, please cite:
+When using WaveSim in your work, please cite:
 
     :cite:`osnabrugge2016convergent` |osnabrugge2016|_
 
-    :cite:`mache2024domain` |mache2024|_
+    :cite:`mache2025domain` |mache2025|_
     
 .. _osnabrugge2016: https://doi.org/10.1016/j.jcp.2016.06.034
-.. |osnabrugge2016| replace:: Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of computational physics, 322*\ , 113-124.
+.. |osnabrugge2016| replace:: Osnabrugge, G., Leedumrongwatthanakun, S., & Vellekoop, I. M. (2016). A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media. *Journal of Computational Physics, 322*\ , 113-124.
 
-.. _mache2024: https://arxiv.org/abs/2410.02395
-.. |mache2024| replace:: Mache, S., & Vellekoop, I. M. (2024). Domain decomposition of the modified Born series approach for large-scale wave propagation simulations. *arXiv preprint arXiv:2410.02395*.
+.. _mache2025: https://doi.org/10.1016/j.jcp.2025.114619
+.. |mache2025| replace:: Mache, S., & Vellekoop, I. M. (2025). Domain decomposition of the modified Born series approach for large-scale wave propagation simulations. *Journal of Computational Physics*\ , 114619.
 
 If you use the code in your research, please cite this repository as well :cite:`wavesim_py`.
 
@@ -39,7 +39,7 @@ Examples and documentation for this project are available at `Read the Docs <htt
 Installation
 ----------------------------------------------
 
-Wavesim requires `Python 3.11.0 and above <https://www.python.org/downloads/>`_ and uses `CuPy <https://cupy.dev/>`_ for GPU acceleration.
+WaveSim requires `Python 3.11.0 and above <https://www.python.org/downloads/>`_ and uses `CuPy <https://cupy.dev/>`_ for GPU acceleration.
 
 First, clone the repository and navigate to the directory::
 

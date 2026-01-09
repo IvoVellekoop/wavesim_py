@@ -3,7 +3,7 @@
 API Layers
 ==========
 
-The Wavesim package is organized in several layers, each of which is responsible for a specific aspect of the simulation. The layers are designed to be modular and extensible, so that users can easily add new functionality or modify existing functionality. The layers are organized in a hierarchical structure, with each layer building on the functionality provided by the layers below it. The layers are as follows:
+The WaveSim package is organized in several layers, each of which is responsible for a specific aspect of the simulation. The layers are designed to be modular and extensible, so that users can easily add new functionality or modify existing functionality. The layers are organized in a hierarchical structure, with each layer building on the functionality provided by the layers below it. The layers are as follows:
 
 1. **The engine layer.** This layer is responsible for the low-level computational operations, such as addition, multiplication, Fourier transforms, etc. The key class is the ``Array``, which is an abstract representation of a multi-dimensional array of numbers. There are different backends that implement the functionality of the ``Array`` class, currently CuPy, and Numpy/Numba. ``Array`` provides a level of abstraction that allows working with blocked arrays, sparse arrays, etc. without changing the code that uses the arrays. Future plans include adding support for distributed arrays, arrays that are evaluated lazily from geometrical data, and arrays that implement indexed or compressed data storage. All data in WaveSim is passed around as ``Array`` objects.
 

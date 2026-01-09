@@ -24,6 +24,20 @@
     doiprefix = {10.48550/arXiv.2410.02395}
 }
 
+@article{mache2025domain,
+    author = {Swapnil Mache and Ivo M. Vellekoop},
+    title = {Domain decomposition of the modified Born series approach for large-scale wave propagation simulations},
+    journal = {Journal of Computational Physics},
+    year = {2025},
+    pages = {114619},
+    issn = {0021-9991},
+    publisher={Elsevier},
+    doi = {https://doi.org/10.1016/j.jcp.2025.114619},
+    url = {https://www.sciencedirect.com/science/article/pii/S0021999125009015},
+    keywords = {Helmholtz equation, Born series, Domain decomposition},
+    abstract = {The modified Born series (MBS) is a fast and accurate method for simulating wave propagation in complex structures. In the current implementation of the MBS, the simulation size is limited by the working memory of a single computer or graphics processing unit (GPU). Here, we present a domain decomposition method that enhances the scalability of the MBS by distributing the computations over multiple GPUs, while maintaining its accuracy, memory efficiency, and guaranteed monotonic convergence. With this new method, the computations can be performed in parallel, and a larger simulation size is possible as it is no longer limited to the memory size of a single computer or GPU. We show how to decompose large problems over subdomains and demonstrate our approach by solving the Helmholtz problem for a complex structure of 3.28 · 107 cubic wavelengths (320 × 320 × 320 wavelengths) in just 45 minutes with a dual-GPU simulation.}
+}
+
 @misc{MiKTeX,
     title = {{MikTeX: An Up-to-Date Implementation of TeX/LaTeX and Related Programs}},
     url = {https://miktex.org/},
@@ -89,7 +103,7 @@
     url = {https://python-poetry.org/},
 }
 
-@misc{readthedocs_Wavesim,
+@misc{readthedocs_WaveSim,
     author = {Ivo M. Vellekoop},
     title = {{W}avesim | {R}ead the {D}ocs},
     url = {https://readthedocs.org/projects/wavesim/},
@@ -131,13 +145,13 @@
 }
 
 @misc{wavesim_documentation,
-    title = {Wavesim documentation},
+    title = {WaveSim documentation},
     url = {https://wavesim.readthedocs.io/en/latest/},
 }
 
 @misc{wavesim_py,
     author = {Swapnil Mache and Ivo M. Vellekoop},
-    title = {Wavesim - A Python package for wave propagation simulation},
+    title = {WaveSim - A Python package for wave propagation simulation},
     url = {https://github.com/IvoVellekoop/wavesim_py}
 }
 

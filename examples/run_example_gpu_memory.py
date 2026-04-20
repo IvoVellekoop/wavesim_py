@@ -57,6 +57,7 @@ memory_after_domain = pool.total_bytes() / 1024**3
 free_memory_after_domain = pool.free_bytes() / 1024**3
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = preconditioned_richardson(domain, source, max_iterations=2000)
 sim_time = time() - start

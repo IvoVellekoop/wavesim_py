@@ -1,11 +1,10 @@
-
 """
 Helmholtz 3D example to demonstrate utilities.create_source
 ===========================================================
-This example simulates the propagation of a wave through a 3D medium 
-with an interface of two media with different refractive indices, and 
-can be simulated with one of the three primitive sources available as 
-functions in utilities.create_source: point_source, plane_wave, or 
+This example simulates the propagation of a wave through a 3D medium
+with an interface of two media with different refractive indices, and
+can be simulated with one of the three primitive sources available as
+functions in utilities.create_source: point_source, plane_wave, or
 gaussian_beam.
 """
 
@@ -13,6 +12,7 @@ import numpy as np
 from time import time
 
 import sys
+
 sys.path.append(".")
 from wavesim.utilities import create_source, plot_computed
 from wavesim.simulate import simulate
@@ -25,9 +25,11 @@ pixel_size = wavelength / 8  # Pixel size in micrometer (μm)
 sim_size = np.array([10, 8, 5])
 n_size = (sim_size / pixel_size).astype(int)  # Size of the simulation domain in pixels
 refractive_index = np.ones(n_size, dtype=np.complex64)  # background refractive index of 1
-refractive_index[:, refractive_index.shape[1] // 2:, :] = 2.0  # medium with refractive index of 2 in the lower half of the domain
+refractive_index[:, refractive_index.shape[1] // 2 :, :] = (
+    2.0  # medium with refractive index of 2 in the lower half of the domain
+)
 
-# Generate source term (values and position) using one of the three create_source utility primitive sources. 
+# Generate source term (values and position) using one of the three create_source utility primitive sources.
 # Uncomment one of the sources below to use in the simulation
 
 # # Option 1: Create a point source
@@ -52,10 +54,10 @@ refractive_index[:, refractive_index.shape[1] // 2:, :] = 2.0  # medium with ref
 
 # Option 3: Create a plane wave source with Gaussian intensity profile with incident angles theta and phi
 source_values, source_position = create_source.gaussian_beam(
-    shape=(sim_size[0]//2, sim_size[2]),  # source shape in micrometer (μm)
-    origin='topleft',  # source position is defined with respect to this origin
+    shape=(sim_size[0] // 2, sim_size[2]),  # source shape in micrometer (μm)
+    origin="topleft",  # source position is defined with respect to this origin
     position=[0, 0, 0],  # source top left position in (x, y, z) in micrometer (μm)
-    source_plane='xz',  # The string is always sorted by alphabetical order, so 'xz' and 'zx' are both recognized as 'xz'.
+    source_plane="xz",  # The string is always sorted by alphabetical order, so 'xz' and 'zx' are both recognized as 'xz'.
     pixel_size=pixel_size,
     amplitude=np.complex64(2.0, 0.0),
     theta=np.pi / 4,  # angle of incidence of the source with respect to the source axis in radians
@@ -65,14 +67,15 @@ source_values, source_position = create_source.gaussian_beam(
 )
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = simulate(
-    permittivity=refractive_index**2, 
-    sources=[ (source_values, source_position) ], 
-    wavelength=wavelength, 
-    pixel_size=pixel_size, 
-    boundary_width=10,  # Boundary width in micrometer (μm) 
-    periodic=(False, False, False)
+    permittivity=refractive_index**2,
+    sources=[(source_values, source_position)],
+    wavelength=wavelength,
+    pixel_size=pixel_size,
+    boundary_width=10,  # Boundary width in micrometer (μm)
+    periodic=(False, False, False),
 )
 sim_time = time() - start
 print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")

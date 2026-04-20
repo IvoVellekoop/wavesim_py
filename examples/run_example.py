@@ -1,7 +1,7 @@
 """
 Run Helmholtz example
 =====================
-Example script to run a simulation of a point source in a 
+Example script to run a simulation of a point source in a
 random refractive index map using the Helmholtz equation.
 """
 
@@ -27,20 +27,21 @@ permittivity = random_permittivity(sim_size, pixel_size)
 
 # Create a point source at the center of the domain
 source_values, source_position = point_source(
-    position=sim_size//2,  # source center position in the center of the domain in micrometer (μm)
-    pixel_size=pixel_size
+    position=sim_size // 2,  # source center position in the center of the domain in micrometer (μm)
+    pixel_size=pixel_size,
 )
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = simulate(
-    permittivity=permittivity, 
-    sources=[ (source_values, source_position) ], 
-    wavelength=wavelength, 
-    pixel_size=pixel_size, 
-    periodic=periodic, 
-    boundary_width=boundary_width, 
-    n_domains=None
+    permittivity=permittivity,
+    sources=[(source_values, source_position)],
+    wavelength=wavelength,
+    pixel_size=pixel_size,
+    periodic=periodic,
+    boundary_width=boundary_width,
+    n_domains=None,
 )
 sim_time = time() - start
 print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")

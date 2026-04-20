@@ -1,7 +1,7 @@
 """
 Helmholtz 1D analytical test
 ============================
-Test to compare the result of Wavesim to analytical results. 
+Test to compare the result of Wavesim to analytical results.
 Compare 1D free-space propagation with analytic solution.
 """
 
@@ -23,19 +23,20 @@ permittivity = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive i
 
 # Create a point source at the center of the domain
 source_values, source_position = point_source(
-    position=[sim_size//2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
-    pixel_size=pixel_size
+    position=[sim_size // 2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
+    pixel_size=pixel_size,
 )
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = simulate(
-    permittivity=permittivity, 
-    sources=[ (source_values, source_position) ], 
-    wavelength=wavelength, 
-    pixel_size=pixel_size, 
-    boundary_width=5,  # Boundary width in micrometer (μm) 
-    periodic=(False, True, True)  # Periodic boundary conditions in the y and z directions
+    permittivity=permittivity,
+    sources=[(source_values, source_position)],
+    wavelength=wavelength,
+    pixel_size=pixel_size,
+    boundary_width=5,  # Boundary width in micrometer (μm)
+    periodic=(False, True, True),  # Periodic boundary conditions in the y and z directions
 )
 sim_time = time() - start
 print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")

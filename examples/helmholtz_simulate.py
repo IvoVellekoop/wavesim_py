@@ -1,7 +1,7 @@
-""" 
+"""
 Helmholtz simulate
 ====================
-This example demonstrates all the arguments of the simulate wrapper 
+This example demonstrates all the arguments of the simulate wrapper
 function through an example solving the Helmholtz equation.
 """
 
@@ -51,28 +51,26 @@ sim_size = np.array([8, 5, 10])  # Simulation size in micrometer (μm)
 permittivity = random_permittivity(sim_size, pixel_size, seed=42)
 
 # Create a point source at the center of the domain
-source_values, source_position = point_source(
-    position=sim_size//2,
-    pixel_size=pixel_size
-)
+source_values, source_position = point_source(position=sim_size // 2, pixel_size=pixel_size)
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = simulate(
-    permittivity=permittivity, 
-    sources=[ (source_values, source_position) ], 
-    wavelength=wavelength, 
-    pixel_size=pixel_size, 
-    boundary_width=5,  # Boundary width in micrometer (μm) 
-    periodic=(False, False, False), 
+    permittivity=permittivity,
+    sources=[(source_values, source_position)],
+    wavelength=wavelength,
+    pixel_size=pixel_size,
+    boundary_width=5,  # Boundary width in micrometer (μm)
+    periodic=(False, False, False),
     use_gpu=True,
     n_domains=[1, 1, 3],
     max_iterations=1000,
-    threshold=1.e-7,  # tolerance for convergence. Default is 1.0e-6.
+    threshold=1.0e-7,  # tolerance for convergence. Default is 1.0e-6.
     alpha=0.9,  # relaxation factor for the preconditioned Richardson method. Default is 0.75.
     full_residuals=True,  # if true return full residuals, and if False, return only the final residual norm. Default is False.
     crop_boundaries=False,  # if true crop the boundaries of the field to remove the absorbing boundaries. Default is True.
-    callback=simulation_callback
+    callback=simulation_callback,
 )
 sim_time = time() - start
 print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")
@@ -82,7 +80,7 @@ print(f"(Residual norm {residual_norm[-1]:.2e})")
 plot_computed(u, pixel_size)
 
 # Plot the residual norm with iterations
-plt.semilogy(np.arange(1, iterations+1), [asnumpy(r) for r in residual_norm])
-plt.xlabel('Iterations')
-plt.ylabel('Residual norm')
+plt.semilogy(np.arange(1, iterations + 1), [asnumpy(r) for r in residual_norm])
+plt.xlabel("Iterations")
+plt.ylabel("Residual norm")
 plt.show()

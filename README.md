@@ -39,6 +39,8 @@ Then, you can install the dependencies in a couple of ways:
 
 [3. Using Poetry](#poetry-installation)
 
+[4. Using uv](#uv-installation)
+
 We recommend working with a virtual environment to avoid conflicts with other packages.
 
 <a id="pip-installation"></a>
@@ -107,6 +109,14 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
    poetry install --with dev
    ```
 3. [Activate](https://python-poetry.org/docs/managing-environments/#activating-the-environment) the virtual environment created by Poetry.
+
+### 4.**Using uv**
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+2. Create virtual environment and install dependencies. Note, the option `--extra dev` installs packages that are only needed for running the
+   examples and tests, not for WaveSim itself.
+   ```default
+   uv sync --extra dev 
+   ```
 
 ## Running the code
 

@@ -13,7 +13,6 @@ For `uv`
 
     git clone https://github.com/IvoVellekoop/wavesim_py
     cd wavesim_py
-    uv venv
     uv sync --all-extras
     uv run pytest tests
 
@@ -44,7 +43,10 @@ Note that for building the pdf version of the documentation, you need to have ``
     make clean
     make html
     make markdown
-    tex
+    make latex
+    cd _build/latex
+    xelatex wavesim
+    xelatex wavesim
 
 
 Reporting bugs and contributing

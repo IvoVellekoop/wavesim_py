@@ -39,8 +39,6 @@ Then, you can install the dependencies in a couple of ways:
 
 [3. Using Poetry](#poetry-installation)
 
-[4. Using uv](#uv-installation)
-
 We recommend working with a virtual environment to avoid conflicts with other packages.
 
 <a id="pip-installation"></a>
@@ -110,14 +108,6 @@ We recommend using [Miniconda](https://docs.anaconda.com/miniconda/) (a much lig
    ```
 3. [Activate](https://python-poetry.org/docs/managing-environments/#activating-the-environment) the virtual environment created by Poetry.
 
-### 4.**Using uv**
-1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
-2. Create virtual environment and install dependencies. Note, the option `--extra dev` installs packages that are only needed for running the
-   examples and tests, not for WaveSim itself.
-   ```default
-   uv sync --extra dev 
-   ```
-
 ## Running the code
 
 Once the virtual environment is set up with all the required packages, you are ready to run the code. You can go through any of the scripts in the `examples` [directory](https://github.com/IvoVellekoop/wavesim_py/tree/main/examples) for the basic steps needed to run a simulation. The directory contains examples of 1D, 2D, and 3D problems, for the Helmholtz equation and Maxwell’s equations for non-magnetic and non-birefringent materials.
@@ -136,7 +126,7 @@ You can run the code with just four inputs to the `simulate` function:
 """
 Helmholtz 1D analytical test
 ============================
-Test to compare the result of Wavesim to analytical results. 
+Test to compare the result of Wavesim to analytical results.
 Compare 1D free-space propagation with analytic solution.
 """
 
@@ -158,19 +148,20 @@ permittivity = np.ones(n_size, dtype=np.complex64)  # permittivity (refractive i
 
 # Create a point source at the center of the domain
 source_values, source_position = point_source(
-    position=[sim_size//2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
-    pixel_size=pixel_size
+    position=[sim_size // 2, 0, 0],  # source center position in the center of the domain in micrometer (μm)
+    pixel_size=pixel_size,
 )
 
 # Run the wavesim iteration and get the computed field
+print("Running simulation...")
 start = time()
 u, iterations, residual_norm = simulate(
-    permittivity=permittivity, 
-    sources=[ (source_values, source_position) ], 
-    wavelength=wavelength, 
-    pixel_size=pixel_size, 
-    boundary_width=5,  # Boundary width in micrometer (μm) 
-    periodic=(False, True, True)  # Periodic boundary conditions in the y and z directions
+    permittivity=permittivity,
+    sources=[(source_values, source_position)],
+    wavelength=wavelength,
+    pixel_size=pixel_size,
+    boundary_width=5,  # Boundary width in micrometer (μm)
+    periodic=(False, True, True),  # Periodic boundary conditions in the y and z directions
 )
 sim_time = time() - start
 print(f"Time {sim_time:2.2f} s; Iterations {iterations}; Time per iteration {sim_time / iterations:.4f} s")
